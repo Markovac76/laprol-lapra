@@ -136,6 +136,53 @@
   .empty-state{text-align:center;color:var(--muted);padding:40px 16px;font-size:14px}
   .loading{text-align:center;color:var(--muted);padding:60px 16px;font-size:15px}
   footer{color:var(--faint);font-size:11.5px;text-align:center;padding:8px 0 26px}
+
+  /* --- Karbantartó eszköztár --- */
+  .admbar{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+  .admbar button{flex:1 1 auto;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    border-radius:11px;padding:10px 8px;font-size:12.5px;font-weight:600;cursor:pointer;min-width:0}
+  .admbar button:active{transform:scale(.97)}
+  .iconbtn.on{background:var(--accent);color:#fff;border-color:transparent}
+  @media (max-width:719px){ .desktop-only{display:none!important} }
+  .rowedit{border:1px solid var(--line);background:var(--panel-2);color:var(--muted);border-radius:10px;
+    width:34px;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;align-self:stretch;font-size:14px}
+
+  /* --- Modál --- */
+  .modal{position:fixed;inset:0;z-index:60;background:rgba(5,7,15,.72);display:none;align-items:flex-end;justify-content:center}
+  .modal.open{display:flex}
+  .sheet{width:100%;max-width:560px;background:var(--panel);border:1px solid var(--line);
+    border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:92dvh;overflow:auto}
+  @media(min-width:560px){.modal{align-items:center}.sheet{border-radius:20px}}
+  .sheet h2{font-family:"Space Grotesk";font-size:18px;margin:0 0 4px}
+  .sheet .msub{color:var(--faint);font-size:12.5px;margin:0 0 14px}
+  .sheet .field select,.sheet .field textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:11px;color:var(--ink);padding:11px;font-size:15px;font-family:inherit}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .swatches{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .swatch{width:30px;height:30px;border-radius:8px;border:2px solid transparent;cursor:pointer}
+  .swatch[aria-pressed="true"]{border-color:#fff}
+  .compchecks{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .compcheck{border:1px solid var(--line);background:var(--panel-2);color:var(--muted);border-radius:999px;
+    padding:8px 13px;font-size:13px;font-weight:600;cursor:pointer}
+  .compcheck[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:transparent}
+  .compedit{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px;background:var(--panel-2)}
+  .compedit h4{margin:0 0 2px;font-size:13px;color:var(--accent);filter:brightness(1.3)}
+  .compedit .kod{font-size:10.5px;color:var(--faint);font-family:ui-monospace,monospace;margin-bottom:8px}
+  .statrow{display:flex;gap:6px;margin-top:4px}
+  .statrow button{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--muted);
+    border-radius:9px;padding:9px 4px;font-size:12px;font-weight:600;cursor:pointer}
+  .statrow button[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:transparent}
+  .modrow{display:flex;gap:8px;margin-top:16px}.modrow .btn{flex:1}
+  .btn.danger{background:transparent;color:#f3b6b6;border:1px solid #6b3a3a}
+  .example{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;
+    font-size:11.5px;color:var(--muted);white-space:pre-wrap;font-family:ui-monospace,monospace;margin-top:6px}
+  .listgrp{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:var(--panel-2)}
+  .listgrp h4{margin:0 0 6px;font-size:13px;color:var(--ink)}
+  .listgrp .vals{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+  .listgrp .val{font-size:11.5px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 9px;color:var(--muted)}
+  .addrow{display:flex;gap:6px}
+  .addrow input{flex:1}
+  .addrow button{border:1px solid var(--line);background:var(--accent);color:#fff;border-radius:9px;padding:0 14px;font-weight:700;cursor:pointer}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
   @media (max-width:380px){.stats{grid-template-columns:1fr}}
 </style>
@@ -159,12 +206,22 @@
   <header class="top"><div class="wrap">
     <div class="brand">
       <h1 class="display">Lapról Lapra</h1>
+      <button class="iconbtn" id="admToggle" title="Karbantartás" aria-pressed="false">🔧</button>
       <button class="iconbtn" id="logout" title="Kijelentkezés">⎋</button>
     </div>
     <div class="tabs" id="tabs" role="tablist"></div>
   </div></header>
   <main class="wrap">
     <section class="hero" id="hero"></section>
+    <div class="admbar" id="admbar" style="display:none">
+      <button id="a-item">+ Új tétel</button>
+      <button id="a-editseries">✎ Sorozat</button>
+      <button id="a-series">+ Új sorozat</button>
+      <button id="a-lists">☰ Listák</button>
+      <button id="a-template" class="desktop-only">⬇ Sablon</button>
+      <button id="a-upload" class="desktop-only">⬆ Excel</button>
+    </div>
+    <input type="file" id="upl" accept=".xlsx,.xls,.csv" style="display:none">
     <div class="controls">
       <input class="search" id="search" type="search" placeholder="Keresés név vagy szám szerint…">
       <div class="chips" id="chips" role="group"></div>
@@ -174,6 +231,8 @@
   </main>
   <footer class="wrap">Adatok: a te privát Supabase-adatbázisodból · telefon–gép szinkron.</footer>
 </div>
+
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
@@ -190,7 +249,9 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 /* ---- állapot ---- */
-let SERIES=[], activeIdx=0, filter="mind", query="";
+let SERIES=[], activeIdx=0, filter="mind", query="", adminMode=false, LISTS={};
+const PAL12=["#3a6ea5","#d21f2b","#7b52b8","#2e9e8f","#c9772e","#c94f9e","#4f7bd2","#e0a13a","#6bbf59","#b0504d","#3aa6b9","#8a7dd6"];
+const DISPLAY_MAX=16;
 const COMP_TYPES={magazin:"Magazin",modell:"Modell",konyv:"Könyv",egyeb:"Egyéb"};
 const PAL_FALLBACK="#3a6ea5";
 const HU_MON=["jan.","febr.","márc.","ápr.","máj.","jún.","júl.","aug.","szept.","okt.","nov.","dec."];
@@ -204,16 +265,19 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 /* ---- adatok betöltése a Supabase-ből ---- */
 async function loadData(){
   document.getElementById("list").innerHTML=`<div class="loading">Adatok betöltése…</div>`;
-  const [s,i,c]=await Promise.all([
+  const [s,i,c,l]=await Promise.all([
     supabase.from("series").select("*").order("sort_order"),
     supabase.from("issues").select("*"),
     supabase.from("components").select("*"),
+    supabase.from("lists").select("*").order("sort_order"),
   ]);
   if(s.error||i.error||c.error){ throw (s.error||i.error||c.error); }
+  LISTS={};
+  if(!l.error && l.data) l.data.forEach(r=>{ (LISTS[r.tipus]=LISTS[r.tipus]||[]).push({ertek:r.ertek,nev:r.megjelenites||r.ertek}); });
   const byS={}, byI={};
   SERIES = s.data.map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],items:[]}; byS[r.id]=o; return o; });
-  i.data.forEach(r=>{ const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,fedelar:r.fedelar,fizetve:r.beszerzesi_ar,fizetve_datum:r.beszerzes_datuma,comps:{}}; byI[r.id]=o; const ser=byS[r.series_id]; if(ser) ser.items.push(o); });
-  c.data.forEach(r=>{ const it=byI[r.issue_id]; if(it) it.comps[r.tipus]={id:r.id,status:r.status,azonosito:r.azonosito,note:r.jegyzet,kep_url:r.kep_url}; });
+  i.data.forEach(r=>{ const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,fedelar:r.fedelar,fizetve:r.beszerzesi_ar,fizetve_datum:r.beszerzes_datuma,forras:r.forras,comps:{}}; byI[r.id]=o; const ser=byS[r.series_id]; if(ser) ser.items.push(o); });
+  c.data.forEach(r=>{ const it=byI[r.issue_id]; if(it) it.comps[r.tipus]={id:r.id,status:r.status,azonosito:r.azonosito,azonosito_tipus:r.azonosito_tipus,note:r.jegyzet,kep_url:r.kep_url}; });
   SERIES.forEach(x=>x.items.sort((a,b)=>a.n-b.n));
   if(activeIdx>=SERIES.length) activeIdx=0;
 }
@@ -347,6 +411,7 @@ function renderList(){
         <div class="imeta">${dateHtml}${money?`<span class="money">${money}</span>`:""}<span class="cid">${scode}-${pad(it.n,4)}</span></div>
       </div>
       <div class="marks">${marks}
+        ${adminMode?`<button class="rowedit" data-edit="${it.n}" title="Szerkesztés">✎</button>`:""}
         <button class="expander" data-exp="${it.n}" aria-expanded="${open}" aria-label="Képek">${CHEV}</button>
       </div>
     </div>${panel}</div>`;
@@ -367,6 +432,8 @@ document.getElementById("search").addEventListener("input",e=>{query=e.target.va
 document.getElementById("list").addEventListener("click",async e=>{
   const exp=e.target.closest(".expander");
   if(exp){ const n=+exp.dataset.exp; openIssue=(openIssue===n)?null:n; renderList(); return; }
+  const ed=e.target.closest("[data-edit]");
+  if(ed){ const it=S().items.find(x=>x.n===+ed.dataset.edit); if(it) itemForm(it); return; }
   const mk=e.target.closest(".mark"); if(!mk||mk.disabled) return;
   const it=S().items.find(x=>x.n===+mk.dataset.n); const t=mk.dataset.t;
   const comp=it.comps[t]; if(!comp||!comp.id) return;
@@ -376,6 +443,248 @@ document.getElementById("list").addEventListener("click",async e=>{
   const {error}=await supabase.from("components").update({status:next}).eq("id",comp.id);
   if(error){ comp.status=prev; renderAll(); alert("Mentés sikertelen: "+error.message); }
 });
+
+/* ============================================================
+   KARBANTARTÁS (5b)
+   ============================================================ */
+const modal=document.getElementById("modal"), sheet=document.getElementById("sheet");
+function openModal(html){ sheet.innerHTML=html; modal.classList.add("open"); }
+function closeModal(){ modal.classList.remove("open"); }
+window.closeModal=closeModal;
+modal.addEventListener("click",e=>{ if(e.target===modal) closeModal(); });
+function opts(tipus,sel){ return (LISTS[tipus]||[]).map(o=>`<option value="${esc(o.ertek)}"${o.ertek===sel?" selected":""}>${esc(o.nev)}</option>`).join(""); }
+function listName(tipus,ertek){ const o=(LISTS[tipus]||[]).find(x=>x.ertek===ertek); return o?o.nev:(ertek||""); }
+function err(e){ alert("Hiba: "+(e.message||e)); }
+
+/* ---- Tétel szerkesztése / új tétel ---- */
+function itemForm(existing){
+  const s=S();
+  const nextN = existing ? existing.n : (s.items.reduce((m,x)=>Math.max(m,x.n||0),0)+1);
+  const it = existing || {n:nextN,name:"",date:"",fedelar:"",fizetve:"",fizetve_datum:"",forras:"",comps:{}};
+  const scode=pad(activeIdx+1,3);
+  const compBlocks = s.components.map((t,ci)=>{
+    const c=it.comps[t]||{};
+    const st=c.status||null;
+    return `<div class="compedit">
+      <h4>${COMP_TYPES[t]||t}</h4>
+      <div class="kod">${scode}-${pad(it.n||nextN,4)}-${pad(ci+1,2)}</div>
+      <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Státusz</label>
+      <div class="statrow" data-stat="${t}">
+        <button type="button" data-v="megvan" aria-pressed="${st==="megvan"}">megvan</button>
+        <button type="button" data-v="hianyzik" aria-pressed="${st==="hianyzik"}">hiány</button>
+        <button type="button" data-v="nemkell" aria-pressed="${st==="nemkell"}">nem kell</button>
+        <button type="button" data-v="" aria-pressed="${!st}">törlés</button>
+      </div>
+      <div class="grid2" style="margin-top:8px">
+        <div class="field"><label>Azonosító típusa</label>
+          <select id="ct-${t}"><option value="">—</option>${opts("azonosito",c.azonosito_tipus)}</select></div>
+        <div class="field"><label>Azonosító</label><input id="cid-${t}" value="${esc(c.azonosito||"")}"></div>
+      </div>
+      <div class="field"><label>Jegyzet</label><input id="cn-${t}" value="${esc(c.note||"")}"></div>
+    </div>`;
+  }).join("");
+
+  openModal(`<h2>${existing?"Tétel szerkesztése":"Új tétel"}</h2>
+    <p class="msub">${esc(s.sorozat)}</p>
+    <div class="grid2">
+      <div class="field"><label>Lapszám</label><input id="f-n" type="number" value="${it.n}"></div>
+      <div class="field"><label>Megjelenés dátuma</label><input id="f-date" type="date" value="${it.date||""}"></div>
+    </div>
+    <div class="field"><label>Cím</label><input id="f-name" value="${esc(it.name||"")}"></div>
+    <div class="grid2">
+      <div class="field"><label>Fedélár (Ft)</label><input id="f-fedelar" type="number" value="${it.fedelar??""}"></div>
+      <div class="field"><label>Beszerzési ár (Ft)</label><input id="f-fizetve" type="number" value="${it.fizetve??""}"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Beszerzés dátuma</label><input id="f-fdatum" type="date" value="${it.fizetve_datum||""}"></div>
+      <div class="field"><label>Beszerzés forrása</label><select id="f-forras"><option value="">—</option>${opts("forras",it.forras)}</select></div>
+    </div>
+    ${compBlocks}
+    <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="f-save">Mentés</button></div>
+    ${existing?`<div class="modrow"><button class="btn danger" id="f-del">Tétel törlése</button></div>`:""}`);
+
+  // státusz-gombok (itt lehet reset-elni)
+  sheet.querySelectorAll(".statrow").forEach(row=>{
+    row.addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return;
+      row.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
+  });
+
+  document.getElementById("f-save").onclick=async ()=>{
+    const v=id=>{const e=document.getElementById(id);return e?e.value.trim():"";};
+    const n=parseInt(v("f-n")); if(isNaN(n)){alert("A lapszám kötelező.");return;}
+    const payload={ lapszam:n, cim:v("f-name")||null, megjelenes:v("f-date")||null,
+      fedelar:v("f-fedelar")?parseInt(v("f-fedelar")):null,
+      beszerzesi_ar:v("f-fizetve")?parseInt(v("f-fizetve")):null,
+      beszerzes_datuma:v("f-fdatum")||null, forras:v("f-forras")||null };
+    try{
+      let issueId = existing ? existing.id : null;
+      if(existing){
+        const {error}=await supabase.from("issues").update(payload).eq("id",existing.id); if(error) throw error;
+      } else {
+        const {data,error}=await supabase.from("issues").insert({...payload, series_id:s.id}).select().single();
+        if(error) throw error; issueId=data.id;
+      }
+      for(let ci=0; ci<s.components.length; ci++){
+        const t=s.components[ci];
+        const row=sheet.querySelector(`.statrow[data-stat="${t}"]`);
+        const pressed=row?row.querySelector('button[aria-pressed="true"]'):null;
+        const stat=pressed?(pressed.dataset.v||null):null;
+        const cp={ status:stat, azonosito_tipus:v("ct-"+t)||null, azonosito:v("cid-"+t)||null, jegyzet:v("cn-"+t)||null };
+        const cur=existing?existing.comps[t]:null;
+        if(cur&&cur.id){ const {error}=await supabase.from("components").update(cp).eq("id",cur.id); if(error) throw error; }
+        else { const {error}=await supabase.from("components").insert({...cp, issue_id:issueId, tipus:t}); if(error) throw error; }
+      }
+      closeModal(); await reload();
+    }catch(e){ err(e); }
+  };
+
+  const delBtn=document.getElementById("f-del");
+  if(delBtn) delBtn.onclick=async ()=>{
+    if(!confirm(`Biztosan törlöd a #${existing.n} tételt?`)) return;
+    try{ const {error}=await supabase.from("issues").delete().eq("id",existing.id); if(error) throw error;
+      closeModal(); await reload(); }catch(e){ err(e); }
+  };
+}
+
+/* ---- Sorozat: új / szerkesztés ---- */
+function seriesForm(existing){
+  const s=existing;
+  let color = s ? s.accent : PAL12[0];
+  let comps = s ? s.components.slice() : ["magazin"];
+  const compList = (LISTS.komponens||[{ertek:"magazin",nev:"Magazin"},{ertek:"modell",nev:"Modell"},{ertek:"konyv",nev:"Könyv"},{ertek:"egyeb",nev:"Egyéb"}]);
+  openModal(`<h2>${s?"Sorozat szerkesztése":"Új sorozat"}</h2>
+    <p class="msub">${s?"A jelenlegi sorozat adatai.":"Válaszd ki, mely komponensekből áll egy szám."}</p>
+    <div class="field"><label>Kiadó</label><select id="s-kiado"><option value="">—</option>${opts("kiado", s?s.kiado:"")}</select></div>
+    <div class="field"><label>Megnevezés (teljes név)</label><input id="s-name" value="${s?esc(s.sorozat):""}" placeholder="pl. Star Wars űrhajók"></div>
+    <div class="field"><label>Megjelenítendő név a fülön (max ${DISPLAY_MAX}) — <span id="s-count">${s&&s.display?s.display.length:0}/${DISPLAY_MAX}</span></label>
+      <input id="s-display" maxlength="${DISPLAY_MAX}" value="${s?esc(s.display||""):""}"></div>
+    <div class="field"><label>Komponensek (miből áll egy szám)</label><div class="compchecks" id="s-comps">
+      ${compList.map(o=>`<button type="button" class="compcheck" data-t="${esc(o.ertek)}" aria-pressed="${comps.includes(o.ertek)}">${esc(o.nev)}</button>`).join("")}</div></div>
+    <div class="field"><label>Szín</label><div class="swatches" id="s-sw">
+      ${PAL12.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-pressed="${c===color}"></button>`).join("")}</div></div>
+    <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="s-save">${s?"Mentés":"Létrehozás"}</button></div>
+    ${s?`<div class="modrow"><button class="btn danger" id="s-del">Sorozat törlése</button></div>`:""}`);
+
+  const dEl=document.getElementById("s-display"), cEl=document.getElementById("s-count");
+  dEl.addEventListener("input",()=>cEl.textContent=`${dEl.value.length}/${DISPLAY_MAX}`);
+  document.getElementById("s-comps").addEventListener("click",e=>{ const b=e.target.closest(".compcheck"); if(!b) return;
+    const t=b.dataset.t; if(comps.includes(t)) comps=comps.filter(x=>x!==t); else comps.push(t);
+    b.setAttribute("aria-pressed", comps.includes(t)); });
+  document.getElementById("s-sw").addEventListener("click",e=>{ const b=e.target.closest(".swatch"); if(!b) return;
+    color=b.dataset.c; sheet.querySelectorAll("#s-sw .swatch").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
+
+  document.getElementById("s-save").onclick=async ()=>{
+    const nm=document.getElementById("s-name").value.trim();
+    if(!nm){ alert("A megnevezés kötelező."); return; }
+    if(!comps.length){ alert("Legalább egy komponens kell."); return; }
+    const disp=(dEl.value.trim()||nm).slice(0,DISPLAY_MAX);
+    const payload={ kiado:document.getElementById("s-kiado").value||null, megnevezes:nm, megjelenites:disp, szin:color, components:comps };
+    try{
+      if(s){ const {error}=await supabase.from("series").update(payload).eq("id",s.id); if(error) throw error; }
+      else {
+        const so=SERIES.length;
+        const {error}=await supabase.from("series").insert({...payload, sort_order:so}); if(error) throw error;
+      }
+      closeModal(); await reload(); if(!s) activeIdx=SERIES.length-1; renderAll();
+    }catch(e){ err(e); }
+  };
+  const sd=document.getElementById("s-del");
+  if(sd) sd.onclick=async ()=>{
+    if(SERIES.length<=1){ alert("Legalább egy sorozatnak maradnia kell."); return; }
+    if(!confirm(`Biztosan törlöd a(z) „${s.sorozat}” sorozatot és MINDEN tételét?`)) return;
+    try{ const {error}=await supabase.from("series").delete().eq("id",s.id); if(error) throw error;
+      closeModal(); activeIdx=0; await reload(); }catch(e){ err(e); }
+  };
+}
+
+/* ---- Listatár bővítése ---- */
+const LIST_TITLES={kiado:"Kiadó",komponens:"Komponens-típus",azonosito:"Azonosító típusa",forras:"Beszerzés forrása"};
+function listsForm(){
+  const grps=Object.keys(LIST_TITLES).map(t=>`
+    <div class="listgrp"><h4>${LIST_TITLES[t]}</h4>
+      <div class="vals">${(LISTS[t]||[]).map(o=>`<span class="val">${esc(o.nev)}</span>`).join("")||'<span class="val">—</span>'}</div>
+      <div class="addrow"><input id="nl-${t}" placeholder="új érték neve"><button data-add="${t}">+</button></div>
+    </div>`).join("");
+  openModal(`<h2>Listák</h2><p class="msub">Itt bővítheted a választható értékeket. Rögzítés közben nem lehet bővíteni — így a listák nem híznak el.</p>
+    ${grps}
+    <div class="modrow"><button class="btn" onclick="closeModal()">Kész</button></div>`);
+  sheet.addEventListener("click",async e=>{
+    const b=e.target.closest("[data-add]"); if(!b) return;
+    const t=b.dataset.add, inp=document.getElementById("nl-"+t);
+    const nev=inp.value.trim(); if(!nev) return;
+    const ertek=nev.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");
+    if(!ertek){ alert("Adj meg érvényes nevet."); return; }
+    try{
+      const so=(LISTS[t]||[]).length+1;
+      const {error}=await supabase.from("lists").insert({tipus:t, ertek, megjelenites:nev, sort_order:so});
+      if(error) throw error;
+      (LISTS[t]=LISTS[t]||[]).push({ertek,nev}); inp.value=""; listsForm();
+    }catch(e){ err(e); }
+  });
+}
+
+/* ---- Excel: sablon + feltöltés (csak asztali) ---- */
+let _xlsx=null; async function xlsx(){ if(!_xlsx) _xlsx=await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm"); return _xlsx; }
+function coerceDate(v){ if(v==null||v==="") return null;
+  if(v instanceof Date && !isNaN(v)) return new Date(v.getTime()-v.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  const t=String(v).trim(); return t?t.replace(/[.\/]/g,"-").replace(/-+$/,""):null; }
+function normStatus(v){ if(!v) return undefined; const t=String(v).trim().toLowerCase().replace(/\s+/g,"");
+  if(t==="megvan")return"megvan"; if(t==="hianyzik"||t==="hiányzik"||t==="hiany"||t==="hiány")return"hianyzik";
+  if(t==="nemkell")return"nemkell"; return undefined; }
+function tmplHead(s){ const h=["lapszám","cím","dátum","fedélár","beszerzési ár"];
+  s.components.forEach(t=>{ h.push((COMP_TYPES[t]||t)+" státusz"); h.push((COMP_TYPES[t]||t)+" azonosító"); }); return h; }
+async function downloadTemplate(){
+  try{ const X=await xlsx(), s=S(), head=tmplHead(s);
+    const ex=[1,"Példa – írd át vagy töröld","","2490",""]; s.components.forEach(()=>{ ex.push("megvan"); ex.push(""); });
+    const ws=X.utils.aoa_to_sheet([head,ex]); ws["!cols"]=head.map(h=>({wch:Math.max(12,h.length+2)}));
+    const wb=X.utils.book_new(); X.utils.book_append_sheet(wb,ws,"Sorozat");
+    X.writeFile(wb,`laprol-lapra-sablon-${(s.display||s.sorozat).replace(/\s+/g,"-")}.xlsx`);
+  }catch(e){ err(e); }
+}
+async function handleUpload(file){
+  const s=S();
+  try{
+    const X=await xlsx(); const wb=X.read(await file.arrayBuffer(),{cellDates:true});
+    const aoa=X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:""});
+    let added=0,updated=0;
+    for(const row of aoa){
+      if(!row||!row.length) continue;
+      const n=parseInt(String(row[0]).trim()); if(isNaN(n)) continue;
+      const name=String(row[1]??"").trim(), date=coerceDate(row[2]);
+      const fed=String(row[3]??"").replace(/\s/g,""), fiz=String(row[4]??"").replace(/\s/g,"");
+      const p={}; if(name) p.cim=name; if(date) p.megjelenes=date;
+      if(fed) p.fedelar=parseInt(fed); if(fiz) p.beszerzesi_ar=parseInt(fiz);
+      let it=s.items.find(x=>x.n===n), issueId;
+      if(it){ issueId=it.id; if(Object.keys(p).length){ const {error}=await supabase.from("issues").update(p).eq("id",it.id); if(error) throw error; } updated++; }
+      else { const {data,error}=await supabase.from("issues").insert({...p, series_id:s.id, lapszam:n}).select().single(); if(error) throw error; issueId=data.id; added++; }
+      for(let ci=0; ci<s.components.length; ci++){
+        const t=s.components[ci];
+        const st=normStatus(row[5+ci*2]); const az=String(row[6+ci*2]??"").trim();
+        const cp={}; if(st!==undefined) cp.status=st; if(az) cp.azonosito=az;
+        const cur=it?it.comps[t]:null;
+        if(cur&&cur.id){ if(Object.keys(cp).length){ const {error}=await supabase.from("components").update(cp).eq("id",cur.id); if(error) throw error; } }
+        else { const {error}=await supabase.from("components").insert({...cp, issue_id:issueId, tipus:t}); if(error) throw error; }
+      }
+    }
+    await reload(); alert(`Feltöltve „${s.sorozat}” sorozatba.\nÚj: ${added}, frissítve: ${updated}`);
+  }catch(e){ err(e); }
+}
+
+/* ---- újratöltés a Supabase-ből ---- */
+async function reload(){ const keep=activeIdx; try{ await loadData(); }catch(e){ err(e); return; }
+  activeIdx = keep<SERIES.length?keep:0; openIssue=null; renderAll(); }
+
+/* ---- karbantartó események ---- */
+document.getElementById("admToggle").onclick=function(){ adminMode=!adminMode;
+  this.setAttribute("aria-pressed",adminMode); this.classList.toggle("on",adminMode);
+  document.getElementById("admbar").style.display=adminMode?"flex":"none"; renderList(); };
+document.getElementById("a-item").onclick=()=>itemForm(null);
+document.getElementById("a-editseries").onclick=()=>seriesForm(S());
+document.getElementById("a-series").onclick=()=>seriesForm(null);
+document.getElementById("a-lists").onclick=listsForm;
+document.getElementById("a-template").onclick=downloadTemplate;
+document.getElementById("a-upload").onclick=()=>document.getElementById("upl").click();
+document.getElementById("upl").addEventListener("change",function(){ const f=this.files&&this.files[0]; if(f) handleUpload(f); this.value=""; });
 
 /* ---- bejelentkezés ---- */
 async function showApp(){
