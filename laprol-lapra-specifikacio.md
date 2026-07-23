@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 0.7 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 0.8 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -85,6 +85,12 @@ Egy szám egy vagy több komponensből áll (pl. **magazin** + **modell**, vagy 
 - **címkék (tag-ek)** — külön lekérdezhetők; ez a platform „fogalomtárához" kapcsolódó réteg
 
 > Ez leváltja a korábbi „két fix képmező" ötletet: a kép mostantól **komponens-szintű**, így akárhány melléklet is viheti a sajátját.
+
+**Képkezelés terve [DÖNTVE, építés előtt]:**
+- Tárolás: **Supabase Storage**, **privát** tárolóban, **felhasználónkénti mappával** (a mappa neve a felhasználó UID-je); csak a saját mappa írható/olvasható. Megjelenítéskor rövid életű, aláírt hivatkozás.
+- **Feltöltés előtti automatikus átméretezés:** hosszabbik oldal max **1200 px**, JPEG — kb. 150–250 kB/kép (az 1 GB ingyenes keretbe több ezer kép fér).
+- Feltöltés helye: a **lenyíló képsáv**. Asztalin **drag & drop** + fájlválasztó; telefonon/tableten koppintásra **kamera vagy galéria**.
+- Kép **cseréje és törlése** a képen lévő kis gombokkal.
 
 ### 5.4 Kezdő adat (az eredeti Excelből)
 RBA — II. vh. repülők (60) · Centuria — Forma 1 (60) · Hachette — Disney könyvek (80).
@@ -196,17 +202,29 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 1. **Lapról Lapra (most):** komponens-modell, kettős azonosító, komponens-szintű kép/azonosító, a négy horog, önálló Supabase, publikálás.
 2. **Felismerés [KÉSŐBB]:** előbb **szám/vonalkód-leolvasás** (ISBN 978/979, ISSN/periodika 977; megbízható), később **vizuális MI-felismerés** (szűkített találati lista; borítónál jobb, modellnél gyengébb; külső MI, költség).
 3. **Értékkövetés [KÉSŐBB]:** aktuális érték + **értéktörténet** (idősor); belekerülési költség vs. jelenlegi összérték, nyereség/ráfizetés.
-4. **OM Curator platform [KÉSŐBB]:** térkép, kapcsolat-tár, fogalomtár; a végén az **okos címke-javaslat** (MI). Elv: „a platform kér, nem parancsol".
+4. **Hordozhatóság [KÉSŐBB]:** adat-export mint biztonsági mentés és költöztetés alapja; szolgáltató-alternatívák felmérése (Vercel/Supabase kiesés esetére); hosszú távon esetleg saját szerver.
+5. **OM Curator platform [KÉSŐBB]:** térkép, kapcsolat-tár, fogalomtár; a végén az **okos címke-javaslat** (MI). Elv: „a platform kér, nem parancsol".
 
 ---
 
 ## 10. Nyitott kérdések
 
-1. **Címkerendszer:** a listatárban a hely megvan, de a logika (hierarchia? szinonimák? kanonikus alak?) **külön átbeszélendő**, mielőtt szabványosítjuk.
-2. **Import-sablon konkrét elrendezése:** az elv eldőlt (a sorozat komponens-készletéből származik); a pontos oszlop-felépítés az építéskor.
-3. **Kép nagyítása:** a lenyíló képsávban a képre koppintva teljes képernyős nézet — hasznos lehet, még nem épült meg.
-4. **Kettőnél több nem-magazin komponens** esetén a hierarchia pontosítása (jelenleg nem aktuális).
-5. **További „nagy kép" szempontok**, ha felmerülnek.
+1. **Több felhasználó — adattárolási modell** **[NYITOTT]**
+   Jelenleg: **egy közös Supabase-projekt**, felhasználónként szétválasztott adattal (RLS + saját mappa a képeknek). Alternatíva: **felhasználónként saját Supabase-projekt**.
+   - *Saját projekt mellett:* teljes adatszétválasztás, külön tárhelykeret, illeszkedik a „modul birtokolja az adatot" elvhez.
+   - *Ellene:* magas belépési küszöb (fiók + projekt + SQL-ek + kulcsok kézzel); minden jövőbeli adatbázis-módosítást **minden felhasználónak** külön le kellene futtatnia; az ingyenes projektet a Supabase **egy hét inaktivitás után felfüggeszti**.
+   - **A tulajdonos iránya:** a **platform** (OM Curator) legyen a fő belépési pont, onnan érhetők el a modulok. Aki közvetlenül a modult használja, az is **adjon adatot a platformnak**. A platform később **automatikusan létrehozhatná** a felhasználó Supabase-projektjét, és **heti ütemezett feladattal** forgalmat generálna, hogy ne függessze fel a szolgáltató. *(Részletek a platform-specifikációba.)*
+   - Köztes lehetőség: alapértelmezés a közös projekt, haladó opcióként „hozd a saját hátteredet" (saját URL + kulcs megadható).
+
+2. **Hordozhatóság / szolgáltatófüggetlenség** **[NYITOTT]**
+   Készüljön terv arra az esetre, ha a **Vercel** vagy a **Supabase** kiesik, vagy erősen fizetőssé válik: milyen alternatívák vannak, és hogyan költöztethető az adat. Az **adat-export** (a négy horog egyike) ennek az alapja.
+   **Hosszú táv:** saját szerver — *jelenleg nem indokolt, felesleges komplikáció; később aktuális lehet.*
+
+3. **Címkerendszer:** a listatárban a hely megvan, de a logika (hierarchia? szinonimák? kanonikus alak?) **külön átbeszélendő**, mielőtt szabványosítjuk.
+4. **Import-sablon konkrét elrendezése:** az elv eldőlt (a sorozat komponens-készletéből származik); a pontos oszlop-felépítés az építéskor.
+5. **Kép nagyítása:** a lenyíló képsávban a képre koppintva teljes képernyős nézet — hasznos lehet, még nem épült meg.
+6. **Kettőnél több nem-magazin komponens** esetén a hierarchia pontosítása (jelenleg nem aktuális).
+7. **További „nagy kép" szempontok**, ha felmerülnek.
 
 ---
 
@@ -227,6 +245,7 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 ---
 
 *Napló:*
+- v0.8 — képkezelés terve rögzítve (privát Storage, felhasználónkénti mappa, automatikus átméretezés, drag & drop / kamera); új nyitott kérdések: több felhasználós adattárolási modell (közös vs. saját Supabase-projekt, platform-alapú automatizálással) és hordozhatóság/szolgáltatófüggetlenség.
 - v0.7 — **építés megkezdve** (Supabase + app 5a él). Új: komponens-hierarchia (domináns komponens) és a lapszám-színezés táblázata; körbeforgó jelölés, jelöletlenre nincs visszatérés (reset csak szerkesztőben); közös **listatár** (kiadó/komponens/azonosító/forrás, „Egyéb"-bel, bővítés csak szerkesztőben); beszerzés forrása mező; lenyíló képsáv; rejthető belekerülési költség; színes fülek; egységes dátum- és tipográfia-szabály; napfény-olvashatóság elve; tartós bejelentkezés.
 - v0.6 — kép komponensenként egy (magazin→borító, modell→modellfotó, könyv→egy kép); a demó (v3) a komponens-modellt tükrözi, képkezelés nélkül (Supabase-fázis).
 - v0.5 — nézetek: egy közös, reszponzív felület, azonos kinézettel; telefon/tablet = beszerzés + karbantartás, asztali = + adminisztráció (fájl-alapú műveletek csak asztalin). 10.2 (telefonos gyors nézet) eldőlt.
