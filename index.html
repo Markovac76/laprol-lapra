@@ -55,6 +55,9 @@
   .hero{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 16%,var(--panel)),var(--panel));border:1px solid var(--line);border-radius:16px;padding:16px 16px 14px;margin:6px 0 12px}
   .hero .kiado{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700;filter:brightness(1.25)}
   .hero .name{font-family:"Space Grotesk";font-size:22px;font-weight:700;margin:3px 0 12px}
+  .closedtag{display:inline-block;vertical-align:middle;margin-left:8px;font-family:inherit;font-size:11px;
+    font-weight:600;letter-spacing:.03em;color:var(--muted);background:var(--panel-2);
+    border:1px solid var(--line);border-radius:999px;padding:3px 9px}
   .prog{margin:8px 0}
   .prog .lab{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px}
   .prog .lab b{font-family:"Space Grotesk"}
@@ -285,17 +288,19 @@ async function loadData(){
 /* ---- statisztika ---- */
 function stats(si){
   const s=SERIES[si]; const perType={}; s.components.forEach(t=>perType[t]={owned:0,total:s.items.length});
-  let belekerulesi=0, beszerzendo=0, next=null;
+  let belekerulesi=0, beszerzendo=0, next=null, hasFuture=false;
   for(const it of s.items){
     if(it.fizetve) belekerulesi+=it.fizetve;
     const future=it.date&&it.date>todayISO;
+    if(future) hasFuture=true;
     for(const t of s.components){ const st=it.comps[t]?it.comps[t].status:null;
-      if(st==="megvan") perType[t].owned++;
-      if(!future && st!=="megvan" && st!=="nemkell") beszerzendo++; }
+      if(st==="megvan") perType[t].owned++; }
+    // Beszerzendő: LAPSZÁM-szinten — ami megjelent, és se nem kész (zöld), se nem kihúzott (szürke)
+    if(!future){ const state=issueState(it,s); if(state!=="megvan" && state!=="nemkell") beszerzendo++; }
     const anyOpen=s.components.some(t=>{const st=it.comps[t]?it.comps[t].status:null; return st!=="megvan"&&st!=="nemkell";});
     if(anyOpen && it.date && it.date>=todayISO){ if(!next||it.date<next.date) next=it; }
   }
-  return {perType,belekerulesi,beszerzendo,next};
+  return {perType,belekerulesi,beszerzendo,next,hasFuture};
 }
 
 /* ---- render ---- */
@@ -310,15 +315,16 @@ function renderHero(){
     return `<div class="prog"><div class="lab"><span>${COMP_TYPES[t]||t}</span><b>${p.owned}/${p.total} · ${pct}%</b></div><div class="bar"><i style="width:${pct}%"></i></div></div>`; }).join("");
   const bottom=st.next
     ? `<div class="stat wide"><div class="k">Következő megjelenés</div><div class="v" style="font-size:14px">${fmtDate(st.next.date)}</div><div class="sub">#${st.next.n} · ${esc(st.next.name||"még nincs cím")}</div></div>`
-    : `<div class="stat wide"><div class="k">Beszerzendő (hiányzó + jelöletlen komponens)</div><div class="v">${st.beszerzendo} db</div></div>`;
+    : `<div class="stat wide"><div class="k">Beszerzendő lapszám</div><div class="v">${st.beszerzendo} db</div><div class="sub">hiányzó vagy még jelöletlen</div></div>`;
+  const closed = !st.hasFuture ? `<span class="closedtag">lezárt sorozat</span>` : "";
   const costBox = costVisible
     ? `<div class="stat"><div class="k">Belekerülési költség</div><div class="v">${fmtFt(st.belekerulesi)||"0 Ft"}</div>
          <button class="costbtn" id="costToggle">elrejt</button></div>`
     : `<div class="stat"><div class="k">Belekerülési költség</div>
          <button class="costbtn show" id="costToggle">összeg megjelenítése</button></div>`;
   document.getElementById("hero").innerHTML=`
-    <div class="kiado">${esc(s.kiado||"")}</div>
-    <div class="name display">${esc(s.sorozat)}</div>
+    <div class="kiado">${esc(s.kiado?listName("kiado",s.kiado):"")}</div>
+    <div class="name display">${esc(s.sorozat)}${closed}</div>
     ${bars}
     <div class="stats">
       ${costBox}
