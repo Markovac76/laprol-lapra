@@ -44,13 +44,14 @@
   .brand h1{font-family:"Space Grotesk";font-size:19px;font-weight:700;margin:0;flex:1}
   .brand .iconbtn{border:1px solid var(--line);background:var(--panel);color:var(--muted);width:38px;height:34px;border-radius:10px;font-size:15px;cursor:pointer}
   .tabbar{display:flex;gap:6px;padding:0 0 10px 0;align-items:stretch}
-  .tabnow{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;text-align:center;
+  .tabnow{flex:1 1 45%;min-width:0;display:flex;align-items:center;justify-content:center;text-align:center;
     border:1px solid var(--tabc,var(--line));background:color-mix(in srgb,var(--tabc,var(--accent)) 62%,var(--panel));
     color:#fff;padding:8px 12px;border-radius:12px;font-size:clamp(13px,3.4vw,16px);font-weight:700;cursor:pointer;
     font-family:"Space Grotesk";min-height:46px;line-height:1.15;box-shadow:inset 0 0 0 2px var(--tabc,var(--accent));
     overflow:hidden;text-overflow:ellipsis}
-  .tabtoggle{flex:0 0 auto;border:1px solid var(--line);background:var(--panel);color:var(--muted);
-    padding:8px 12px;border-radius:12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:"Space Grotesk";min-height:46px}
+  .tabtoggle{flex:1 1 55%;min-width:0;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    padding:8px 12px;border-radius:12px;font-size:clamp(13px,3.2vw,15px);font-weight:700;cursor:pointer;
+    font-family:"Space Grotesk";min-height:46px}
   .tabtoggle[aria-expanded="true"]{background:var(--panel-2);color:var(--ink);border-color:var(--accent)}
   .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:0 0 10px 0}
   .tabs[hidden]{display:none}
@@ -103,6 +104,14 @@
     width:52px;border-radius:10px;cursor:pointer;transition:.12s;padding:5px 2px 4px;
     display:flex;flex-direction:column;align-items:center;gap:2px}
   .mark svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .markwrap{display:flex;flex-direction:column;gap:3px;align-items:center}
+  .mark .mrow{display:flex;align-items:center;justify-content:center;gap:3px}
+  .mark.has-cnt{width:60px}
+  .mark .cnt{font-family:"Space Grotesk";font-size:13px;font-weight:700;line-height:1}
+  .stepper{display:flex;gap:3px}
+  .stepbtn{border:1px solid var(--line);background:var(--panel-2);color:var(--muted);
+    width:26px;height:22px;border-radius:6px;font-size:13px;font-weight:700;line-height:1;cursor:pointer;padding:0}
+  .stepbtn:active{transform:scale(.92)}
   .mark .mlab{font-size:9.5px;font-weight:600;line-height:1.1;min-height:11px;letter-spacing:.01em}
   .mark:active{transform:scale(.94)}
   .mark.m-megvan{background:var(--green-d);border-color:var(--green);color:#8ee9ad}
@@ -308,7 +317,7 @@ async function loadData(){
   const byS={}, byI={};
   SERIES = s.data.map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,items:[]}; byS[r.id]=o; return o; });
   i.data.forEach(r=>{ const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,fedelar:r.fedelar,fizetve:r.beszerzesi_ar,fizetve_datum:r.beszerzes_datuma,forras:r.forras,db:(r.mennyiseg==null?1:r.mennyiseg),comps:{}}; byI[r.id]=o; const ser=byS[r.series_id]; if(ser) ser.items.push(o); });
-  c.data.forEach(r=>{ const it=byI[r.issue_id]; if(it) it.comps[r.tipus]={id:r.id,status:r.status,azonosito:r.azonosito,azonosito_tipus:r.azonosito_tipus,note:r.jegyzet,kep_url:r.kep_url}; });
+  c.data.forEach(r=>{ const it=byI[r.issue_id]; if(it) it.comps[r.tipus]={id:r.id,status:r.status,azonosito:r.azonosito,azonosito_tipus:r.azonosito_tipus,note:r.jegyzet,kep_url:r.kep_url,db:(r.db==null?1:r.db)}; });
   SERIES.forEach(x=>x.items.sort((a,b)=>a.n-b.n));
   if(activeIdx>=SERIES.length) activeIdx=0;
 }
@@ -439,9 +448,16 @@ function renderList(){
     const dateHtml=it.date?`<span class="${future?"future":""}">${fmtDate(it.date)}</span>`:`<span style="color:var(--faint)">nincs dátum</span>`;
     const dbTag=(it.db&&it.db>1)?`<span class="dbtag">${it.db} db</span>`:"";
     const money=[it.fedelar!=null?`fedélár ${fmtFt(it.fedelar)}`:null,it.fizetve!=null?`fizetve ${fmtFt(it.fizetve)}`:null].filter(Boolean).join(" · ");
-    const marks=s.components.map(t=>{ const c=it.comps[t]||{status:null}; const stt=c.status;
-      return `<button class="mark${stt?" m-"+stt:""}" data-n="${it.n}" data-t="${t}" ${future?"disabled":""}
-        title="${COMP_TYPES[t]||t}${stt?": "+stt:": jelöletlen"}" aria-label="${COMP_TYPES[t]||t}">${ICONS[t]||ICONS.egyeb}<span class="mlab">${MLAB[stt]||""}</span></button>`;
+    const marks=s.components.map(t=>{ const c=it.comps[t]||{status:null}; const stt=c.status; const cdb=(c.db==null?1:c.db);
+      const showCnt = stt==="megvan" && cdb>1;
+      const showStep = !future && (adminMode || (stt==="megvan" && cdb>1));
+      const btn=`<button class="mark${stt?" m-"+stt:""}${showCnt?" has-cnt":""}" data-n="${it.n}" data-t="${t}" ${future?"disabled":""}
+        title="${COMP_TYPES[t]||t}${stt?": "+stt:": jelöletlen"}${showCnt?" · "+cdb+" db":""}" aria-label="${COMP_TYPES[t]||t}">
+        <span class="mrow">${ICONS[t]||ICONS.egyeb}${showCnt?`<span class="cnt">${cdb}</span>`:""}</span><span class="mlab">${MLAB[stt]||""}</span></button>`;
+      const step= showStep ? `<div class="stepper">
+        <button class="stepbtn" data-step="+" data-n="${it.n}" data-t="${t}" aria-label="Több">+</button>
+        <button class="stepbtn" data-step="-" data-n="${it.n}" data-t="${t}" aria-label="Kevesebb">−</button></div>` : "";
+      return `<div class="markwrap">${btn}${step}</div>`;
     }).join("");
     const open = openIssue===it.n;
     const panel = open ? `<div class="imgpanel">` + s.components.map((t,ci)=>{
@@ -469,11 +485,23 @@ function syncHeadHeight(){
   if(h) document.documentElement.style.setProperty("--headh", h.offsetHeight+"px");
 }
 window.addEventListener("resize",syncHeadHeight);
-function renderAll(){ if(!SERIES.length){ document.getElementById("hero").innerHTML=""; document.getElementById("chips").innerHTML=""; document.getElementById("listhead").innerHTML=""; document.getElementById("list").innerHTML=`<div class="empty-state">Nincs még sorozat.</div>`; return; } setAccent(); renderTabs(); renderHero(); renderChips(); renderListHead(); renderList(); syncHeadHeight(); }
+function renderAll(){
+  if(!SERIES.length){ document.getElementById("hero").innerHTML=""; document.getElementById("chips").innerHTML=""; document.getElementById("listhead").innerHTML=""; document.getElementById("list").innerHTML=`<div class="empty-state">Nincs még sorozat.</div>`; return; }
+  setAccent(); renderTabs(); renderHero(); renderChips(); renderListHead(); renderList(); applyPickerMode(); syncHeadHeight();
+}
+// Sorozatválasztás közben a tétel-lista és a szűrők elrejtve — csak a választásra fókuszálunk.
+function applyPickerMode(){
+  const hide = tabsOpen;
+  ["listhead","list"].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display = hide ? "none" : ""; });
+  const ctrls=document.querySelector(".controls"); if(ctrls) ctrls.style.display = hide ? "none" : "";
+  const hero=document.getElementById("hero"); if(hero) hero.style.display = hide ? "none" : "";
+  const adm=document.getElementById("admbar");
+  if(adm) adm.style.display = hide ? "none" : (adminMode ? "flex" : "none");
+}
 
 /* ---- események ---- */
-document.getElementById("tabtoggle").addEventListener("click",()=>{ tabsOpen=!tabsOpen; renderTabs(); syncHeadHeight(); });
-document.getElementById("tabnow").addEventListener("click",()=>{ tabsOpen=!tabsOpen; renderTabs(); syncHeadHeight(); });
+document.getElementById("tabtoggle").addEventListener("click",()=>{ tabsOpen=!tabsOpen; renderTabs(); applyPickerMode(); syncHeadHeight(); });
+document.getElementById("tabnow").addEventListener("click",()=>{ tabsOpen=!tabsOpen; renderTabs(); applyPickerMode(); syncHeadHeight(); });
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return; activeIdx=+b.dataset.i; costVisible=false; openIssue=null; tabsOpen=false; window.scrollTo({top:0}); renderAll();});
 document.getElementById("chips").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return; filter=b.dataset.f; openIssue=null; renderChips(); renderList();});
 document.getElementById("search").addEventListener("input",e=>{query=e.target.value.trim(); openIssue=null; renderList();});
@@ -481,16 +509,37 @@ document.getElementById("search").addEventListener("input",e=>{query=e.target.va
 document.getElementById("list").addEventListener("click",async e=>{
   const exp=e.target.closest(".expander");
   if(exp){ const n=+exp.dataset.exp; openIssue=(openIssue===n)?null:n; renderList(); return; }
+
+  // +/− darabszám-léptető
+  const st=e.target.closest(".stepbtn");
+  if(st){
+    const it=S().items.find(x=>x.n===+st.dataset.n); const t=st.dataset.t;
+    const comp=it&&it.comps[t]; if(!comp||!comp.id) return;
+    const prevDb=(comp.db==null?1:comp.db), prevStatus=comp.status;
+    let nextDb = prevDb + (st.dataset.step==="+" ? 1 : -1);
+    if(nextDb<0) nextDb=0;
+    // 0-nál automatikusan „hiányzik”, 1 fölé emelve automatikusan „megvan”
+    let nextStatus=prevStatus;
+    if(nextDb===0) nextStatus="hianyzik";
+    else if(prevDb===0 || prevStatus!=="megvan") nextStatus="megvan";
+    comp.db=nextDb; comp.status=nextStatus; renderAll();
+    const {error}=await supabase.from("components").update({db:nextDb,status:nextStatus}).eq("id",comp.id);
+    if(error){ comp.db=prevDb; comp.status=prevStatus; renderAll(); alert("Mentés sikertelen: "+error.message); }
+    return;
+  }
+
   const ed=e.target.closest("[data-edit]");
   if(ed){ const it=S().items.find(x=>x.n===+ed.dataset.edit); if(it) itemForm(it); return; }
   const mk=e.target.closest(".mark"); if(!mk||mk.disabled) return;
   const it=S().items.find(x=>x.n===+mk.dataset.n); const t=mk.dataset.t;
   const comp=it.comps[t]; if(!comp||!comp.id) return;
-  const prev=comp.status;
+  const prev=comp.status, prevDb=(comp.db==null?1:comp.db);
   const next=nextStatus(prev);                                   // jelöletlenre nem tér vissza
-  comp.status=next; renderAll();                                 // optimista frissítés
-  const {error}=await supabase.from("components").update({status:next}).eq("id",comp.id);
-  if(error){ comp.status=prev; renderAll(); alert("Mentés sikertelen: "+error.message); }
+  // „megvan”-ra váltáskor a számláló mindig 1-ről indul (onnan lehet +/− gombbal emelni)
+  const nextDb = (next==="megvan") ? Math.max(1, prevDb===0?1:prevDb) : prevDb;
+  comp.status=next; comp.db=nextDb; renderAll();                 // optimista frissítés
+  const {error}=await supabase.from("components").update({status:next,db:nextDb}).eq("id",comp.id);
+  if(error){ comp.status=prev; comp.db=prevDb; renderAll(); alert("Mentés sikertelen: "+error.message); }
 });
 
 /* ============================================================
@@ -525,10 +574,11 @@ function itemForm(existing){
         <button type="button" data-v="" aria-pressed="${!st}">törlés</button>
       </div>
       <div class="grid2" style="margin-top:8px">
+        <div class="field"><label>Darabszám (db)</label><input id="cdb-${t}" type="number" min="0" value="${c.db==null?1:c.db}"></div>
         <div class="field"><label>Azonosító típusa</label>
           <select id="ct-${t}"><option value="">—</option>${opts("azonosito",c.azonosito_tipus)}</select></div>
-        <div class="field"><label>Azonosító</label><input id="cid-${t}" value="${esc(c.azonosito||"")}"></div>
       </div>
+      <div class="field"><label>Azonosító</label><input id="cid-${t}" value="${esc(c.azonosito||"")}"></div>
       <div class="field"><label>Jegyzet</label><input id="cn-${t}" value="${esc(c.note||"")}"></div>
     </div>`;
   }).join("");
@@ -581,7 +631,8 @@ function itemForm(existing){
         const row=sheet.querySelector(`.statrow[data-stat="${t}"]`);
         const pressed=row?row.querySelector('button[aria-pressed="true"]'):null;
         const stat=pressed?(pressed.dataset.v||null):null;
-        const cp={ status:stat, azonosito_tipus:v("ct-"+t)||null, azonosito:v("cid-"+t)||null, jegyzet:v("cn-"+t)||null };
+        const dbv=Math.max(0, parseInt(v("cdb-"+t))||0);
+        const cp={ status:stat, db:dbv, azonosito_tipus:v("ct-"+t)||null, azonosito:v("cid-"+t)||null, jegyzet:v("cn-"+t)||null };
         const cur=existing?existing.comps[t]:null;
         if(cur&&cur.id){ const {error}=await supabase.from("components").update(cp).eq("id",cur.id); if(error) throw error; }
         else { const {error}=await supabase.from("components").insert({...cp, issue_id:issueId, tipus:t}); if(error) throw error; }
@@ -823,7 +874,7 @@ async function reload(){ const keep=activeIdx; try{ await loadData(); }catch(e){
 /* ---- karbantartó események ---- */
 document.getElementById("admToggle").onclick=function(){ adminMode=!adminMode;
   this.setAttribute("aria-pressed",adminMode); this.classList.toggle("on",adminMode);
-  document.getElementById("admbar").style.display=adminMode?"flex":"none"; renderList(); };
+  renderList(); applyPickerMode(); };
 document.getElementById("a-item").onclick=()=>{ if(!S()){ alert("Előbb hozz létre egy sorozatot (+ Új sorozat)."); return; } itemForm(null); };
 document.getElementById("a-editseries").onclick=()=>{ if(!S()){ alert("Nincs sorozat, amit szerkeszteni lehetne."); return; } seriesForm(S()); };
 document.getElementById("a-series").onclick=()=>seriesForm(null);

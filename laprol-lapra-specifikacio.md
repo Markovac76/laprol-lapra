@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.1 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.2 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -90,6 +90,7 @@ A komponens-**típusokat a modul** definiálja (magazin / modell / egyéb; a mod
 Egy szám egy vagy több komponensből áll (pl. **magazin** + **modell**, vagy több melléklet). Minden komponens:
 - UUID · kód · **típus** (magazin / modell / egyéb)
 - **saját státusz** (megvan / hiányzik / nem kell / jelöletlen)
+- **darabszám (db)** — élő készlet-számláló, alapértelmezetten 1; komponensenként külön (a magazinból maradhat 1, a modellből 2). Lásd 6.7.
 - **saját kép** (**egy kép komponensenként**: a magaziné a borító, a modellé a modellfotó, a könyvé egy kép a könyvről — Supabase Storage)
 - **azonosító** (ISBN / ISSN / vonalkód, elhagyható) — **a komponensen ül, nem a számon**
 - **ár / érték** (elhagyható)
@@ -165,11 +166,22 @@ Egy szám színét a **domináns komponens** dönti el:
 
 **Olvasata:** zöld = kész · sárga = van belőle valami, de a lényeg hiányzik · piros = kell · szürke = tudatosan kihúzva · semleges = még nem téma.
 
-### 6.5 Láthatóság napfényben **[DÖNTVE]**
+### 6.5 Darabszám-számláló (komponensenként) **[DÖNTVE]**
+Egy komponensből több példány is lehet (pl. 4 magazint veszel a melléklet miatt), és a példányok sorsa **komponensenként eltérhet** (a magazinokból 1 marad, a figurákból 2).
+
+- A számláló **komponensenként** él, alapértelmezetten **1**.
+- „Megvan"-ra jelöléskor mindig **1-ről indul** — onnan emelhető.
+- A listában **+/− gombokkal** léptethető; a darabszám a jelölő gombon látszik (ikon balra, szám jobbra), **csak ha 1-nél több**.
+- A +/− gombok akkor láthatók, ha a darabszám 1-nél több, **vagy** ha be van kapcsolva a karbantartó mód (így lehet 1-ről feljebb lépni anélkül, hogy a böngésző nézet zsúfolt lenne).
+- **0-ra csökkentve** a komponens automatikusan **„hiányzik"** állapotba vált; **1 fölé visszanövelve** automatikusan **„megvan"**-ra. Negatívba nem megy.
+- A számláló a *jelenlegi készletet* mutatja; a **beszerzéskori** mennyiség (a költségszámításhoz) külön mező a **számon** (5.2). A kettő szándékosan külön: az egyik „mennyit vettem", a másik „mennyi van most".
+- Az egyes példányok részletes sorsa (mi tört el, mi cserélődött el) továbbra is a szabad **jegyzet** mezőbe írható, strukturálás nélkül.
+
+### 6.6 Láthatóság napfényben **[DÖNTVE]**
 A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős háttérrel** és **tömör, színes bal oldali csíkkal** jelennek meg — a halvány árnyalatok kültéren eltűnnek.
 *(Ha kevés: teljesen telített háttér, vagy világos mód — [NYITOTT], ha felmerül.)*
 
-### 6.6 Egyéb megjelenítési elvek **[DÖNTVE]**
+### 6.7 Egyéb megjelenítési elvek **[DÖNTVE]**
 - A haladás **komponens-típusonként** mérhető (pl. „magazinok 40/60, modellek 31/60").
 - A rendszer **soha nem állít át magától** semmit.
 - **Dátum:** egységes méret/vastagság/szín minden sorozatnál — **egyetlen kivétel**: a még meg nem jelent számnál **piros**.
@@ -179,13 +191,13 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 
 ## 7. Funkciók
 
-- **Fülek 3-asával**, reszponzív; a fül a sorozat **színével kitöltve** (a kijelölt telítettebb, erős kerettel), nagyobb, vastagabb felirattal; hosszú név tördelődik. **[DÖNTVE]**
+- **Összecsukható fülsáv [DÖNTVE, megvalósítva]:** alapból csak az **aktív sorozat** füle látszik (saját színével), mellette egy nagyobb **„Sorozatok (n)"** gomb nyitja le a többit 3-as rácsban. Választás után magától visszazár. **Nyitott választó közben a tétel-lista, a szűrők és a hero el vannak rejtve** — csak a választásra fókuszálunk. A „Sorozatok" gomb szándékosan **nagyobb**, mint az aktív sorozaté (könnyebb telefonos célzás).
 - **Hero:** kiadó, teljes név, haladás komponens-típusonként.
 - **Belekerülési költség:** **alapból rejtett**, gombbal megjeleníthető/elrejthető; **sorozatváltáskor mindig visszaáll rejtettre**. **[DÖNTVE]**
 - **Adaptív statisztika:** van jövőbeli szám → „Következő megjelenés"; nincs → „Beszerzendő (hiányzó + jelöletlen)". **[DÖNTVE]**
 - **Szűrők:** Mind / Megvan / Hiányzik / Nem kell / Várható (a Várható elrejtve, ha nincs jövőbeli). **[DÖNTVE]**
 - **Keresés** név/szám szerint.
-- **Lista (kompakt):** egy sor / lapszám — szám, cím, adatok, jobbra **komponensenként egy-egy ikonos jelölő** (a gomb alatt rövid felirat: megvan / hiány / nem kell). **[DÖNTVE]**
+- **Lista (kompakt):** egy sor / lapszám — szám, cím, adatok, jobbra **komponensenként egy-egy ikonos jelölő** (a gomb alatt rövid felirat: megvan / hiány / nem kell). Ha egy komponensből 1-nél több van, a **darabszám a gombon** jelenik meg az ikon mellett, alatta **+/− léptetőkkel** (lásd 6.5). **[DÖNTVE]**
 - **Tapadó fejléc:** a lista fölött rögzített sáv nevezi meg az oszlopokat (Magazin / Modell / Könyv) — mint Excelben a fagyasztott sor. **[DÖNTVE]**
 - **Lenyíló képsáv:** a sor végén nyíl; lenyitva komponensenként **egy-egy azonos méretű kép** (egy komponensnél középre húzva), alatta a **komponens neve és kódja**; ha nincs kép: „nincs adat". **Alapból csukott, egyszerre csak egy nyitható**, sorozat-/szűrő-/keresésváltáskor visszazár. **[DÖNTVE]**
 - **Karbantartó mód:** tétel/komponens szerkesztése-törlése, új tétel, új sorozat, sorozat szerkesztése; **státusz-reset**; a **listatár bővítése**. *(Építés alatt — 5b.)*
@@ -224,13 +236,16 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 
 1. **Komponens-típus bővítés: Lego-jellegű sorozatok** **[NYITOTT]**
    Hasonló szerkezetű, de eddig nem kezelt sorozattípus: magazin + figura (pl. Lego) — a mostani komponens-modell (5.3) ezt már ma is elbírja, csak egy új komponens-típust kell felvenni a listatárba (☰ Listák), kódolás nélkül. Kapcsolódik az 5.6 „azonosító mező tudatosan általános" ponthoz.
-2. **12 fölötti sorozatszám kezelése — 8–15 sorozatra tervezve** **[DÖNTVE, építés alatt]**
+2. **12 fölötti sorozatszám kezelése — 8–15 sorozatra tervezve** **[DÖNTVE, megvalósítva]**
    - **Színek:** bővített, **színcsaládokba csoportosított** paletta (kb. 6 család × 3–4 árnyalat). A színválasztó vizuálisan csoportosítva mutatja a családokat, hogy logikailag összetartozó sorozatok (pl. modellautók, könyvek, Lego-figurák) hasonló árnyalatot kaphassanak. **Nincs mögötte tárolt kategória-adat** — tisztán vizuális segítség, tudatosan nem előlegzi meg a platform jövőbeli címke-/fogalomtárát.
    - **Fülek elrendezése:** **összecsukható fülsáv** — alapból csak az aktív sorozat füle látszik nagyban, mellette egy „Sorozatok" gombbal nyitható a többi (mini-választó, nem állandóan kiterített rács). 20–30+ sorozatnál később megfontolandó egy kereshető sorozatválasztó is — egyelőre nem indokolt.
 3. **Lapszám beszúrása lista közepére** **[LEZÁRVA, funkció nem szükséges]**
    Tisztázva: a lapszám a rendszerben **nem pozíció, hanem sima adat** — a tételek mindig szám szerint rendeződnek, nem felvitel sorrendje szerint. Ha a kiadó kihagy egy számot és később pótolja (pl. 1,2,3,4,6,7… majd később az 5), elég felvinni az 5-öst — magától a helyére kerül, semmit nem kell eltolni. **Valódi átszámozás** (amikor a kiadó ténylegesen minden utána lévő számot átszámoz, pl. egy beékelt különkiadás miatt) nem jellemző eset a tulajdonos szerint — nem épül rá funkció.
-4. **Többespéldány kezelése egy beszerzésen belül** **[DÖNTVE, építés alatt]**
-   Példa: 4 db ugyanabból a magazinból egy vásárlással (mert a melléklet kell többször). Megoldás: egyszerű **„mennyiség (db)"** mező a **számon** (alapértelmezetten 1), ami beépül a belekerülési költség számításába (mennyiség × beszerzési ár). A komponens-státusz marad **egyetlen egyszerű jelző** (megvan/hiányzik/nem kell) — tudatosan nem bomlik szét példányonkénti részállapotra. Az egyes példányok sorsának részletei (pl. „4-ből 2 megvan, 1 eltört, 1 elcserélve") a már meglévő **szabad jegyzet mezőbe** írhatók, strukturálás nélkül. *(A platform-fejezet „drift" elvéhez kapcsolódik: mennyiségi árnyalat nélkül a modulok-közti értesítés is csak megvan/nincs-meg szinten tudna jelezni.)*
+4. **Többespéldány kezelése egy beszerzésen belül** **[DÖNTVE, megvalósítva]**
+   Példa: 4 db ugyanabból a magazinból egy vásárlással (mert a melléklet kell többször). **Két, szándékosan külön mező** oldja meg:
+   - **Beszerzési mennyiség** a **számon** (5.2) — „mennyit vettem": ez épül be a belekerülési költségbe (mennyiség × beszerzési ár).
+   - **Darabszám** a **komponensen** (6.5) — „mennyi van most": komponensenként külön él és a listában +/− gombokkal léptethető, mert a magazinok és a mellékletek sorsa eltérhet. 0-nál automatikusan „hiányzik".
+   Az egyes példányok részletes sorsa (mi tört el, mi cserélődött el) továbbra is a **szabad jegyzet mezőbe** írható, strukturálás nélkül. *(A platform-fejezet „drift" elvéhez kapcsolódik: mennyiségi árnyalat nélkül a modulok-közti értesítés is csak megvan/nincs-meg szinten tudna jelezni.)*
 5. **Több felhasználó — adattárolási modell** **[NYITOTT]**
    Jelenleg: **egy közös Supabase-projekt**, felhasználónként szétválasztott adattal (RLS + saját mappa a képeknek). Alternatíva: **felhasználónként saját Supabase-projekt**.
    - *Saját projekt mellett:* teljes adatszétválasztás, külön tárhelykeret, illeszkedik a „modul birtokolja az adatot" elvhez.
@@ -281,6 +296,7 @@ Az 5b (karbantartás) éles tesztelése során felmerült hibák és a rájuk ad
 ---
 
 *Napló:*
+- v1.2 — megvalósítva: összecsukható fülsáv (nyitott választónál a lista/szűrők/hero elrejtve, nagyobb „Sorozatok" gomb), színcsaládokba rendezett 24-es paletta, **komponensenkénti darabszám-számláló** (+/− a listában, 0-nál automatikus „hiányzik", 1 fölé visszanövelve „megvan"). A beszerzési mennyiség (szám) és a jelenlegi darabszám (komponens) szándékosan külön mező.
 - v1.1 — a „később megbeszélendő" csomag lezárva: 12 fölötti sorozatszám (színcsaládos paletta + összecsukható fülsáv); lapszám-beszúrás lezárva funkció nélkül (a lapszám eleve nem pozíció); többespéldány kezelése (mennyiség mező a számon, költségszámításba építve, részletek a jegyzetben).
 - v1.0 — platform-jegyzetek: „Modulok közti kapcsolat" három elve (általános azonosító, tágabb/szűkebb címke-modell, kezdeményez→jóváhagy→befogad — a jóváhagyási állapot kizárólag a platformon él); négy új Lapról Lapra nyitott kérdés (Lego-jellegű komponens, 12 fölötti sorozatszám, lapszám-beszúrás, többespéldány); az 5b hibajavítási napló „élesben ellenőrizve" állapotra frissítve (a néma Excel-hibával együtt, 6 hiba összesen).
 - v0.9 — hibajavítási kör (5b tesztelés): kód-számláló soha nem forog vissza (sorozat/tétel/komponens); Excel-import célsorozat megerősítő ablak (tervezett); sablon dátum/szám-formátum javítás (tervezett); ár ezres-tagolás javítás (tervezett); sorozatok kézi átrendezése a roadmapre (KÉSŐBB, „keep it simple").
