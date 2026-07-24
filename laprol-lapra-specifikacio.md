@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 0.9 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.0 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -37,6 +37,17 @@ Az OM Curator egy **munkaterület**: innen érhetők el a modulok és itt épül
 - **A modul birtokolja az adatot.** A platform nem másolja át magához; ha képre/adatra van szüksége egy elemről, **kinyúl a modul felé és behúzza**, majd elengedi. **[DÖNTVE, elv]**
 - **A platform kér, nem parancsol.** Egységesítést/címkézést **javasol**; a modul felé csak annyit ír vissza, amennyit a modul megenged — így a modul platform nélkül is sértetlen marad. **[DÖNTVE, elv]**
 - **Okos javaslattétel** (a platform felajánl új címke-szempontokat, és elfogadás után végrehajtja): a **roadmap vége**, valószínűleg MI-réteggel. Az architektúra ne zárja ki. **[KÉSŐBB]**
+
+**Modulok közti kapcsolat — három elv [NYITOTT, jegyzet a platform-specifikációhoz]**
+
+Konkrét példa, ami idevezetett: egy Lego-magazin számhoz tartozó figura (saját, külső — pl. BrickLink — kóddal) egy jövőbeli önálló Lego-nyilvántartás modulban is szerepelhetne. A Lapról Lapra ehhez ma is készen áll (általános azonosító- és címke-mező a komponensen), a modulok-közti összekötés viszont platform-feladat:
+
+1. **Azonosító mező — tudatosan általános.** A komponens azonosító mezője nem csak ISBN/ISSN/vonalkód lehet, hanem **bármilyen külső rendszer kódja** (pl. BrickLink-kód). A listatár csak példákat ad, nem korlátoz.
+2. **Címkézés — „tágabb/szűkebb fogalom" (thesaurus-szerű) modell, nem szigorú fa és nem lapos lista.** Egy címke (pl. „Episode IV") kaphat egy vagy több „ez alá tartozik" kapcsolatot (pl. „Star Wars"), és **nem kizárólagosan** — egy címke több tágabb fogalomhoz is tartozhat. Tágabb fogalomra keresve a keresés automatikusan lemegy az alá tartozó szűkebb címkékre is. *(Példa: platform-szintű keresés „Star Wars — Új remény"-re több modulból hoz találatot: akciófigura, lego, kártya, képregény, könyv — mind a saját, egyszer felvitt címkéjük alapján.)* Ez a logika **kizárólag a platform fogalomtárában** él; a modul oldalán a címke marad egyszerű, szabad szöveges lista.
+3. **„Kezdeményez → jóváhagy → befogad" folyamat, két szabállyal:**
+   - **Új kapcsolat:** a modul csak **javasolja** a másik modulba való átvételt (pl. „ez a figura nyilvántartható a Lego-modulban is — átveszed?"); **sosem történik automatikusan.**
+   - **Meglévő kapcsolat sérülése (drift):** ha egy már jóváhagyott kapcsolat egyik oldala megváltozik (pl. a Lego-nyilvántartásban egy darab eltörik/elcserélődik), a platform **értesít**, de **nem ír felül automatikusan** semmit egyik modulban sem.
+   - **A jóváhagyási állapot maga (a kapcsolat ténye) kizárólag a platformon él, egyetlen példányban** — a modulok felülete csak **ablak** erre az egy, központi rekordra, nem másolat. Így mindegy, melyik felületen (platform vagy bármelyik érintett modul) fogadod el vagy nézed meg a javaslatot, mindig ugyanazt az állapotot látod — nincs szinkronizálási rés.
 
 ---
 
@@ -211,22 +222,30 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 
 ## 10. Nyitott kérdések
 
-1. **Több felhasználó — adattárolási modell** **[NYITOTT]**
+1. **Komponens-típus bővítés: Lego-jellegű sorozatok** **[NYITOTT]**
+   Hasonló szerkezetű, de eddig nem kezelt sorozattípus: magazin + figura (pl. Lego) — a mostani komponens-modell (5.3) ezt már ma is elbírja, csak egy új komponens-típust kell felvenni a listatárba (☰ Listák), kódolás nélkül. Kapcsolódik az 5.6 „azonosító mező tudatosan általános" ponthoz.
+2. **12 fölötti sorozatszám kezelése** **[NYITOTT]**
+   Ha 12 fölé nő a sorozatok száma: mi történjen a fülek színeivel (ismétlődés / bővített paletta / szabad színválasztó) és a fülek elrendezésével (3-as grid meddig marad átlátható; kellhet keresés/szűrés a sorozatok *között* is, nem csak a tételek között).
+3. **Lapszám beszúrása lista közepére, sorszám-eltolással** **[NYITOTT]**
+   Eddig mindig a következő szabad lapszámot ajánlja fel az app; felmerült az igény, hogy néha egy korábbi pozícióba kelljen beszúrni, ami az utána lévő lapszámokat eltolja. **Fontos:** ez a kiadvány saját, valós lapszáma, **nem** a belső kód-számláló (4. fejezet) — a kettő élesen elkülönítendő, a kód-számláló szabálya nem változik emiatt.
+4. **Többespéldány kezelése egy beszerzésen belül** **[NYITOTT]**
+   Példa: 4 db ugyanabból a magazinból egy vásárlással (mert a melléklet kell többször). A mostani modell 1 beszerzés = 1 tétel; a többes példány (és részleges elhasználódás/csere, pl. a mellékletek egy része később eltörik vagy elcserélődik) még nincs kezelve. Kapcsolódik a platform-fejezet „meglévő kapcsolat sérülése (drift)" elvéhez — enélkül a modulok-közti drift-értesítés sem tudna mennyiségi változást kifejezni.
+5. **Több felhasználó — adattárolási modell** **[NYITOTT]**
    Jelenleg: **egy közös Supabase-projekt**, felhasználónként szétválasztott adattal (RLS + saját mappa a képeknek). Alternatíva: **felhasználónként saját Supabase-projekt**.
    - *Saját projekt mellett:* teljes adatszétválasztás, külön tárhelykeret, illeszkedik a „modul birtokolja az adatot" elvhez.
    - *Ellene:* magas belépési küszöb (fiók + projekt + SQL-ek + kulcsok kézzel); minden jövőbeli adatbázis-módosítást **minden felhasználónak** külön le kellene futtatnia; az ingyenes projektet a Supabase **egy hét inaktivitás után felfüggeszti**.
    - **A tulajdonos iránya:** a **platform** (OM Curator) legyen a fő belépési pont, onnan érhetők el a modulok. Aki közvetlenül a modult használja, az is **adjon adatot a platformnak**. A platform később **automatikusan létrehozhatná** a felhasználó Supabase-projektjét, és **heti ütemezett feladattal** forgalmat generálna, hogy ne függessze fel a szolgáltató. *(Részletek a platform-specifikációba.)*
    - Köztes lehetőség: alapértelmezés a közös projekt, haladó opcióként „hozd a saját hátteredet" (saját URL + kulcs megadható).
 
-2. **Hordozhatóság / szolgáltatófüggetlenség** **[NYITOTT]**
+6. **Hordozhatóság / szolgáltatófüggetlenség** **[NYITOTT]**
    Készüljön terv arra az esetre, ha a **Vercel** vagy a **Supabase** kiesik, vagy erősen fizetőssé válik: milyen alternatívák vannak, és hogyan költöztethető az adat. Az **adat-export** (a négy horog egyike) ennek az alapja.
    **Hosszú táv:** saját szerver — *jelenleg nem indokolt, felesleges komplikáció; később aktuális lehet.*
 
-3. **Címkerendszer:** a listatárban a hely megvan, de a logika (hierarchia? szinonimák? kanonikus alak?) **külön átbeszélendő**, mielőtt szabványosítjuk.
-4. **Import-sablon konkrét elrendezése:** az elv eldőlt (a sorozat komponens-készletéből származik); a pontos oszlop-felépítés az építéskor.
-5. **Kép nagyítása:** a lenyíló képsávban a képre koppintva teljes képernyős nézet — hasznos lehet, még nem épült meg.
-6. **Kettőnél több nem-magazin komponens** esetén a hierarchia pontosítása (jelenleg nem aktuális).
-7. **További „nagy kép" szempontok**, ha felmerülnek.
+7. **Címkerendszer:** a listatárban a hely megvan, de a logika (hierarchia? szinonimák? kanonikus alak?) **külön átbeszélendő**, mielőtt szabványosítjuk. *(Lásd bővebben a platform-fejezet „Modulok közti kapcsolat" pontját is.)*
+8. **Import-sablon konkrét elrendezése:** az elv eldőlt (a sorozat komponens-készletéből származik); a pontos oszlop-felépítés az építéskor.
+9. **Kép nagyítása:** a lenyíló képsávban a képre koppintva teljes képernyős nézet — hasznos lehet, még nem épült meg.
+10. **Kettőnél több nem-magazin komponens** esetén a hierarchia pontosítása (jelenleg nem aktuális).
+11. **További „nagy kép" szempontok**, ha felmerülnek.
 
 ---
 
@@ -256,11 +275,12 @@ Az 5b (karbantartás) éles tesztelése során felmerült hibák és a rájuk ad
 4. **Ár beolvasása nem kezelte az ezres tagolást:** `1.490` → hibásan `1`-ként olvasódott be (a `parseInt` a tagoló karakternél megállt). → Javítás: a tagolójelek (pont, vessző, szóköz) eltávolítása szám-értelmezés előtt.
 5. **Kód pozícióból, nem számlálóból származott:** lásd 4. fejezet — javítva.
 
-*(A tényleges kódjavítás folyamatban; ez a napló a döntéseket rögzíti, amíg a build el nem készül.)*
+*(A javítások élesben ellenőrizve, működnek — beleértve egy menet közben talált 6. hibát is: az Excel-feltöltés néma hibája a `dateWarnings` hibás hatóköre miatt, javítva. A dátum-felismerés emellett magyar hónapneveket (Excel-automatikus formázás) is kezel.)*
 
 ---
 
 *Napló:*
+- v1.0 — platform-jegyzetek: „Modulok közti kapcsolat" három elve (általános azonosító, tágabb/szűkebb címke-modell, kezdeményez→jóváhagy→befogad — a jóváhagyási állapot kizárólag a platformon él); négy új Lapról Lapra nyitott kérdés (Lego-jellegű komponens, 12 fölötti sorozatszám, lapszám-beszúrás, többespéldány); az 5b hibajavítási napló „élesben ellenőrizve" állapotra frissítve (a néma Excel-hibával együtt, 6 hiba összesen).
 - v0.9 — hibajavítási kör (5b tesztelés): kód-számláló soha nem forog vissza (sorozat/tétel/komponens); Excel-import célsorozat megerősítő ablak (tervezett); sablon dátum/szám-formátum javítás (tervezett); ár ezres-tagolás javítás (tervezett); sorozatok kézi átrendezése a roadmapre (KÉSŐBB, „keep it simple").
 - v0.8 — képkezelés terve rögzítve (privát Storage, felhasználónkénti mappa, automatikus átméretezés, drag & drop / kamera); új nyitott kérdések: több felhasználós adattárolási modell (közös vs. saját Supabase-projekt, platform-alapú automatizálással) és hordozhatóság/szolgáltatófüggetlenség.
 - v0.7 — **építés megkezdve** (Supabase + app 5a él). Új: komponens-hierarchia (domináns komponens) és a lapszám-színezés táblázata; körbeforgó jelölés, jelöletlenre nincs visszatérés (reset csak szerkesztőben); közös **listatár** (kiadó/komponens/azonosító/forrás, „Egyéb"-bel, bővítés csak szerkesztőben); beszerzés forrása mező; lenyíló képsáv; rejthető belekerülési költség; színes fülek; egységes dátum- és tipográfia-szabály; napfény-olvashatóság elve; tartós bejelentkezés.
