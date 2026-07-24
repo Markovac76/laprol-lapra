@@ -43,7 +43,19 @@
   .brand{display:flex;align-items:center;gap:8px;padding:8px 2px 10px}
   .brand h1{font-family:"Space Grotesk";font-size:19px;font-weight:700;margin:0;flex:1}
   .brand .iconbtn{border:1px solid var(--line);background:var(--panel);color:var(--muted);width:38px;height:34px;border-radius:10px;font-size:15px;cursor:pointer}
+  .tabbar{display:flex;gap:6px;padding:0 0 10px 0;align-items:stretch}
+  .tabnow{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;text-align:center;
+    border:1px solid var(--tabc,var(--line));background:color-mix(in srgb,var(--tabc,var(--accent)) 62%,var(--panel));
+    color:#fff;padding:8px 12px;border-radius:12px;font-size:clamp(13px,3.4vw,16px);font-weight:700;cursor:pointer;
+    font-family:"Space Grotesk";min-height:46px;line-height:1.15;box-shadow:inset 0 0 0 2px var(--tabc,var(--accent));
+    overflow:hidden;text-overflow:ellipsis}
+  .tabtoggle{flex:0 0 auto;border:1px solid var(--line);background:var(--panel);color:var(--muted);
+    padding:8px 12px;border-radius:12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:"Space Grotesk";min-height:46px}
+  .tabtoggle[aria-expanded="true"]{background:var(--panel-2);color:var(--ink);border-color:var(--accent)}
   .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:0 0 10px 0}
+  .tabs[hidden]{display:none}
+  .swfam{margin-bottom:8px}
+  .swfam-nev{display:block;font-size:10.5px;color:var(--faint);margin-bottom:3px;letter-spacing:.03em}
   .tab{display:flex;align-items:center;justify-content:center;text-align:center;
     border:1px solid color-mix(in srgb,var(--tabc) 55%,var(--line));
     background:color-mix(in srgb,var(--tabc) 22%,var(--panel));color:#e8ecf7;
@@ -137,6 +149,8 @@
   .imeta .future{color:#ff6a5c;font-weight:600}
   .imeta .money{color:var(--ink)}
   .imeta .cid{color:var(--faint)}
+  .imeta .dbtag{background:color-mix(in srgb,var(--accent) 30%,var(--panel-2));border:1px solid var(--line);
+    border-radius:999px;padding:1px 8px;color:var(--ink);font-weight:600}
   .empty-state{text-align:center;color:var(--muted);padding:40px 16px;font-size:14px}
   .loading{text-align:center;color:var(--muted);padding:60px 16px;font-size:15px}
   footer{color:var(--faint);font-size:11.5px;text-align:center;padding:8px 0 26px}
@@ -213,7 +227,11 @@
       <button class="iconbtn" id="admToggle" title="Karbantartás" aria-pressed="false">🔧</button>
       <button class="iconbtn" id="logout" title="Kijelentkezés">⎋</button>
     </div>
-    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="tabbar">
+      <button class="tabnow" id="tabnow"></button>
+      <button class="tabtoggle" id="tabtoggle" aria-expanded="false" title="Sorozatok">Sorozatok ▾</button>
+    </div>
+    <div class="tabs" id="tabs" role="tablist" hidden></div>
   </div></header>
   <main class="wrap">
     <section class="hero" id="hero"></section>
@@ -255,7 +273,15 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || "hianyzik", {
 
 /* ---- állapot ---- */
 let SERIES=[], activeIdx=0, filter="mind", query="", adminMode=false, LISTS={};
-const PAL12=["#3a6ea5","#d21f2b","#7b52b8","#2e9e8f","#c9772e","#c94f9e","#4f7bd2","#e0a13a","#6bbf59","#b0504d","#3aa6b9","#8a7dd6"];
+const PAL_FAMILIES=[
+  {nev:"Kék",    szinek:["#2f5f8f","#3a6ea5","#4f8ac4","#6ea6dd"]},
+  {nev:"Vörös",  szinek:["#a8202b","#d21f2b","#e04c47","#eb7a6b"]},
+  {nev:"Lila",   szinek:["#5b3d96","#7b52b8","#9a72d4","#b795e6"]},
+  {nev:"Zöld",   szinek:["#1f7a5e","#2e9e8f","#4fbf9b","#6bbf59"]},
+  {nev:"Barna",  szinek:["#8a4f22","#c9772e","#d99a4e","#b0504d"]},
+  {nev:"Magenta",szinek:["#9c3a78","#c94f9e","#dd7ab6","#8a7dd6"]},
+];
+const PAL12=PAL_FAMILIES.flatMap(f=>f.szinek);   // visszafelé kompatibilis, sík lista
 const DISPLAY_MAX=16;
 const COMP_TYPES={magazin:"Magazin",modell:"Modell",konyv:"Könyv",egyeb:"Egyéb"};
 const PAL_FALLBACK="#3a6ea5";
@@ -281,7 +307,7 @@ async function loadData(){
   if(!l.error && l.data) l.data.forEach(r=>{ (LISTS[r.tipus]=LISTS[r.tipus]||[]).push({ertek:r.ertek,nev:r.megjelenites||r.ertek}); });
   const byS={}, byI={};
   SERIES = s.data.map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,items:[]}; byS[r.id]=o; return o; });
-  i.data.forEach(r=>{ const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,fedelar:r.fedelar,fizetve:r.beszerzesi_ar,fizetve_datum:r.beszerzes_datuma,forras:r.forras,comps:{}}; byI[r.id]=o; const ser=byS[r.series_id]; if(ser) ser.items.push(o); });
+  i.data.forEach(r=>{ const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,fedelar:r.fedelar,fizetve:r.beszerzesi_ar,fizetve_datum:r.beszerzes_datuma,forras:r.forras,db:(r.mennyiseg==null?1:r.mennyiseg),comps:{}}; byI[r.id]=o; const ser=byS[r.series_id]; if(ser) ser.items.push(o); });
   c.data.forEach(r=>{ const it=byI[r.issue_id]; if(it) it.comps[r.tipus]={id:r.id,status:r.status,azonosito:r.azonosito,azonosito_tipus:r.azonosito_tipus,note:r.jegyzet,kep_url:r.kep_url}; });
   SERIES.forEach(x=>x.items.sort((a,b)=>a.n-b.n));
   if(activeIdx>=SERIES.length) activeIdx=0;
@@ -292,7 +318,7 @@ function stats(si){
   const s=SERIES[si]; const perType={}; s.components.forEach(t=>perType[t]={owned:0,total:s.items.length});
   let belekerulesi=0, beszerzendo=0, next=null, hasFuture=false;
   for(const it of s.items){
-    if(it.fizetve) belekerulesi+=it.fizetve;
+    if(it.fizetve) belekerulesi += it.fizetve * (it.db||1);
     const future=it.date&&it.date>todayISO;
     if(future) hasFuture=true;
     for(const t of s.components){ const st=it.comps[t]?it.comps[t].status:null;
@@ -307,9 +333,21 @@ function stats(si){
 
 /* ---- render ---- */
 function setAccent(){ document.documentElement.style.setProperty("--accent",S().accent); }
-function renderTabs(){ document.getElementById("tabs").innerHTML=SERIES.map((s,i)=>`
-  <button class="tab" role="tab" data-i="${i}" aria-selected="${i===activeIdx}" style="--tabc:${s.accent}">
-    <span class="lbl">${esc(s.display||s.sorozat)}</span></button>`).join(""); }
+let tabsOpen=false;
+function renderTabs(){
+  const cur=S();
+  const now=document.getElementById("tabnow");
+  if(cur){ now.textContent=cur.display||cur.sorozat; now.style.setProperty("--tabc",cur.accent); }
+  else { now.textContent="—"; }
+  const tog=document.getElementById("tabtoggle");
+  tog.textContent = `Sorozatok (${SERIES.length}) ` + (tabsOpen?"▴":"▾");
+  tog.setAttribute("aria-expanded", tabsOpen);
+  const el=document.getElementById("tabs");
+  el.hidden = !tabsOpen;
+  el.innerHTML=SERIES.map((s,i)=>`
+    <button class="tab" role="tab" data-i="${i}" aria-selected="${i===activeIdx}" style="--tabc:${s.accent}">
+      <span class="lbl">${esc(s.display||s.sorozat)}</span></button>`).join("");
+}
 let costVisible=false;   // alapállapot: rejtett; sorozatváltáskor visszaáll
 function renderHero(){
   const s=S(), st=stats(activeIdx);
@@ -399,6 +437,7 @@ function renderList(){
     const future=it.date&&it.date>todayISO;
     const state=issueState(it,s);
     const dateHtml=it.date?`<span class="${future?"future":""}">${fmtDate(it.date)}</span>`:`<span style="color:var(--faint)">nincs dátum</span>`;
+    const dbTag=(it.db&&it.db>1)?`<span class="dbtag">${it.db} db</span>`:"";
     const money=[it.fedelar!=null?`fedélár ${fmtFt(it.fedelar)}`:null,it.fizetve!=null?`fizetve ${fmtFt(it.fizetve)}`:null].filter(Boolean).join(" · ");
     const marks=s.components.map(t=>{ const c=it.comps[t]||{status:null}; const stt=c.status;
       return `<button class="mark${stt?" m-"+stt:""}" data-n="${it.n}" data-t="${t}" ${future?"disabled":""}
@@ -416,7 +455,7 @@ function renderList(){
       <div class="num">#${it.n}</div>
       <div class="rmain">
         <div class="ititle ${it.name?"":"empty"}">${esc(it.name||"még nincs cím")}</div>
-        <div class="imeta">${dateHtml}${money?`<span class="money">${money}</span>`:""}<span class="cid">${scode}-${pad(it.n,4)}</span></div>
+        <div class="imeta">${dateHtml}${money?`<span class="money">${money}</span>`:""}${dbTag}<span class="cid">${scode}-${pad(it.n,4)}</span></div>
       </div>
       <div class="marks">${marks}
         ${adminMode?`<button class="rowedit" data-edit="${it.n}" title="Szerkesztés">✎</button>`:""}
@@ -433,7 +472,9 @@ window.addEventListener("resize",syncHeadHeight);
 function renderAll(){ if(!SERIES.length){ document.getElementById("hero").innerHTML=""; document.getElementById("chips").innerHTML=""; document.getElementById("listhead").innerHTML=""; document.getElementById("list").innerHTML=`<div class="empty-state">Nincs még sorozat.</div>`; return; } setAccent(); renderTabs(); renderHero(); renderChips(); renderListHead(); renderList(); syncHeadHeight(); }
 
 /* ---- események ---- */
-document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return; activeIdx=+b.dataset.i; costVisible=false; openIssue=null; window.scrollTo({top:0}); renderAll();});
+document.getElementById("tabtoggle").addEventListener("click",()=>{ tabsOpen=!tabsOpen; renderTabs(); syncHeadHeight(); });
+document.getElementById("tabnow").addEventListener("click",()=>{ tabsOpen=!tabsOpen; renderTabs(); syncHeadHeight(); });
+document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return; activeIdx=+b.dataset.i; costVisible=false; openIssue=null; tabsOpen=false; window.scrollTo({top:0}); renderAll();});
 document.getElementById("chips").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return; filter=b.dataset.f; openIssue=null; renderChips(); renderList();});
 document.getElementById("search").addEventListener("input",e=>{query=e.target.value.trim(); openIssue=null; renderList();});
 
@@ -468,7 +509,7 @@ function err(e){ alert("Hiba: "+(e.message||e)); }
 function itemForm(existing){
   const s=S();
   const nextN = existing ? existing.n : (s.items.reduce((m,x)=>Math.max(m,x.n||0),0)+1);
-  const it = existing || {n:nextN,name:"",date:"",fedelar:"",fizetve:"",fizetve_datum:"",forras:"",comps:{}};
+  const it = existing || {n:nextN,name:"",date:"",fedelar:"",fizetve:"",fizetve_datum:"",forras:"",db:1,comps:{}};
   const scode=pad(S().kodSzam||(activeIdx+1),3);
   const compBlocks = s.components.map((t,ci)=>{
     const c=it.comps[t]||{};
@@ -507,6 +548,8 @@ function itemForm(existing){
       <div class="field"><label>Beszerzés dátuma</label><input id="f-fdatum" type="date" value="${it.fizetve_datum||""}"></div>
       <div class="field"><label>Beszerzés forrása</label><select id="f-forras"><option value="">—</option>${opts("forras",it.forras)}</select></div>
     </div>
+    <div class="field"><label>Mennyiség (db) <span style="color:var(--faint);font-weight:400">— ha egy vásárlásból több példány (pl. a melléklet miatt)</span></label>
+      <input id="f-db" type="number" min="1" value="${it.db??1}"></div>
     ${compBlocks}
     <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="f-save">Mentés</button></div>
     ${existing?`<div class="modrow"><button class="btn danger" id="f-del">Tétel törlése</button></div>`:""}`);
@@ -523,7 +566,8 @@ function itemForm(existing){
     const payload={ lapszam:n, cim:v("f-name")||null, megjelenes:v("f-date")||null,
       fedelar:v("f-fedelar")?parseInt(v("f-fedelar")):null,
       beszerzesi_ar:v("f-fizetve")?parseInt(v("f-fizetve")):null,
-      beszerzes_datuma:v("f-fdatum")||null, forras:v("f-forras")||null };
+      beszerzes_datuma:v("f-fdatum")||null, forras:v("f-forras")||null,
+      mennyiseg: Math.max(1, parseInt(v("f-db"))||1) };
     try{
       let issueId = existing ? existing.id : null;
       if(existing){
@@ -568,8 +612,11 @@ function seriesForm(existing){
       <input id="s-display" maxlength="${DISPLAY_MAX}" value="${s?esc(s.display||""):""}"></div>
     <div class="field"><label>Komponensek (miből áll egy szám)</label><div class="compchecks" id="s-comps">
       ${compList.map(o=>`<button type="button" class="compcheck" data-t="${esc(o.ertek)}" aria-pressed="${comps.includes(o.ertek)}">${esc(o.nev)}</button>`).join("")}</div></div>
-    <div class="field"><label>Szín</label><div class="swatches" id="s-sw">
-      ${PAL12.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-pressed="${c===color}"></button>`).join("")}</div></div>
+    <div class="field"><label>Szín <span style="color:var(--faint);font-weight:400">— rokon sorozatoknak érdemes egy családból választani</span></label>
+      <div id="s-sw">${PAL_FAMILIES.map(f=>`
+        <div class="swfam"><span class="swfam-nev">${f.nev}</span>
+          <div class="swatches">${f.szinek.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-pressed="${c===color}"></button>`).join("")}</div>
+        </div>`).join("")}</div></div>
     <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="s-save">${s?"Mentés":"Létrehozás"}</button></div>
     ${s?`<div class="modrow"><button class="btn danger" id="s-del">Sorozat törlése</button></div>`:""}`);
 
