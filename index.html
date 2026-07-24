@@ -708,11 +708,11 @@ async function downloadTemplate(){
 async function handleUpload(file){
   const s=S();
   if(!s){ alert("Előbb hozz létre egy sorozatot (+ Új sorozat), utána tudsz hozzá Excelt feltölteni."); return; }
-  let plan;
+  let plan=[], dateWarnings=[];
   try{
     const X=await xlsx(); const wb=X.read(await file.arrayBuffer(),{cellDates:true});
     const aoa=X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:""});
-    plan=[]; let bad=0; const dateWarnings=[];
+    let bad=0;
     for(const row of aoa){
       if(!row||!row.length) continue;
       const n=parseInt(String(row[0]).trim()); if(isNaN(n)){ bad++; continue; }
@@ -783,7 +783,7 @@ document.getElementById("a-series").onclick=()=>seriesForm(null);
 document.getElementById("a-lists").onclick=listsForm;
 document.getElementById("a-template").onclick=downloadTemplate;
 document.getElementById("a-upload").onclick=()=>document.getElementById("upl").click();
-document.getElementById("upl").addEventListener("change",function(){ const f=this.files&&this.files[0]; if(f) handleUpload(f); this.value=""; });
+document.getElementById("upl").addEventListener("change",function(){ const f=this.files&&this.files[0]; if(f) handleUpload(f).catch(err); this.value=""; });
 
 /* ---- bejelentkezés ---- */
 async function showApp(){
