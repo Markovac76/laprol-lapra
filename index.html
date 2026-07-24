@@ -280,7 +280,7 @@ async function loadData(){
   LISTS={};
   if(!l.error && l.data) l.data.forEach(r=>{ (LISTS[r.tipus]=LISTS[r.tipus]||[]).push({ertek:r.ertek,nev:r.megjelenites||r.ertek}); });
   const byS={}, byI={};
-  SERIES = s.data.map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],items:[]}; byS[r.id]=o; return o; });
+  SERIES = s.data.map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,items:[]}; byS[r.id]=o; return o; });
   i.data.forEach(r=>{ const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,fedelar:r.fedelar,fizetve:r.beszerzesi_ar,fizetve_datum:r.beszerzes_datuma,forras:r.forras,comps:{}}; byI[r.id]=o; const ser=byS[r.series_id]; if(ser) ser.items.push(o); });
   c.data.forEach(r=>{ const it=byI[r.issue_id]; if(it) it.comps[r.tipus]={id:r.id,status:r.status,azonosito:r.azonosito,azonosito_tipus:r.azonosito_tipus,note:r.jegyzet,kep_url:r.kep_url}; });
   SERIES.forEach(x=>x.items.sort((a,b)=>a.n-b.n));
@@ -394,7 +394,7 @@ function renderListHead(){
 function renderList(){
   const s=S(), items=s.items.filter(matches), list=document.getElementById("list");
   if(!items.length){ list.innerHTML=`<div class="empty-state">Nincs a szűrőnek megfelelő szám.</div>`; return; }
-  const scode=pad(activeIdx+1,3);
+  const scode=pad(S().kodSzam||(activeIdx+1),3);
   list.innerHTML=items.map(it=>{
     const future=it.date&&it.date>todayISO;
     const state=issueState(it,s);
@@ -469,7 +469,7 @@ function itemForm(existing){
   const s=S();
   const nextN = existing ? existing.n : (s.items.reduce((m,x)=>Math.max(m,x.n||0),0)+1);
   const it = existing || {n:nextN,name:"",date:"",fedelar:"",fizetve:"",fizetve_datum:"",forras:"",comps:{}};
-  const scode=pad(activeIdx+1,3);
+  const scode=pad(S().kodSzam||(activeIdx+1),3);
   const compBlocks = s.components.map((t,ci)=>{
     const c=it.comps[t]||{};
     const st=c.status||null;
@@ -591,7 +591,8 @@ function seriesForm(existing){
       if(s){ const {error}=await supabase.from("series").update(payload).eq("id",s.id); if(error) throw error; }
       else {
         const so=SERIES.length;
-        const {error}=await supabase.from("series").insert({...payload, sort_order:so}); if(error) throw error;
+        const kodSzam=await nextSeriesNo();
+        const {error}=await supabase.from("series").insert({...payload, sort_order:so, kod_szam:kodSzam}); if(error) throw error;
       }
       closeModal(); await reload(); if(!s) activeIdx=SERIES.length-1; renderAll();
     }catch(e){ err(e); }
@@ -631,51 +632,121 @@ function listsForm(){
   });
 }
 
+/* ---- Soha vissza nem forgó sorozat-kód számláló ---- */
+async function nextSeriesNo(){
+  const uid=(await supabase.auth.getUser()).data.user.id;
+  let {data,error}=await supabase.from("counters").select("*").eq("user_id",uid).maybeSingle();
+  if(error) throw error;
+  if(!data){
+    const ins=await supabase.from("counters").insert({user_id:uid,next_series_no:2}).select().single();
+    if(ins.error) throw ins.error;
+    return 1;
+  }
+  const no=data.next_series_no;
+  const {error:upErr}=await supabase.from("counters").update({next_series_no:no+1}).eq("user_id",uid);
+  if(upErr) throw upErr;
+  return no;
+}
+
 /* ---- Excel: sablon + feltöltés (csak asztali) ---- */
 let _xlsx=null; async function xlsx(){ if(!_xlsx) _xlsx=await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm"); return _xlsx; }
 function coerceDate(v){ if(v==null||v==="") return null;
   if(v instanceof Date && !isNaN(v)) return new Date(v.getTime()-v.getTimezoneOffset()*60000).toISOString().slice(0,10);
   const t=String(v).trim(); return t?t.replace(/[.\/]/g,"-").replace(/-+$/,""):null; }
+function parseHuNumber(v){
+  if(v==null || v==="") return null;
+  if(typeof v==="number") return Math.round(v);
+  let s=String(v).trim(); if(!s) return null;
+  const neg=s.startsWith("-");
+  // "1.490,50" vagy "1490,50" alakú tizedes vessző esetén kezeljük tizedesként
+  const m=s.match(/^-?\d{1,3}(?:[ .]\d{3})*,(\d{1,2})$/);
+  if(m){ const num=parseFloat(s.replace(/[ .]/g,"").replace(",",".")); return Math.round(num); }
+  // egyébként minden nem-számjegyet eltávolítunk (ezres pont/vessző/szóköz mind eltűnik)
+  const digits=s.replace(/[^\d]/g,"");
+  if(!digits) return null;
+  return (neg?-1:1)*parseInt(digits,10);
+}
 function normStatus(v){ if(!v) return undefined; const t=String(v).trim().toLowerCase().replace(/\s+/g,"");
   if(t==="megvan")return"megvan"; if(t==="hianyzik"||t==="hiányzik"||t==="hiany"||t==="hiány")return"hianyzik";
   if(t==="nemkell")return"nemkell"; return undefined; }
-function tmplHead(s){ const h=["lapszám","cím","dátum","fedélár","beszerzési ár"];
-  s.components.forEach(t=>{ h.push((COMP_TYPES[t]||t)+" státusz"); h.push((COMP_TYPES[t]||t)+" azonosító"); }); return h; }
+function tmplHead(s){ const h=["lapszám","cím","dátum (Excel dátum, pl. 2026.03.15)","fedélár (csak szám)","beszerzési ár (csak szám)"];
+  s.components.forEach(t=>{ h.push((COMP_TYPES[t]||t)+" státusz (megvan/hianyzik/nemkell)"); h.push((COMP_TYPES[t]||t)+" azonosító"); }); return h; }
 async function downloadTemplate(){
-  try{ const X=await xlsx(), s=S(), head=tmplHead(s);
-    const ex=[1,"Példa – írd át vagy töröld","","2490",""]; s.components.forEach(()=>{ ex.push("megvan"); ex.push(""); });
-    const ws=X.utils.aoa_to_sheet([head,ex]); ws["!cols"]=head.map(h=>({wch:Math.max(12,h.length+2)}));
+  const s=S();
+  if(!s){ alert("Előbb hozz létre egy sorozatot (+ Új sorozat), utána tudsz hozzá sablont letölteni."); return; }
+  try{
+    const X=await xlsx(), head=tmplHead(s);
+    // valódi Excel dátum- és szám-típusú példacellák, hogy Excel a helyes formátumot ajánlja fel
+    const ex1=[1,"Példa – írd át vagy töröld", new Date(2026,2,15), 2490, ""];
+    s.components.forEach(()=>{ ex1.push("megvan"); ex1.push(""); });
+    const ex2=[2,"Másik példa", new Date(2026,3,15), 1490, 1490];
+    s.components.forEach(()=>{ ex2.push(""); ex2.push(""); });
+    const ws=X.utils.aoa_to_sheet([head,ex1,ex2], {cellDates:true});
+    ws["!cols"]=head.map(h=>({wch:Math.max(14,h.length+2)}));
+    // pénz-oszlopok (D, E) explicit szám-formátum
+    ["D2","E2","D3","E3"].forEach(ref=>{ if(ws[ref]) ws[ref].z='#,##0" Ft"'; });
+    if(ws["C2"]) ws["C2"].z="yyyy-mm-dd"; if(ws["C3"]) ws["C3"].z="yyyy-mm-dd";
     const wb=X.utils.book_new(); X.utils.book_append_sheet(wb,ws,"Sorozat");
     X.writeFile(wb,`laprol-lapra-sablon-${(s.display||s.sorozat).replace(/\s+/g,"-")}.xlsx`);
   }catch(e){ err(e); }
 }
 async function handleUpload(file){
   const s=S();
+  if(!s){ alert("Előbb hozz létre egy sorozatot (+ Új sorozat), utána tudsz hozzá Excelt feltölteni."); return; }
+  let plan;
   try{
     const X=await xlsx(); const wb=X.read(await file.arrayBuffer(),{cellDates:true});
     const aoa=X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:""});
-    let added=0,updated=0;
+    plan=[]; let bad=0;
     for(const row of aoa){
       if(!row||!row.length) continue;
-      const n=parseInt(String(row[0]).trim()); if(isNaN(n)) continue;
+      const n=parseInt(String(row[0]).trim()); if(isNaN(n)){ bad++; continue; }
       const name=String(row[1]??"").trim(), date=coerceDate(row[2]);
-      const fed=String(row[3]??"").replace(/\s/g,""), fiz=String(row[4]??"").replace(/\s/g,"");
+      const fed=parseHuNumber(row[3]), fiz=parseHuNumber(row[4]);
       const p={}; if(name) p.cim=name; if(date) p.megjelenes=date;
-      if(fed) p.fedelar=parseInt(fed); if(fiz) p.beszerzesi_ar=parseInt(fiz);
-      let it=s.items.find(x=>x.n===n), issueId;
-      if(it){ issueId=it.id; if(Object.keys(p).length){ const {error}=await supabase.from("issues").update(p).eq("id",it.id); if(error) throw error; } updated++; }
-      else { const {data,error}=await supabase.from("issues").insert({...p, series_id:s.id, lapszam:n}).select().single(); if(error) throw error; issueId=data.id; added++; }
+      if(fed!=null) p.fedelar=fed; if(fiz!=null) p.beszerzesi_ar=fiz;
+      const comps=[];
       for(let ci=0; ci<s.components.length; ci++){
         const t=s.components[ci];
         const st=normStatus(row[5+ci*2]); const az=String(row[6+ci*2]??"").trim();
         const cp={}; if(st!==undefined) cp.status=st; if(az) cp.azonosito=az;
-        const cur=it?it.comps[t]:null;
-        if(cur&&cur.id){ if(Object.keys(cp).length){ const {error}=await supabase.from("components").update(cp).eq("id",cur.id); if(error) throw error; } }
-        else { const {error}=await supabase.from("components").insert({...cp, issue_id:issueId, tipus:t}); if(error) throw error; }
+        comps.push({t,cp});
       }
+      const existing=s.items.find(x=>x.n===n);
+      plan.push({n, p, comps, isNew:!existing});
     }
-    await reload(); alert(`Feltöltve „${s.sorozat}” sorozatba.\nÚj: ${added}, frissítve: ${updated}`);
-  }catch(e){ err(e); }
+  }catch(e){ err(e); return; }
+
+  if(!plan.length){ alert("Nem találtam feldolgozható sort a fájlban."); return; }
+  const added=plan.filter(x=>x.isNew).length, updated=plan.length-added;
+  openModal(`<h2>Feltöltés megerősítése</h2>
+    <p class="msub">Ez a fájl a <b>„${esc(s.sorozat)}”</b> sorozatba kerül.</p>
+    <div class="example" style="font-size:13px">
+${plan.length} sor feldolgozva a fájlból:
+  • ${added} új tétel jön létre
+  • ${updated} meglévő tétel frissül (felülíródik)
+${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új)":" (frissül)"}`).join("\n")}${plan.length>5?"\n  …":""}
+</div>
+    <p class="msub" style="margin-top:10px">Ha ez nem a várt sorozat vagy a szám nem stimmel, inkább <b>Mégse</b>, és ellenőrizd, melyik fület nyitottad meg feltöltés előtt.</p>
+    <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="up-confirm">Feltöltés a(z) „${esc(s.display||s.sorozat)}” sorozatba</button></div>`);
+
+  document.getElementById("up-confirm").onclick=async ()=>{
+    closeModal();
+    try{
+      let ins=0, upd=0;
+      for(const item of plan){
+        let it=s.items.find(x=>x.n===item.n), issueId;
+        if(it){ issueId=it.id; if(Object.keys(item.p).length){ const {error}=await supabase.from("issues").update(item.p).eq("id",it.id); if(error) throw error; } upd++; }
+        else { const {data,error}=await supabase.from("issues").insert({...item.p, series_id:s.id, lapszam:item.n}).select().single(); if(error) throw error; issueId=data.id; ins++; }
+        for(const {t,cp} of item.comps){
+          const cur=it?it.comps[t]:null;
+          if(cur&&cur.id){ if(Object.keys(cp).length){ const {error}=await supabase.from("components").update(cp).eq("id",cur.id); if(error) throw error; } }
+          else { const {error}=await supabase.from("components").insert({...cp, issue_id:issueId, tipus:t}); if(error) throw error; }
+        }
+      }
+      await reload(); alert(`Feltöltve „${s.sorozat}” sorozatba.\nÚj: ${ins}, frissítve: ${upd}`);
+    }catch(e){ err(e); }
+  };
 }
 
 /* ---- újratöltés a Supabase-ből ---- */
@@ -686,8 +757,8 @@ async function reload(){ const keep=activeIdx; try{ await loadData(); }catch(e){
 document.getElementById("admToggle").onclick=function(){ adminMode=!adminMode;
   this.setAttribute("aria-pressed",adminMode); this.classList.toggle("on",adminMode);
   document.getElementById("admbar").style.display=adminMode?"flex":"none"; renderList(); };
-document.getElementById("a-item").onclick=()=>itemForm(null);
-document.getElementById("a-editseries").onclick=()=>seriesForm(S());
+document.getElementById("a-item").onclick=()=>{ if(!S()){ alert("Előbb hozz létre egy sorozatot (+ Új sorozat)."); return; } itemForm(null); };
+document.getElementById("a-editseries").onclick=()=>{ if(!S()){ alert("Nincs sorozat, amit szerkeszteni lehetne."); return; } seriesForm(S()); };
 document.getElementById("a-series").onclick=()=>seriesForm(null);
 document.getElementById("a-lists").onclick=listsForm;
 document.getElementById("a-template").onclick=downloadTemplate;
