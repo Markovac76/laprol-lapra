@@ -650,9 +650,24 @@ async function nextSeriesNo(){
 
 /* ---- Excel: sablon + feltöltés (csak asztali) ---- */
 let _xlsx=null; async function xlsx(){ if(!_xlsx) _xlsx=await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm"); return _xlsx; }
-function coerceDate(v){ if(v==null||v==="") return null;
+const HU_MONTHS={jan:1,január:1,febr:2,február:2,márc:3,március:3,ápr:4,április:4,
+  máj:5,május:5,jún:6,június:6,júl:7,július:7,aug:8,augusztus:8,
+  szept:9,szeptember:9,okt:10,október:10,nov:11,november:11,dec:12,december:12};
+function isoDate(y,mo,d){ y=parseInt(y); mo=parseInt(mo); d=parseInt(d);
+  if(!y||mo<1||mo>12||d<1||d>31) return null;
+  return `${y}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
+function coerceDate(v){
+  if(v==null||v==="") return null;
   if(v instanceof Date && !isNaN(v)) return new Date(v.getTime()-v.getTimezoneOffset()*60000).toISOString().slice(0,10);
-  const t=String(v).trim(); return t?t.replace(/[.\/]/g,"-").replace(/-+$/,""):null; }
+  let s=String(v).trim(); if(!s) return null;
+  // ÉÉÉÉ-HH-NN / ÉÉÉÉ.HH.NN / ÉÉÉÉ/HH/NN
+  let m=s.match(/^(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})\.?$/);
+  if(m) return isoDate(m[1],m[2],m[3]);
+  // Excel-féle, magyar hónapnévvel/szóközzel tördelt alak: "2025- aug- 26", "2025 augusztus 26."
+  m=s.toLowerCase().match(/^(\d{4})[.\-\s]+([a-záéíóöőúüű]+)\.?[.\-\s]+(\d{1,2})\.?$/i);
+  if(m){ const mo=HU_MONTHS[m[2].replace(/\.$/,"")]; if(mo) return isoDate(m[1],mo,m[3]); }
+  return null;  // felismerhetetlen formátum → nem dob hibát, csak üresen marad
+}
 function parseHuNumber(v){
   if(v==null || v==="") return null;
   if(typeof v==="number") return Math.round(v);
@@ -697,11 +712,12 @@ async function handleUpload(file){
   try{
     const X=await xlsx(); const wb=X.read(await file.arrayBuffer(),{cellDates:true});
     const aoa=X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:""});
-    plan=[]; let bad=0;
+    plan=[]; let bad=0; const dateWarnings=[];
     for(const row of aoa){
       if(!row||!row.length) continue;
       const n=parseInt(String(row[0]).trim()); if(isNaN(n)){ bad++; continue; }
       const name=String(row[1]??"").trim(), date=coerceDate(row[2]);
+      if(row[2] && String(row[2]).trim() && !date) dateWarnings.push(n);
       const fed=parseHuNumber(row[3]), fiz=parseHuNumber(row[4]);
       const p={}; if(name) p.cim=name; if(date) p.megjelenes=date;
       if(fed!=null) p.fedelar=fed; if(fiz!=null) p.beszerzesi_ar=fiz;
@@ -719,8 +735,12 @@ async function handleUpload(file){
 
   if(!plan.length){ alert("Nem találtam feldolgozható sort a fájlban."); return; }
   const added=plan.filter(x=>x.isNew).length, updated=plan.length-added;
+  const warnBlock = dateWarnings.length
+    ? `<p class="msub" style="color:#f0cd8a">⚠ ${dateWarnings.length} sor dátuma nem volt felismerhető (#${dateWarnings.slice(0,8).join(", #")}${dateWarnings.length>8?"…":""}) — ezeknél a dátum üresen marad, a többi mező feltöltődik.</p>`
+    : "";
   openModal(`<h2>Feltöltés megerősítése</h2>
     <p class="msub">Ez a fájl a <b>„${esc(s.sorozat)}”</b> sorozatba kerül.</p>
+    ${warnBlock}
     <div class="example" style="font-size:13px">
 ${plan.length} sor feldolgozva a fájlból:
   • ${added} új tétel jön létre
