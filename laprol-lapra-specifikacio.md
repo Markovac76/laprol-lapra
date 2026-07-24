@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.0 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.1 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -82,7 +82,7 @@ Minden elem két azonosítót kap, külön szerepben:
 UUID · kód · **kiadó** · **megnevezés** (teljes név) · **megjelenítendő név** (fülön, max **16** karakter) · **szín** (12-es paletta, de bármennyi sorozat) · **komponens-készlet** (mely komponensekből áll egy szám ebben a sorozatban — a modul készletéből választva). **[DÖNTVE]**
 
 ### 5.2 Szám (= „tartó") **[DÖNTVE]**
-UUID · kód · **lapszám** · **megjelenés dátuma** (elhagyható) · **fedélár** (referencia-ár, az egész számra, elhagyható) · **beszerzési ár** („amit fizettem", elhagyható) · **beszerzés dátuma** (elhagyható). A szám önmagában nem birtokol státuszt — a státusz a komponenseké. Az **ár a számon ül** (nem komponensenként), és nem szétosztható. **[DÖNTVE]**
+UUID · kód · **lapszám** · **megjelenés dátuma** (elhagyható) · **fedélár** (referencia-ár, az egész számra, elhagyható) · **beszerzési ár** („amit fizettem", elhagyható) · **beszerzés dátuma** (elhagyható) · **mennyiség** (db, alapértelmezetten 1 — több példány egy beszerzésből, pl. 4 magazin a melléklet miatt; beépül a belekerülési költség számításába: mennyiség × beszerzési ár). A szám önmagában nem birtokol státuszt — a státusz a komponenseké. Az **ár a számon ül** (nem komponensenként), és nem szétosztható. **[DÖNTVE]**
 
 ### 5.3 Komponens (a lényegi újdonság) **[DÖNTVE]**
 A komponens-**típusokat a modul** definiálja (magazin / modell / egyéb; a modul szintjén bővíthető). Minden **sorozat megadja**, mely komponensekből áll egy szám (Disney: csak füzet; F1: magazin + modell), a modul készletéből választva. Az **import-sablon a sorozat komponens-készletéből származik**, így a kettő sosem csúszik szét.
@@ -224,12 +224,13 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 
 1. **Komponens-típus bővítés: Lego-jellegű sorozatok** **[NYITOTT]**
    Hasonló szerkezetű, de eddig nem kezelt sorozattípus: magazin + figura (pl. Lego) — a mostani komponens-modell (5.3) ezt már ma is elbírja, csak egy új komponens-típust kell felvenni a listatárba (☰ Listák), kódolás nélkül. Kapcsolódik az 5.6 „azonosító mező tudatosan általános" ponthoz.
-2. **12 fölötti sorozatszám kezelése** **[NYITOTT]**
-   Ha 12 fölé nő a sorozatok száma: mi történjen a fülek színeivel (ismétlődés / bővített paletta / szabad színválasztó) és a fülek elrendezésével (3-as grid meddig marad átlátható; kellhet keresés/szűrés a sorozatok *között* is, nem csak a tételek között).
-3. **Lapszám beszúrása lista közepére, sorszám-eltolással** **[NYITOTT]**
-   Eddig mindig a következő szabad lapszámot ajánlja fel az app; felmerült az igény, hogy néha egy korábbi pozícióba kelljen beszúrni, ami az utána lévő lapszámokat eltolja. **Fontos:** ez a kiadvány saját, valós lapszáma, **nem** a belső kód-számláló (4. fejezet) — a kettő élesen elkülönítendő, a kód-számláló szabálya nem változik emiatt.
-4. **Többespéldány kezelése egy beszerzésen belül** **[NYITOTT]**
-   Példa: 4 db ugyanabból a magazinból egy vásárlással (mert a melléklet kell többször). A mostani modell 1 beszerzés = 1 tétel; a többes példány (és részleges elhasználódás/csere, pl. a mellékletek egy része később eltörik vagy elcserélődik) még nincs kezelve. Kapcsolódik a platform-fejezet „meglévő kapcsolat sérülése (drift)" elvéhez — enélkül a modulok-közti drift-értesítés sem tudna mennyiségi változást kifejezni.
+2. **12 fölötti sorozatszám kezelése — 8–15 sorozatra tervezve** **[DÖNTVE, építés alatt]**
+   - **Színek:** bővített, **színcsaládokba csoportosított** paletta (kb. 6 család × 3–4 árnyalat). A színválasztó vizuálisan csoportosítva mutatja a családokat, hogy logikailag összetartozó sorozatok (pl. modellautók, könyvek, Lego-figurák) hasonló árnyalatot kaphassanak. **Nincs mögötte tárolt kategória-adat** — tisztán vizuális segítség, tudatosan nem előlegzi meg a platform jövőbeli címke-/fogalomtárát.
+   - **Fülek elrendezése:** **összecsukható fülsáv** — alapból csak az aktív sorozat füle látszik nagyban, mellette egy „Sorozatok" gombbal nyitható a többi (mini-választó, nem állandóan kiterített rács). 20–30+ sorozatnál később megfontolandó egy kereshető sorozatválasztó is — egyelőre nem indokolt.
+3. **Lapszám beszúrása lista közepére** **[LEZÁRVA, funkció nem szükséges]**
+   Tisztázva: a lapszám a rendszerben **nem pozíció, hanem sima adat** — a tételek mindig szám szerint rendeződnek, nem felvitel sorrendje szerint. Ha a kiadó kihagy egy számot és később pótolja (pl. 1,2,3,4,6,7… majd később az 5), elég felvinni az 5-öst — magától a helyére kerül, semmit nem kell eltolni. **Valódi átszámozás** (amikor a kiadó ténylegesen minden utána lévő számot átszámoz, pl. egy beékelt különkiadás miatt) nem jellemző eset a tulajdonos szerint — nem épül rá funkció.
+4. **Többespéldány kezelése egy beszerzésen belül** **[DÖNTVE, építés alatt]**
+   Példa: 4 db ugyanabból a magazinból egy vásárlással (mert a melléklet kell többször). Megoldás: egyszerű **„mennyiség (db)"** mező a **számon** (alapértelmezetten 1), ami beépül a belekerülési költség számításába (mennyiség × beszerzési ár). A komponens-státusz marad **egyetlen egyszerű jelző** (megvan/hiányzik/nem kell) — tudatosan nem bomlik szét példányonkénti részállapotra. Az egyes példányok sorsának részletei (pl. „4-ből 2 megvan, 1 eltört, 1 elcserélve") a már meglévő **szabad jegyzet mezőbe** írhatók, strukturálás nélkül. *(A platform-fejezet „drift" elvéhez kapcsolódik: mennyiségi árnyalat nélkül a modulok-közti értesítés is csak megvan/nincs-meg szinten tudna jelezni.)*
 5. **Több felhasználó — adattárolási modell** **[NYITOTT]**
    Jelenleg: **egy közös Supabase-projekt**, felhasználónként szétválasztott adattal (RLS + saját mappa a képeknek). Alternatíva: **felhasználónként saját Supabase-projekt**.
    - *Saját projekt mellett:* teljes adatszétválasztás, külön tárhelykeret, illeszkedik a „modul birtokolja az adatot" elvhez.
@@ -280,6 +281,7 @@ Az 5b (karbantartás) éles tesztelése során felmerült hibák és a rájuk ad
 ---
 
 *Napló:*
+- v1.1 — a „később megbeszélendő" csomag lezárva: 12 fölötti sorozatszám (színcsaládos paletta + összecsukható fülsáv); lapszám-beszúrás lezárva funkció nélkül (a lapszám eleve nem pozíció); többespéldány kezelése (mennyiség mező a számon, költségszámításba építve, részletek a jegyzetben).
 - v1.0 — platform-jegyzetek: „Modulok közti kapcsolat" három elve (általános azonosító, tágabb/szűkebb címke-modell, kezdeményez→jóváhagy→befogad — a jóváhagyási állapot kizárólag a platformon él); négy új Lapról Lapra nyitott kérdés (Lego-jellegű komponens, 12 fölötti sorozatszám, lapszám-beszúrás, többespéldány); az 5b hibajavítási napló „élesben ellenőrizve" állapotra frissítve (a néma Excel-hibával együtt, 6 hiba összesen).
 - v0.9 — hibajavítási kör (5b tesztelés): kód-számláló soha nem forog vissza (sorozat/tétel/komponens); Excel-import célsorozat megerősítő ablak (tervezett); sablon dátum/szám-formátum javítás (tervezett); ár ezres-tagolás javítás (tervezett); sorozatok kézi átrendezése a roadmapre (KÉSŐBB, „keep it simple").
 - v0.8 — képkezelés terve rögzítve (privát Storage, felhasználónkénti mappa, automatikus átméretezés, drag & drop / kamera); új nyitott kérdések: több felhasználós adattárolási modell (közös vs. saját Supabase-projekt, platform-alapú automatizálással) és hordozhatóság/szolgáltatófüggetlenség.
