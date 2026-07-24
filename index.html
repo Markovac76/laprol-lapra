@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="config.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -241,13 +242,14 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 /* ============================================================
-   CONFIG — ide illeszd be az anon kulcsot (az URL már kész)
-   A Supabase-ben: Project Settings → API Keys → "anon public"
+   CONFIG — a beállítások a külön config.js fájlból jönnek.
+   Ezt a fájlt NEM kell szerkesztened frissítéskor.
+   (Mintát lásd: config.example.js)
    ============================================================ */
-const SUPABASE_URL = "https://jwiujuxvymzxjpphrgip.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3aXVqdXh2eW16eGpwcGhyZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NDI3NzMsImV4cCI6MjEwMDMxODc3M30.KptwXFxtMZfFpmurRnmH32B_LrPF1ZRpX3dI4z-ikOA";
+const SUPABASE_URL = window.SUPABASE_URL || "https://jwiujuxvymzxjpphrgip.supabase.co";
+const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "";
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || "hianyzik", {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: "laprol-lapra-auth" }
 });
 
@@ -704,7 +706,7 @@ function showGate(){ document.getElementById("app").style.display="none"; docume
 document.getElementById("g-in").onclick=async ()=>{
   const btn=document.getElementById("g-in"), err=document.getElementById("g-err");
   err.textContent="";
-  if(SUPABASE_ANON_KEY.startsWith("IDE_ILLESZD")){ err.textContent="Előbb illeszd be az anon kulcsot a fájl CONFIG részébe."; return; }
+  if(!SUPABASE_ANON_KEY){ err.textContent="Hiányzik a config.js fájl vagy az anon kulcs benne."; return; }
   btn.disabled=true; btn.textContent="Belépés…";
   const email=document.getElementById("g-email").value.trim();
   const password=document.getElementById("g-pass").value;

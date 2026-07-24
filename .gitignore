@@ -1,0 +1,8 @@
+# A tényleges kulcsot tartalmazó beállítás — ez NEM kerül a repóba
+config.js
+
+# Rendszer- és szerkesztő-fájlok
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
