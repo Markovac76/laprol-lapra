@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 0.8 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 0.9 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -61,6 +61,7 @@ Minden elem két azonosítót kap, külön szerepben:
 - **UUID (identitás):** véletlenszerű, globálisan egyedi kód (a Supabase generálja). Ezt használja a linkelés; soha nem változik, sosem ütközik — még két külön adatbázis közt sem.
 - **Kód (beszédes felirat):** a te hierarchikus sémád, pl. `001-002-0017-02` = modul 001 (Lapról Lapra) · sorozat 002 · 17. szám · 02. komponens. A felületen ez látszik, e szerint rendezünk. A kód a **hierarchiából származtatott**: ha valami átrendeződik, a kód frissül, de az UUID fix marad, így a linkek nem törnek.
 - A **modulszámot** (a „001") nem születéskor kapja a modul, hanem a **platformhoz csatlakozáskor** (a platform osztja ki, hogy ne ütközzön). Önállóan a modul a saját UUID-jével azonosítja magát.
+- **A kód-számláló soha nem forog vissza. [DÖNTVE, hibajavítás]** A sorozat- (és tétel-/komponens-) kód nem a **pozícióból** (hányadik a listában) származik, hanem egy **folyamatosan növekvő, soha vissza nem forgó számlálóból**. Ha egy sorozatot törölsz, a kódja nem adódik ki újra — a következő új sorozat a *következő* számot kapja. Így a kód „lyukas" lehet, de sosem mutat véletlenül más entitásra, mint amire eredetileg utalt (ez fontos a platform-hivatkozások és bármilyen kód-alapú export miatt).
 
 ---
 
@@ -201,9 +202,10 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 
 1. **Lapról Lapra (most):** komponens-modell, kettős azonosító, komponens-szintű kép/azonosító, a négy horog, önálló Supabase, publikálás.
 2. **Felismerés [KÉSŐBB]:** előbb **szám/vonalkód-leolvasás** (ISBN 978/979, ISSN/periodika 977; megbízható), később **vizuális MI-felismerés** (szűkített találati lista; borítónál jobb, modellnél gyengébb; külső MI, költség).
-3. **Értékkövetés [KÉSŐBB]:** aktuális érték + **értéktörténet** (idősor); belekerülési költség vs. jelenlegi összérték, nyereség/ráfizetés.
-4. **Hordozhatóság [KÉSŐBB]:** adat-export mint biztonsági mentés és költöztetés alapja; szolgáltató-alternatívák felmérése (Vercel/Supabase kiesés esetére); hosszú távon esetleg saját szerver.
-5. **OM Curator platform [KÉSŐBB]:** térkép, kapcsolat-tár, fogalomtár; a végén az **okos címke-javaslat** (MI). Elv: „a platform kér, nem parancsol".
+3. **Sorozatok sorrendjének kézi átrendezése [KÉSŐBB]:** drag & drop (mint telefonon az alkalmazás-ikonok rendezése). A **kód** ettől függetlenül a létrehozás sorrendjét (a számlálót) követi — csak a *megjelenítési sorrend* változna. Most nem szükséges (kevés sorozatnál a létrehozási sorrend elég), „keep it simple" — később, ha indokolt.
+4. **Értékkövetés [KÉSŐBB]:** aktuális érték + **értéktörténet** (idősor); belekerülési költség vs. jelenlegi összérték, nyereség/ráfizetés.
+5. **Hordozhatóság [KÉSŐBB]:** adat-export mint biztonsági mentés és költöztetés alapja; szolgáltató-alternatívák felmérése (Vercel/Supabase kiesés esetére); hosszú távon esetleg saját szerver.
+6. **OM Curator platform [KÉSŐBB]:** térkép, kapcsolat-tár, fogalomtár; a végén az **okos címke-javaslat** (MI). Elv: „a platform kér, nem parancsol".
 
 ---
 
@@ -244,7 +246,22 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 
 ---
 
+## 12. Karbantartás — hibajavítási napló (5b tesztelés) **[DÖNTVE, javítás alatt]**
+
+Az 5b (karbantartás) éles tesztelése során felmerült hibák és a rájuk adott döntés:
+
+1. **Sablon sorozat nélkül:** nem volt jelzés, hogy előbb sorozatot kell létrehozni. → Javítás: figyelmeztető üzenet, ha nincs kiválasztott/aktív sorozat.
+2. **Excel-feltöltés célsorozata nem egyértelmű (súlyos):** a feltöltés a véletlenül aktív fület töltötte fel — más sorozat sablonjával könnyen felül lehetett írni egy másikat. → Javítás: **megerősítő ablak** feltöltés előtt, ami kiírja a célsorozat nevét és a várható hatást (hány új tétel, hány frissül), mielőtt bármi mentődik.
+3. **Sablon formátuma nem vezetett:** a dátum/ár cellák szövegként viselkedtek, a rendszer a nem felismert formátumot szótlanul elutasította. → Javítás: a sablon cellái **valódi Excel dátum- és szám-formátumot** kapjanak.
+4. **Ár beolvasása nem kezelte az ezres tagolást:** `1.490` → hibásan `1`-ként olvasódott be (a `parseInt` a tagoló karakternél megállt). → Javítás: a tagolójelek (pont, vessző, szóköz) eltávolítása szám-értelmezés előtt.
+5. **Kód pozícióból, nem számlálóból származott:** lásd 4. fejezet — javítva.
+
+*(A tényleges kódjavítás folyamatban; ez a napló a döntéseket rögzíti, amíg a build el nem készül.)*
+
+---
+
 *Napló:*
+- v0.9 — hibajavítási kör (5b tesztelés): kód-számláló soha nem forog vissza (sorozat/tétel/komponens); Excel-import célsorozat megerősítő ablak (tervezett); sablon dátum/szám-formátum javítás (tervezett); ár ezres-tagolás javítás (tervezett); sorozatok kézi átrendezése a roadmapre (KÉSŐBB, „keep it simple").
 - v0.8 — képkezelés terve rögzítve (privát Storage, felhasználónkénti mappa, automatikus átméretezés, drag & drop / kamera); új nyitott kérdések: több felhasználós adattárolási modell (közös vs. saját Supabase-projekt, platform-alapú automatizálással) és hordozhatóság/szolgáltatófüggetlenség.
 - v0.7 — **építés megkezdve** (Supabase + app 5a él). Új: komponens-hierarchia (domináns komponens) és a lapszám-színezés táblázata; körbeforgó jelölés, jelöletlenre nincs visszatérés (reset csak szerkesztőben); közös **listatár** (kiadó/komponens/azonosító/forrás, „Egyéb"-bel, bővítés csak szerkesztőben); beszerzés forrása mező; lenyíló képsáv; rejthető belekerülési költség; színes fülek; egységes dátum- és tipográfia-szabály; napfény-olvashatóság elve; tartós bejelentkezés.
 - v0.6 — kép komponensenként egy (magazin→borító, modell→modellfotó, könyv→egy kép); a demó (v3) a komponens-modellt tükrözi, képkezelés nélkül (Supabase-fázis).
