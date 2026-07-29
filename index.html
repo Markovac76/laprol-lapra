@@ -38,6 +38,8 @@
   .btn{width:100%;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;font-family:"Space Grotesk"}
   .btn:disabled{opacity:.6;cursor:default}
   .err{color:#f3b6b6;font-size:13px;margin-top:10px;min-height:16px}
+  .note{color:var(--faint);font-size:13px;text-align:center;margin-top:14px}
+  .note a{color:var(--accent);filter:brightness(1.3);text-decoration:none;font-weight:600}
 
   header.top{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,var(--bg) 72%,rgba(15,18,32,.86));backdrop-filter:blur(8px);padding-top:calc(env(safe-area-inset-top) + 12px)}
   .brand{display:flex;align-items:center;gap:8px;padding:8px 2px 10px}
@@ -225,6 +227,7 @@
     <div class="field"><label>Jelszó</label><input id="g-pass" type="password" autocomplete="current-password" placeholder="••••••••"></div>
     <button class="btn" id="g-in">Belépés</button>
     <div class="err" id="g-err"></div>
+    <p class="note" id="g-switchwrap">Nincs még fiókod? <a href="#" id="g-switch">Regisztrálj</a></p>
   </div>
 </div>
 
@@ -274,6 +277,8 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
    (Mintát lásd: config.example.js)
    ============================================================ */
 const SUPABASE_URL = window.SUPABASE_URL || "https://jwiujuxvymzxjpphrgip.supabase.co";
+const OWNER_UID = "25cb3724-02d4-4002-98b0-c93f74ef4e42";
+let myId = null, isOwner = false;
 const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || "hianyzik", {
@@ -305,19 +310,28 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 /* ---- adatok betöltése a Supabase-ből ---- */
 async function loadData(){
   document.getElementById("list").innerHTML=`<div class="loading">Adatok betöltése…</div>`;
-  const [s,i,c,l]=await Promise.all([
+  const { data: userData } = await supabase.auth.getUser();
+  myId = userData?.user?.id || null;
+  isOwner = myId === OWNER_UID;
+  const [s,i,c,l,ms]=await Promise.all([
     supabase.from("series").select("*").order("sort_order"),
     supabase.from("issues").select("*"),
     supabase.from("components").select("*"),
     supabase.from("lists").select("*").order("sort_order"),
+    supabase.from("member_status").select("*").eq("user_id",myId),
   ]);
   if(s.error||i.error||c.error){ throw (s.error||i.error||c.error); }
   LISTS={};
   if(!l.error && l.data) l.data.forEach(r=>{ (LISTS[r.tipus]=LISTS[r.tipus]||[]).push({ertek:r.ertek,nev:r.megjelenites||r.ertek}); });
+  const myStatus={};
+  if(!ms.error && ms.data) ms.data.forEach(r=>{ myStatus[r.component_id]={status:r.status,db:(r.db==null?1:r.db),jegyzet:r.jegyzet}; });
   const byS={}, byI={};
   SERIES = s.data.map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,items:[]}; byS[r.id]=o; return o; });
   i.data.forEach(r=>{ const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,fedelar:r.fedelar,fizetve:r.beszerzesi_ar,fizetve_datum:r.beszerzes_datuma,forras:r.forras,db:(r.mennyiseg==null?1:r.mennyiseg),comps:{}}; byI[r.id]=o; const ser=byS[r.series_id]; if(ser) ser.items.push(o); });
-  c.data.forEach(r=>{ const it=byI[r.issue_id]; if(it) it.comps[r.tipus]={id:r.id,status:r.status,azonosito:r.azonosito,azonosito_tipus:r.azonosito_tipus,note:r.jegyzet,kep_url:r.kep_url,db:(r.db==null?1:r.db)}; });
+  c.data.forEach(r=>{ const it=byI[r.issue_id]; if(!it) return;
+    const my=myStatus[r.id]||{status:null,db:1,jegyzet:null};
+    it.comps[r.tipus]={id:r.id,status:my.status,azonosito:r.azonosito,azonosito_tipus:r.azonosito_tipus,note:my.jegyzet,kep_url:r.kep_url,db:my.db};
+  });
   SERIES.forEach(x=>x.items.sort((a,b)=>a.n-b.n));
   if(activeIdx>=SERIES.length) activeIdx=0;
 }
@@ -506,6 +520,13 @@ document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.cl
 document.getElementById("chips").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return; filter=b.dataset.f; openIssue=null; renderChips(); renderList();});
 document.getElementById("search").addEventListener("input",e=>{query=e.target.value.trim(); openIssue=null; renderList();});
 
+/* ---- Személyes státusz mentése (member_status, upsert) ---- */
+async function upsertMyStatus(componentId, fields){
+  const { error } = await supabase.from("member_status")
+    .upsert({ user_id: myId, component_id: componentId, ...fields }, { onConflict: "user_id,component_id" });
+  return error;
+}
+
 document.getElementById("list").addEventListener("click",async e=>{
   const exp=e.target.closest(".expander");
   if(exp){ const n=+exp.dataset.exp; openIssue=(openIssue===n)?null:n; renderList(); return; }
@@ -523,7 +544,7 @@ document.getElementById("list").addEventListener("click",async e=>{
     if(nextDb===0) nextStatus="hianyzik";
     else if(prevDb===0 || prevStatus!=="megvan") nextStatus="megvan";
     comp.db=nextDb; comp.status=nextStatus; renderAll();
-    const {error}=await supabase.from("components").update({db:nextDb,status:nextStatus}).eq("id",comp.id);
+    const error=await upsertMyStatus(comp.id,{db:nextDb,status:nextStatus});
     if(error){ comp.db=prevDb; comp.status=prevStatus; renderAll(); alert("Mentés sikertelen: "+error.message); }
     return;
   }
@@ -538,7 +559,7 @@ document.getElementById("list").addEventListener("click",async e=>{
   // „megvan”-ra váltáskor a számláló mindig 1-ről indul (onnan lehet +/− gombbal emelni)
   const nextDb = (next==="megvan") ? Math.max(1, prevDb===0?1:prevDb) : prevDb;
   comp.status=next; comp.db=nextDb; renderAll();                 // optimista frissítés
-  const {error}=await supabase.from("components").update({status:next,db:nextDb}).eq("id",comp.id);
+  const error=await upsertMyStatus(comp.id,{status:next,db:nextDb});
   if(error){ comp.status=prev; comp.db=prevDb; renderAll(); alert("Mentés sikertelen: "+error.message); }
 });
 
@@ -632,10 +653,13 @@ function itemForm(existing){
         const pressed=row?row.querySelector('button[aria-pressed="true"]'):null;
         const stat=pressed?(pressed.dataset.v||null):null;
         const dbv=Math.max(0, parseInt(v("cdb-"+t))||0);
-        const cp={ status:stat, db:dbv, azonosito_tipus:v("ct-"+t)||null, azonosito:v("cid-"+t)||null, jegyzet:v("cn-"+t)||null };
+        const master={ azonosito_tipus:v("ct-"+t)||null, azonosito:v("cid-"+t)||null };
         const cur=existing?existing.comps[t]:null;
-        if(cur&&cur.id){ const {error}=await supabase.from("components").update(cp).eq("id",cur.id); if(error) throw error; }
-        else { const {error}=await supabase.from("components").insert({...cp, issue_id:issueId, tipus:t}); if(error) throw error; }
+        let compId=cur&&cur.id;
+        if(compId){ if(isOwner){ const {error}=await supabase.from("components").update(master).eq("id",compId); if(error) throw error; } }
+        else { const {data,error}=await supabase.from("components").insert({...master, issue_id:issueId, tipus:t}).select().single(); if(error) throw error; compId=data.id; }
+        const merr=await upsertMyStatus(compId,{status:stat, db:dbv, jegyzet:v("cn-"+t)||null});
+        if(merr) throw merr;
       }
       closeModal(); await reload();
     }catch(e){ err(e); }
@@ -887,21 +911,37 @@ document.getElementById("upl").addEventListener("change",function(){ const f=thi
 async function showApp(){
   document.getElementById("gate").classList.add("hidden");
   document.getElementById("app").style.display="block";
-  try{ await loadData(); renderTabs(); renderAll(); }
+  try{ await loadData(); document.getElementById("admToggle").style.display = isOwner ? "" : "none"; renderTabs(); renderAll(); }
   catch(e){ document.getElementById("list").innerHTML=`<div class="empty-state">Hiba a betöltéskor: ${esc(e.message||e)}</div>`; }
 }
 function showGate(){ document.getElementById("app").style.display="none"; document.getElementById("gate").classList.remove("hidden"); }
 
+let registerMode=false;
+document.getElementById("g-switch").onclick=(e)=>{
+  e.preventDefault(); registerMode=!registerMode;
+  document.getElementById("g-in").textContent = registerMode ? "Regisztráció" : "Belépés";
+  document.getElementById("g-switch").textContent = registerMode ? "Van már fiókod? Lépj be" : "Regisztrálj";
+  document.getElementById("g-err").textContent="";
+};
 document.getElementById("g-in").onclick=async ()=>{
   const btn=document.getElementById("g-in"), err=document.getElementById("g-err");
   err.textContent="";
   if(!SUPABASE_ANON_KEY){ err.textContent="Hiányzik a config.js fájl vagy az anon kulcs benne."; return; }
-  btn.disabled=true; btn.textContent="Belépés…";
   const email=document.getElementById("g-email").value.trim();
   const password=document.getElementById("g-pass").value;
+  if(registerMode){
+    btn.disabled=true; btn.textContent="Regisztráció…";
+    const {error}=await supabase.auth.signUp({email,password});
+    btn.disabled=false; btn.textContent="Regisztráció";
+    if(error){ err.textContent="Regisztráció sikertelen: "+error.message; return; }
+    err.style.color="#8ee9ad"; err.textContent="Sikeres regisztráció! Most jelentkezz be ugyanezzel az e-maillel/jelszóval.";
+    registerMode=false; document.getElementById("g-in").textContent="Belépés";
+    document.getElementById("g-switch").textContent="Regisztrálj"; return;
+  }
+  btn.disabled=true; btn.textContent="Belépés…";
   const {error}=await supabase.auth.signInWithPassword({email,password});
   btn.disabled=false; btn.textContent="Belépés";
-  if(error){ err.textContent="Hibás e-mail vagy jelszó."; return; }
+  if(error){ err.style.color=""; err.textContent="Hibás e-mail vagy jelszó."; return; }
   showApp();
 };
 document.getElementById("g-pass").addEventListener("keydown",e=>{ if(e.key==="Enter") document.getElementById("g-in").click(); });
