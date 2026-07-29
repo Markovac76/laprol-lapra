@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.2 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.3 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -295,7 +295,33 @@ Az 5b (karbantartás) éles tesztelése során felmerült hibák és a rájuk ad
 
 ---
 
+## 13. Megosztott katalógus és felhasználó-kezelés **[DÖNTVE, alap; részletek NYITOTT]**
+
+### 13.1 Alapmodell **[DÖNTVE, megvalósítva]**
+A sorozatokat/tételeket a **tulajdonos** viszi fel — minden bejelentkezett felhasználó látja őket. A **státusz/darabszám/jegyzet személyes** (`member_status` tábla, felhasználónként elkülönítve). Regisztráció nyitott, bárki létrehozhat fiókot. A karbantartó mód (🔧, sorozat/tétel szerkesztés) **csak a tulajdonosnak** érhető el.
+
+### 13.2 Fiókkezelés **[NYITOTT]**
+- **Adminisztrátori fióktörlés:** a tulajdonos jelenleg csak a Supabase Dashboardon keresztül tud felhasználót törölni (Authentication → Users), az appból nem. Az app-beli "kirúgás" gomb megvalósításához szerver-oldali funkció (Supabase Edge Function) kellene, mert a törléshez a titkos `service_role` kulcs szükséges, ami sosem kerülhet a böngészőbe.
+- **Saját fiók törlése (felhasználó által):** jelenleg nincs megoldva, ugyanaz a technikai korlát vonatkozik rá (admin API kell hozzá).
+- Mindkettőt egy közös, később megépítendő Edge Function oldaná meg.
+
+### 13.3 Felhasználói sorozat-választás (kiválasztás/bővítés/törlés) **[NYITOTT]**
+Igény: a nem-tulajdonos felhasználó a tulajdonos által felvitt sorozatok közül **kiválaszthassa**, melyiket szeretné a saját nyilvántartásába felvenni (nem mindegyiket látja automatikusan alapértelmezésben) — később bővíthet, vagy törölhet a választásából.
+- **Egy sorozatból csak egy aktív választás lehet** — nem választható be kétszer ugyanaz.
+- **Törlés-korlát:** ha egy felhasználó sokszor törli, majd újra felveszi ugyanazt a sorozatot, az zavart okozhat a kód-hivatkozásoknál (platform-integráció szempontjából). **Javasolt limit: max. 5 törlés** sorozatonként/felhasználónként — ez látszódjon is a sorozat-kezelő felületen (pl. "3/5 törlés felhasználva").
+- **Újra felvételkor tiszta lap:** ha egy felhasználó töröl egy sorozatot a saját nyilvántartásából, majd újra hozzáadja, **ne emlékezzen a korábbi jelöléseire** — teljesen új, üres állapotból induljon (nem a régi `member_status` sorok élednek újra, hanem törlődnek/érvénytelenednek, és a következő felvételkor friss kezdés van).
+- Nyitott technikai kérdés: ez egy új kapcsoló-tábla igényét veti fel (pl. `member_series` — melyik felhasználó melyik sorozatot választotta be, hányszor törölte), amit még nem terveztünk meg részletesen.
+
+### 13.4 Üzenetküldés az adminisztrátornak **[NYITOTT, koncepció]**
+Alapötlet: a nem-tulajdonos felhasználó rövid üzenetet küldhessen a tulajdonosnak.
+- **Max. 150 karakter.**
+- Az adminisztrátornál megjelenik: **ki küldte** + **az üzenet szövege**.
+- A részletek (hol jelenik meg az adminnak, olvasottság-jelzés, válaszolhat-e, értesítés-e vagy csak belépéskor látható lista) **külön átbeszélendő**, mielőtt tervezünk rá adatmodellt.
+
+---
+
 *Napló:*
+- v1.3 — megosztott katalógus (13. fejezet): alapmodell megvalósítva (member_status, tulajdonos-only szerkesztés, nyitott regisztráció); négy új nyitott kérdés: admin/saját fióktörlés (Edge Function kell), felhasználói sorozat-választás (max 5 törlés/sorozat limit, tiszta újrafelvétel), üzenetküldés adminnak (max 150 karakter, koncepció szinten).
 - v1.2 — megvalósítva: összecsukható fülsáv (nyitott választónál a lista/szűrők/hero elrejtve, nagyobb „Sorozatok" gomb), színcsaládokba rendezett 24-es paletta, **komponensenkénti darabszám-számláló** (+/− a listában, 0-nál automatikus „hiányzik", 1 fölé visszanövelve „megvan"). A beszerzési mennyiség (szám) és a jelenlegi darabszám (komponens) szándékosan külön mező.
 - v1.1 — a „később megbeszélendő" csomag lezárva: 12 fölötti sorozatszám (színcsaládos paletta + összecsukható fülsáv); lapszám-beszúrás lezárva funkció nélkül (a lapszám eleve nem pozíció); többespéldány kezelése (mennyiség mező a számon, költségszámításba építve, részletek a jegyzetben).
 - v1.0 — platform-jegyzetek: „Modulok közti kapcsolat" három elve (általános azonosító, tágabb/szűkebb címke-modell, kezdeményez→jóváhagy→befogad — a jóváhagyási állapot kizárólag a platformon él); négy új Lapról Lapra nyitott kérdés (Lego-jellegű komponens, 12 fölötti sorozatszám, lapszám-beszúrás, többespéldány); az 5b hibajavítási napló „élesben ellenőrizve" állapotra frissítve (a néma Excel-hibával együtt, 6 hiba összesen).
