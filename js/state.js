@@ -8,8 +8,8 @@ export const OWNER_UID = "25cb3724-02d4-4002-98b0-c93f74ef4e42";
 
 export const state = {
   SERIES: [], activeIdx: 0, filter: "mind", query: "", adminMode: false,
-  LISTS: {}, costVisible: false, openIssue: null, tabsOpen: false,
-  myId: null, isOwner: false,
+  LISTS: {}, costVisible: false, costBasis: "eredeti", openIssue: null, tabsOpen: false,
+  myId: null, isOwner: false, role: "user", status: "active",
 };
 
 export const PAL_FAMILIES = [

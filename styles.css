@@ -69,6 +69,10 @@ header.top{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,va
 .stat .k{font-size:11px;color:var(--faint);text-transform:uppercase}
 .stat .v{font-family:"Space Grotesk";font-size:17px;font-weight:700;margin-top:2px}
 .stat.wide{grid-column:1/-1}.stat .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.basisrow{display:flex;gap:5px;margin-top:8px}
+.basisbtn{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--muted);
+  border-radius:8px;padding:6px 4px;font-size:11px;font-weight:600;cursor:pointer;line-height:1.1}
+.basisbtn[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:transparent}
 
 .controls{padding:2px 0 8px}
 .search{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:11px 13px;font-size:15px;margin-bottom:8px}
@@ -197,5 +201,23 @@ footer{color:var(--faint);font-size:11.5px;text-align:center;padding:8px 0 26px}
 .addrow{display:flex;gap:6px}
 .addrow input{flex:1}
 .addrow button{border:1px solid var(--line);background:var(--accent);color:#fff;border-radius:9px;padding:0 14px;font-weight:700;cursor:pointer}
+
+/* --- Felhasználó-kezelő (admin-users) --- */
+.userrow{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--line);
+  border-radius:10px;background:var(--panel-2);margin-bottom:8px}
+.userrow .uinfo{flex:1;min-width:0}
+.userrow .uname{font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.userrow .urole{margin-top:3px}
+.rolebadge{display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;
+  border:1px solid var(--line);letter-spacing:.02em}
+.rolebadge.owner{background:color-mix(in srgb,var(--accent) 40%,var(--panel));color:#fff;border-color:transparent}
+.rolebadge.admin{background:var(--amber-d);color:var(--amber);border-color:var(--amber)}
+.rolebadge.user{background:var(--panel);color:var(--muted)}
+.rolebadge.disabled{background:var(--red-d);color:#f5a8a0;border-color:var(--red)}
+.uactions{display:flex;flex-direction:column;gap:5px;flex:0 0 auto;align-items:stretch}
+.uactions button{border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  border-radius:8px;padding:6px 10px;font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+.uactions button.danger{color:#f3b6b6;border-color:#6b3a3a;background:transparent}
+.uactions .unote{font-size:11px;color:var(--faint);text-align:center}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (max-width:380px){.stats{grid-template-columns:1fr}}

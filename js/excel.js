@@ -6,6 +6,7 @@ import { supabase } from "./supabase.js";
 import { S, COMP_TYPES, esc } from "./state.js";
 import { openModal, closeModal, err } from "./modal.js";
 import { reload } from "./data.js";
+import { upsertMyIssueData } from "./personal.js";
 
 let _xlsx=null;
 async function xlsx(){ if(!_xlsx) _xlsx=await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm"); return _xlsx; }
@@ -49,7 +50,7 @@ function normStatus(v){ if(!v) return undefined; const t=String(v).trim().toLowe
   if(t==="megvan")return"megvan"; if(t==="hianyzik"||t==="hiányzik"||t==="hiany"||t==="hiány")return"hianyzik";
   if(t==="nemkell")return"nemkell"; return undefined; }
 
-function tmplHead(s){ const h=["lapszám","cím","dátum (Excel dátum, pl. 2026.03.15)","fedélár (csak szám)","beszerzési ár (csak szám)"];
+function tmplHead(s){ const h=["lapszám","cím","dátum (Excel dátum, pl. 2026.03.15)","eredeti ár (csak szám)","fizetett ár – személyes (csak szám)"];
   s.components.forEach(t=>{ h.push((COMP_TYPES[t]||t)+" státusz (megvan/hianyzik/nemkell)"); h.push((COMP_TYPES[t]||t)+" azonosító"); }); return h; }
 
 export async function downloadTemplate(){
@@ -85,9 +86,10 @@ export async function handleUpload(file){
       const n=parseInt(String(row[0]).trim()); if(isNaN(n)){ bad++; continue; }
       const name=String(row[1]??"").trim(), date=coerceDate(row[2]);
       if(row[2] && String(row[2]).trim() && !date) dateWarnings.push(n);
-      const fed=parseHuNumber(row[3]), fiz=parseHuNumber(row[4]);
-      const p={}; if(name) p.cim=name; if(date) p.megjelenes=date;
-      if(fed!=null) p.fedelar=fed; if(fiz!=null) p.beszerzesi_ar=fiz;
+      const er=parseHuNumber(row[3]), fiz=parseHuNumber(row[4]);
+      const p={}; if(name) p.cim=name; if(date) p.megjelenes=date;   // TÖRZSADAT (issues)
+      if(er!=null) p.eredeti_ar=er;
+      const pi={}; if(fiz!=null) pi.fizetett_ar=fiz;                 // SZEMÉLYES (member_issue_data)
       const comps=[];
       for(let ci=0; ci<s.components.length; ci++){
         const t=s.components[ci];
@@ -96,7 +98,7 @@ export async function handleUpload(file){
         comps.push({t,cp});
       }
       const existing=s.items.find(x=>x.n===n);
-      plan.push({n, p, comps, isNew:!existing});
+      plan.push({n, p, pi, comps, isNew:!existing});
     }
   }catch(e){ err(e); return; }
 
@@ -125,6 +127,8 @@ ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új
         let it=s.items.find(x=>x.n===item.n), issueId;
         if(it){ issueId=it.id; if(Object.keys(item.p).length){ const {error}=await supabase.from("issues").update(item.p).eq("id",it.id); if(error) throw error; } upd++; }
         else { const {data,error}=await supabase.from("issues").insert({...item.p, series_id:s.id, lapszam:item.n}).select().single(); if(error) throw error; issueId=data.id; ins++; }
+        // Személyes fizetett ár (a feltöltő saját member_issue_data-jába)
+        if(Object.keys(item.pi).length){ const pierr=await upsertMyIssueData(issueId, item.pi); if(pierr) throw pierr; }
         for(const {t,cp} of item.comps){
           const cur=it?it.comps[t]:null;
           if(cur&&cur.id){ if(Object.keys(cp).length){ const {error}=await supabase.from("components").update(cp).eq("id",cur.id); if(error) throw error; } }

@@ -12,3 +12,10 @@ export async function upsertMyStatus(componentId, fields){
     .upsert({ user_id: state.myId, component_id: componentId, ...fields }, { onConflict: "user_id,component_id" });
   return error;
 }
+
+// Szám-szintű személyes ár-adat (fizetett ár, beszerzési mennyiség, dátum, forrás).
+export async function upsertMyIssueData(issueId, fields){
+  const { error } = await supabase.from("member_issue_data")
+    .upsert({ user_id: state.myId, issue_id: issueId, ...fields }, { onConflict: "user_id,issue_id" });
+  return error;
+}

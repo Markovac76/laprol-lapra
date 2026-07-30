@@ -9,13 +9,13 @@ import { openModal, closeModal, err, sheet } from "./modal.js";
 import { reload } from "./data.js";
 import { renderAll } from "./render.js";
 import { canEditMaster } from "./permissions.js";
-import { upsertMyStatus } from "./personal.js";
+import { upsertMyStatus, upsertMyIssueData } from "./personal.js";
 
 /* ---- Tétel szerkesztése / új tétel ---- */
 export function itemForm(existing){
   const s=S();
   const nextN = existing ? existing.n : (s.items.reduce((m,x)=>Math.max(m,x.n||0),0)+1);
-  const it = existing || {n:nextN,name:"",date:"",fedelar:"",fizetve:"",fizetve_datum:"",forras:"",db:1,comps:{}};
+  const it = existing || {n:nextN,name:"",date:"",eredeti_ar:"",fizetett_ar:"",besz_menny:1,besz_datum:"",forras:"",comps:{}};
   const scode=pad(S().kodSzam||(state.activeIdx+1),3);
   const compBlocks = s.components.map((t,ci)=>{
     const c=it.comps[t]||{};
@@ -47,16 +47,18 @@ export function itemForm(existing){
       <div class="field"><label>Megjelenés dátuma</label><input id="f-date" type="date" value="${it.date||""}"></div>
     </div>
     <div class="field"><label>Cím</label><input id="f-name" value="${esc(it.name||"")}"></div>
+    <div class="field"><label>Eredeti ár (Ft) <span style="color:var(--faint);font-weight:400">— a megjelenéskori/újságos ár (közös törzsadat)</span></label>
+      <input id="f-eredeti" type="number" value="${it.eredeti_ar??""}"></div>
+    <div class="msub" style="margin:14px 0 2px;color:var(--accent);filter:brightness(1.2);font-weight:600">Személyes beszerzés — csak a tiéd</div>
     <div class="grid2">
-      <div class="field"><label>Fedélár (Ft)</label><input id="f-fedelar" type="number" value="${it.fedelar??""}"></div>
-      <div class="field"><label>Beszerzési ár (Ft)</label><input id="f-fizetve" type="number" value="${it.fizetve??""}"></div>
+      <div class="field"><label>Fizetett ár (Ft)</label><input id="f-fizetett" type="number" value="${it.fizetett_ar??""}"></div>
+      <div class="field"><label>Beszerzési mennyiség (db) <span style="color:var(--faint);font-weight:400">— hány db-ot vettél</span></label>
+        <input id="f-menny" type="number" min="1" value="${it.besz_menny??1}"></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Beszerzés dátuma</label><input id="f-fdatum" type="date" value="${it.fizetve_datum||""}"></div>
+      <div class="field"><label>Beszerzés dátuma</label><input id="f-fdatum" type="date" value="${it.besz_datum||""}"></div>
       <div class="field"><label>Beszerzés forrása</label><select id="f-forras"><option value="">—</option>${opts("forras",it.forras)}</select></div>
     </div>
-    <div class="field"><label>Mennyiség (db) <span style="color:var(--faint);font-weight:400">— ha egy vásárlásból több példány (pl. a melléklet miatt)</span></label>
-      <input id="f-db" type="number" min="1" value="${it.db??1}"></div>
     ${compBlocks}
     <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="f-save">Mentés</button></div>
     ${existing?`<div class="modrow"><button class="btn danger" id="f-del">Tétel törlése</button></div>`:""}`);
@@ -70,19 +72,21 @@ export function itemForm(existing){
   document.getElementById("f-save").onclick=async ()=>{
     const v=id=>{const e=document.getElementById(id);return e?e.value.trim():"";};
     const n=parseInt(v("f-n")); if(isNaN(n)){alert("A lapszám kötelező.");return;}
-    const payload={ lapszam:n, cim:v("f-name")||null, megjelenes:v("f-date")||null,
-      fedelar:v("f-fedelar")?parseInt(v("f-fedelar")):null,
-      beszerzesi_ar:v("f-fizetve")?parseInt(v("f-fizetve")):null,
-      beszerzes_datuma:v("f-fdatum")||null, forras:v("f-forras")||null,
-      mennyiseg: Math.max(1, parseInt(v("f-db"))||1) };
+    // Törzsadat (issues) — csak admin/owner; a személyes rész (member_issue_data) mindenkié.
+    const master={ lapszam:n, cim:v("f-name")||null, megjelenes:v("f-date")||null,
+      eredeti_ar:v("f-eredeti")?parseInt(v("f-eredeti")):null };
+    const personal={ fizetett_ar:v("f-fizetett")?parseInt(v("f-fizetett")):null,
+      beszerzesi_mennyiseg: Math.max(1, parseInt(v("f-menny"))||1),
+      beszerzes_datuma:v("f-fdatum")||null, forras:v("f-forras")||null };
     try{
       let issueId = existing ? existing.id : null;
       if(existing){
-        const {error}=await supabase.from("issues").update(payload).eq("id",existing.id); if(error) throw error;
+        const {error}=await supabase.from("issues").update(master).eq("id",existing.id); if(error) throw error;
       } else {
-        const {data,error}=await supabase.from("issues").insert({...payload, series_id:s.id}).select().single();
+        const {data,error}=await supabase.from("issues").insert({...master, series_id:s.id}).select().single();
         if(error) throw error; issueId=data.id;
       }
+      const pierr=await upsertMyIssueData(issueId, personal); if(pierr) throw pierr;
       for(let ci=0; ci<s.components.length; ci++){
         const t=s.components[ci];
         const row=sheet.querySelector(`.statrow[data-stat="${t}"]`);

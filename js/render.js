@@ -29,10 +29,17 @@ export function renderHero(){
     ? `<div class="stat wide"><div class="k">Következő megjelenés</div><div class="v" style="font-size:14px">${fmtDate(st.next.date)}</div><div class="sub">#${st.next.n} · ${esc(st.next.name||"még nincs cím")}</div></div>`
     : `<div class="stat wide"><div class="k">Beszerzendő lapszám</div><div class="v">${st.beszerzendo} db</div><div class="sub">hiányzó vagy még jelöletlen</div></div>`;
   const closed = !st.hasFuture ? `<span class="closedtag">lezárt sorozat</span>` : "";
+  const fizetettBasis = state.costBasis==="fizetett";
+  const total = fizetettBasis ? st.fizetettTotal : st.eredetiTotal;
+  const basisLabel = fizetettBasis ? "Összeg — fizetett ár alapján" : "Összeg — eredeti ár alapján";
   const costBox = state.costVisible
-    ? `<div class="stat"><div class="k">Belekerülési költség</div><div class="v">${fmtFt(st.belekerulesi)||"0 Ft"}</div>
+    ? `<div class="stat wide"><div class="k">${basisLabel}</div><div class="v">${fmtFt(total)||"0 Ft"}</div>
+         <div class="basisrow">
+           <button class="basisbtn" data-basis="eredeti" aria-pressed="${!fizetettBasis}">Eredeti ár</button>
+           <button class="basisbtn" data-basis="fizetett" aria-pressed="${fizetettBasis}">Fizetett ár</button>
+         </div>
          <button class="costbtn" id="costToggle">elrejt</button></div>`
-    : `<div class="stat"><div class="k">Belekerülési költség</div>
+    : `<div class="stat"><div class="k">Összeg</div>
          <button class="costbtn show" id="costToggle">összeg megjelenítése</button></div>`;
   document.getElementById("hero").innerHTML=`
     <div class="kiado">${esc(s.kiado?listName("kiado",s.kiado):"")}</div>
@@ -45,6 +52,7 @@ export function renderHero(){
     </div>`;
   const cb=document.getElementById("costToggle");
   if(cb) cb.onclick=()=>{ state.costVisible=!state.costVisible; renderHero(); };
+  document.querySelectorAll(".basisbtn").forEach(b=>{ b.onclick=()=>{ state.costBasis=b.dataset.basis; renderHero(); }; });
 }
 
 const FILTERS=[["mind","Mind"],["megvan","Megvan"],["hianyzik","Hiányzik"],["nemkell","Nem kell"],["varhato","Várható"]];
@@ -90,8 +98,8 @@ export function renderList(){
     const future=it.date&&it.date>todayISO;
     const istate=issueState(it,s);
     const dateHtml=it.date?`<span class="${future?"future":""}">${fmtDate(it.date)}</span>`:`<span style="color:var(--faint)">nincs dátum</span>`;
-    const dbTag=(it.db&&it.db>1)?`<span class="dbtag">${it.db} db</span>`:"";
-    const money=[it.fedelar!=null?`fedélár ${fmtFt(it.fedelar)}`:null,it.fizetve!=null?`fizetve ${fmtFt(it.fizetve)}`:null].filter(Boolean).join(" · ");
+    const dbTag=(it.besz_menny&&it.besz_menny>1)?`<span class="dbtag">${it.besz_menny} db</span>`:"";
+    const money=[it.eredeti_ar!=null?`eredeti ár ${fmtFt(it.eredeti_ar)}`:null,it.fizetett_ar!=null?`fizetve ${fmtFt(it.fizetett_ar)}`:null].filter(Boolean).join(" · ");
     const marks=s.components.map(t=>{ const c=it.comps[t]||{status:null}; const stt=c.status; const cdb=(c.db==null?1:c.db);
       const showCnt = stt==="megvan" && cdb>1;
       const showStep = !future && (state.adminMode || (stt==="megvan" && cdb>1));

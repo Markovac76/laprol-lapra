@@ -6,6 +6,7 @@ import { SUPABASE_ANON_KEY } from "./supabase.js";
 import { renderAll, renderList, renderChips, renderTabs, applyPickerMode, syncHeadHeight } from "./render.js";
 import { upsertMyStatus } from "./personal.js";
 import { itemForm, seriesForm, listsForm } from "./admin-forms.js";
+import { usersForm } from "./admin-users.js";
 import { downloadTemplate, handleUpload } from "./excel.js";
 import { err } from "./modal.js";
 import { showApp, loginWithPassword, registerWithPassword, logout, initSession } from "./auth.js";
@@ -13,7 +14,7 @@ import { showApp, loginWithPassword, registerWithPassword, logout, initSession }
 /* ---- fülsáv / szűrők / keresés ---- */
 document.getElementById("tabtoggle").addEventListener("click",()=>{ state.tabsOpen=!state.tabsOpen; renderTabs(); applyPickerMode(); syncHeadHeight(); });
 document.getElementById("tabnow").addEventListener("click",()=>{ state.tabsOpen=!state.tabsOpen; renderTabs(); applyPickerMode(); syncHeadHeight(); });
-document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return; state.activeIdx=+b.dataset.i; state.costVisible=false; state.openIssue=null; state.tabsOpen=false; window.scrollTo({top:0}); renderAll();});
+document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return; state.activeIdx=+b.dataset.i; state.costVisible=false; state.costBasis="eredeti"; state.openIssue=null; state.tabsOpen=false; window.scrollTo({top:0}); renderAll();});
 document.getElementById("chips").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return; state.filter=b.dataset.f; state.openIssue=null; renderChips(); renderList();});
 document.getElementById("search").addEventListener("input",e=>{state.query=e.target.value.trim(); state.openIssue=null; renderList();});
 
@@ -62,6 +63,7 @@ document.getElementById("a-item").onclick=()=>{ if(!S()){ alert("Előbb hozz lé
 document.getElementById("a-editseries").onclick=()=>{ if(!S()){ alert("Nincs sorozat, amit szerkeszteni lehetne."); return; } seriesForm(S()); };
 document.getElementById("a-series").onclick=()=>seriesForm(null);
 document.getElementById("a-lists").onclick=listsForm;
+document.getElementById("a-users").onclick=usersForm;
 document.getElementById("a-template").onclick=downloadTemplate;
 document.getElementById("a-upload").onclick=()=>document.getElementById("upl").click();
 document.getElementById("upl").addEventListener("change",function(){ const f=this.files&&this.files[0]; if(f) handleUpload(f).catch(err); this.value=""; });
