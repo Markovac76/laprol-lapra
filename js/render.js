@@ -1,7 +1,7 @@
 /* ============================================================
    Megjelenítés: fülek, hero, szűrők, lista, tapadó fejléc.
    ============================================================ */
-import { state, S, COMP_TYPES, todayISO, fmtDate, fmtFt, esc, pad, listName, issueState } from "./state.js";
+import { state, S, COMP_TYPES, todayISO, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent } from "./state.js";
 import { stats } from "./data.js";
 
 function setAccent(){ document.documentElement.style.setProperty("--accent",S().accent); }
@@ -99,7 +99,7 @@ export function renderList(){
     const istate=issueState(it,s);
     const dateHtml=it.date?`<span class="${future?"future":""}">${fmtDate(it.date)}</span>`:`<span style="color:var(--faint)">nincs dátum</span>`;
     const dbTag=(it.besz_menny&&it.besz_menny>1)?`<span class="dbtag">${it.besz_menny} db</span>`:"";
-    const money=[it.eredeti_ar!=null?`eredeti ár ${fmtFt(it.eredeti_ar)}`:null,it.fizetett_ar!=null?`fizetve ${fmtFt(it.fizetett_ar)}`:null].filter(Boolean).join(" · ");
+    const money=[it.eredeti_ar!=null?`eredeti ár ${fmtFt(it.eredeti_ar)}`:null,(it.fizetett_ar!=null && hasOwnedComponent(it,s))?`fizetve ${fmtFt(it.fizetett_ar)}`:null].filter(Boolean).join(" · ");
     const marks=s.components.map(t=>{ const c=it.comps[t]||{status:null}; const stt=c.status; const cdb=(c.db==null?1:c.db);
       const showCnt = stt==="megvan" && cdb>1;
       const showStep = !future && (state.adminMode || (stt==="megvan" && cdb>1));

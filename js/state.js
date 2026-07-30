@@ -52,6 +52,12 @@ export function dominantType(s){
   return nm.length ? nm[0] : (s.components[0]||null);
 }
 
+// Legalább egy komponens 'megvan' — ekkor tekintjük a tételt ténylegesen megvettnek
+// (ettől függ a "fizetve" felirat és a "Fizetett ár alapján" összeg).
+export function hasOwnedComponent(it,s){
+  return s.components.some(t=>it.comps[t] && it.comps[t].status==="megvan");
+}
+
 export function issueState(it,s){
   if(it.date && it.date>todayISO) return null;                  // még nem jelent meg → semleges
   const dt=dominantType(s); if(!dt) return null;

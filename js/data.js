@@ -2,7 +2,7 @@
    Adatbetöltés a Supabase-ből, statisztika, újratöltés.
    ============================================================ */
 import { supabase } from "./supabase.js";
-import { state, OWNER_UID, PAL_FALLBACK, todayISO, issueState } from "./state.js";
+import { state, OWNER_UID, PAL_FALLBACK, todayISO, issueState, hasOwnedComponent } from "./state.js";
 import { renderAll } from "./render.js";
 import { err } from "./modal.js";
 
@@ -59,8 +59,9 @@ export function stats(si){
       const rc=it.comps[refType];
       if(rc && rc.status==="megvan") eredetiTotal += it.eredeti_ar * (rc.db||1);
     }
-    // Fizetett ár alapján: Σ (fizetett ár × beszerzési mennyiség) a saját rögzített tételekre
-    if(it.fizetett_ar!=null) fizetettTotal += it.fizetett_ar * (it.besz_menny||1);
+    // Fizetett ár alapján: Σ (fizetett ár × beszerzési mennyiség) — CSAK ahol legalább
+    // egy komponens 'megvan' (különben semmi nem lett ténylegesen megvéve)
+    if(it.fizetett_ar!=null && hasOwnedComponent(it,s)) fizetettTotal += it.fizetett_ar * (it.besz_menny||1);
     for(const t of s.components){ const st=it.comps[t]?it.comps[t].status:null;
       if(st==="megvan") perType[t].owned++; }
     // Beszerzendő: LAPSZÁM-szinten — ami megjelent, és se nem kész (zöld), se nem kihúzott (szürke)
