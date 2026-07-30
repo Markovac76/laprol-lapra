@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.3 · **Állapot:** ÉPÍTÉS ALATT (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.4 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -81,8 +81,12 @@ Minden elem két azonosítót kap, külön szerepben:
 ### 5.1 Sorozat
 UUID · kód · **kiadó** · **megnevezés** (teljes név) · **megjelenítendő név** (fülön, max **16** karakter) · **szín** (12-es paletta, de bármennyi sorozat) · **komponens-készlet** (mely komponensekből áll egy szám ebben a sorozatban — a modul készletéből választva). **[DÖNTVE]**
 
-### 5.2 Szám (= „tartó") **[DÖNTVE]**
-UUID · kód · **lapszám** · **megjelenés dátuma** (elhagyható) · **fedélár** (referencia-ár, az egész számra, elhagyható) · **beszerzési ár** („amit fizettem", elhagyható) · **beszerzés dátuma** (elhagyható) · **mennyiség** (db, alapértelmezetten 1 — több példány egy beszerzésből, pl. 4 magazin a melléklet miatt; beépül a belekerülési költség számításába: mennyiség × beszerzési ár). A szám önmagában nem birtokol státuszt — a státusz a komponenseké. Az **ár a számon ül** (nem komponensenként), és nem szétosztható. **[DÖNTVE]**
+### 5.2 Szám (= „tartó") **[DÖNTVE · v1.4-ben átrendezve]**
+**Közös törzsadat (a számon ül, mindenki ugyanazt látja, csak admin/owner szerkeszti):**
+UUID · kód · **lapszám** · **cím** · **megjelenés dátuma** (elhagyható) · **eredeti ár** (a megjelenéskori/újságos referencia-ár az egész számra, korábban „fedélár", elhagyható). A szám önmagában nem birtokol státuszt — a státusz a komponenseké.
+
+**Személyes, szám-szintű adat (felhasználónként, `member_issue_data` tábla — v1.4):**
+**fizetett ár** (amennyiért Ő ténylegesen megszerezte) · **beszerzési mennyiség** (db, alapértelmezetten 1 — hány db-ot vett egy vételből; ez szorozza a fizetett árat az összesítésnél) · **beszerzés dátuma** · **beszerzés forrása**. Ezek nem komponenshez, hanem a **számhoz** tartoznak, de **személyesek** (mindenki a sajátját rögzíti). **[DÖNTVE, v1.4]**
 
 ### 5.3 Komponens (a lényegi újdonság) **[DÖNTVE]**
 A komponens-**típusokat a modul** definiálja (magazin / modell / egyéb; a modul szintjén bővíthető). Minden **sorozat megadja**, mely komponensekből áll egy szám (Disney: csak füzet; F1: magazin + modell), a modul készletéből választva. Az **import-sablon a sorozat komponens-készletéből származik**, így a kettő sosem csúszik szét.
@@ -108,12 +112,18 @@ Egy szám egy vagy több komponensből áll (pl. **magazin** + **modell**, vagy 
 ### 5.4 Kezdő adat (az eredeti Excelből)
 RBA — II. vh. repülők (60) · Centuria — Forma 1 (60) · Hachette — Disney könyvek (80).
 
-### 5.5 Pénz-fogalmak (ár és érték) — három külön dolog **[DÖNTVE]**
-1. **Fedélár (referencia-ár):** megjelenéskori/hivatalos ár, az egész **számra**. Változhat. → *v1-ben benne.*
-2. **Beszerzési ár („amit fizettem") + dátum:** egy **beszerzéshez** kötve (általánosan a *vételhez*: egy MtG-booster egy költség → több elem; partworknél 1 szám = 1 vétel). Összegük = a **hobbi belekerülési költsége**. → *v1-ben benne.*
+### 5.5 Pénz-fogalmak (ár és érték) — három külön dolog **[DÖNTVE · v1.4-ben pontosítva]**
+1. **Eredeti ár (referencia-ár, korábban „fedélár"):** megjelenéskori/újságos ár, az egész **számra**. **Közös törzsadat** — mindenki ugyanazt látja, csak admin/owner szerkeszti. → *v1-ben benne.* **[DÖNTVE, v1.4 átnevezés]**
+2. **Fizetett ár („amit én fizettem") + beszerzési mennyiség + dátum + forrás:** **személyes**, szám-szinten (felhasználónként, `member_issue_data`). Mindenki a sajátját rögzíti. A belekerülési költség = Σ (**fizetett ár × beszerzési mennyiség**) a saját tételekre. → *v1-ben benne.* **[DÖNTVE, v1.4]**
 3. **Aktuális érték (piaci / központi) + értéktörténet:** az elem *mai* értéke, időbélyeges naplóval; ülhet **számon vagy komponensen** is (a Lapról Lapra a szám-szintűt használná). → **[KÉSŐBB]** — betervezve, de nem v1.
 
-**Származtatott statisztikák:** belekerülési költség (Σ beszerzési ár) · jelenlegi összérték (Σ aktuális érték) · a kettő különbsége (nyereség / ráfizetés).
+**Származtatott statisztikák:** belekerülési költség (Σ fizetett ár × mennyiség) · jelenlegi összérték (Σ aktuális érték) · a kettő különbsége (nyereség / ráfizetés).
+
+**Sorozat-összeg — kétféle nézet (választható) [DÖNTVE, v1.4]:** a hero összeg-doboza két alapon számol, kapcsolóval:
+- **„Eredeti ár alapján"** (alapértelmezett): Σ eredeti ár × a **referencia-komponens** aktuális darabszáma, **csak a `megvan` állapotúakra**. Referencia-komponens: **magazin** → ha nincs, **könyv** → ha az sincs, az első komponens-típus.
+- **„Fizetett ár alapján":** Σ fizetett ár × beszerzési mennyiség, a saját rögzített tételekre.
+
+**Megjelenítési szabály [DÖNTVE, v1.4]:** a **„fizetve X Ft"** felirat (lista) és a **„Fizetett ár alapján"** összeg **csak azt a tételt** veszi figyelembe, amelynél **legalább egy komponens `megvan`**. Ha semmi nincs megvan állapotban (hiányzik/jelöletlen), a „fizetve" nem jelenik meg és nem számít az összegbe — hiszen ténylegesen semmi nem lett megvéve.
 
 ### 5.6 Közös listatár (kötött, bővíthető listák) **[DÖNTVE]**
 A szabad szöveges mezők elgépelhetők, és ez később a címkerendszert is összezavarná. Ezért egy **közös listatár** (egy tábla, több listatípussal) szolgálja ki a választható értékeket:
@@ -218,6 +228,8 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 - **Supabase (a modul saját projektje):** adatbázis + Storage (képek) + Auth (privát bejelentkezés). **[DÖNTVE]**
 - A felület **közvetlenül** a Supabase-hez fordul — nincs külön proxy. **[DÖNTVE]**
 - **Privát**, **szinkron** telefon és gép közt (közös háttér). **[DÖNTVE]**
+- **Felület felépítése [DÖNTVE, v1.4]:** natív **ES modulok**, **build-eszköz nélkül**. `index.html` (markup) + `styles.css` + `js/` mappa: `state`, `supabase`, `modal`, `permissions`, `data`, `render`, `personal`, `admin-forms`, `admin-users`, `excel`, `auth`, `main`. A `supabase-js` és az `xlsx` CDN-ről, ESM-ként. (A mutálható app-állapot egy közös `state` objektumban.)
+- **Jogosultság:** háromszintű szerep a `members` táblában, RLS-sel és belépéskori ellenőrzéssel — lásd 13.
 
 ---
 
@@ -293,17 +305,29 @@ Az 5b (karbantartás) éles tesztelése során felmerült hibák és a rájuk ad
 
 *(A javítások élesben ellenőrizve, működnek — beleértve egy menet közben talált 6. hibát is: az Excel-feltöltés néma hibája a `dateWarnings` hibás hatóköre miatt, javítva. A dátum-felismerés emellett magyar hónapneveket (Excel-automatikus formázás) is kezel.)*
 
+**Utólagos adatjavítás (v1.4) [DÖNTVE, javítva]:** a 4. pont ezres-tagolási **kód-hibája rég javítva**, de a régi adatokban maradt egy korrupt csomag: a „II VH Repülők" **#5–60** ára `5990 → 5`-re romlott (az `eredeti_ar`-nál és a migrált `fizetett_ar`-nál is). Egyszeri, biztonságos SQL-lel visszatöltve a **forrásból** (`újság megjelenések.xlsx` + `laprol-lapra-adatbetoltes.sql`, egyező árak), **`< 100 Ft` szűrővel csak a korrupt sorokra** (legitim árat nem érintve), tranzakcióban. A többi öt sorozat ellenőrizve, tiszta. Emellett a személyes `fizetett_ar` teljessé téve (minden árral bíró számhoz `fizetett_ar = eredeti_ar`, ahol hiányzott). Fájlok: `laprol-lapra-arjavitas.sql`, `laprol-lapra-fizetett-teljesseg.sql`.
+
 ---
 
 ## 13. Megosztott katalógus és felhasználó-kezelés **[DÖNTVE, alap; részletek NYITOTT]**
 
-### 13.1 Alapmodell **[DÖNTVE, megvalósítva]**
-A sorozatokat/tételeket a **tulajdonos** viszi fel — minden bejelentkezett felhasználó látja őket. A **státusz/darabszám/jegyzet személyes** (`member_status` tábla, felhasználónként elkülönítve). Regisztráció nyitott, bárki létrehozhat fiókot. A karbantartó mód (🔧, sorozat/tétel szerkesztés) **csak a tulajdonosnak** érhető el.
+### 13.1 Alapmodell + háromszintű jogosultság **[DÖNTVE, megvalósítva — v1.4]**
+A sorozatokat/tételeket a **tulajdonos/admin** viszi fel — minden bejelentkezett felhasználó látja őket. A **státusz/darabszám/jegyzet** (`member_status`) és a **szám-szintű személyes ár-adat** (`member_issue_data`) felhasználónként elkülönített. Regisztráció nyitott; új fiók automatikusan `role='user'`, `status='active'`.
 
-### 13.2 Fiókkezelés **[NYITOTT]**
-- **Adminisztrátori fióktörlés:** a tulajdonos jelenleg csak a Supabase Dashboardon keresztül tud felhasználót törölni (Authentication → Users), az appból nem. Az app-beli "kirúgás" gomb megvalósításához szerver-oldali funkció (Supabase Edge Function) kellene, mert a törléshez a titkos `service_role` kulcs szükséges, ami sosem kerülhet a böngészőbe.
-- **Saját fiók törlése (felhasználó által):** jelenleg nincs megoldva, ugyanaz a technikai korlát vonatkozik rá (admin API kell hozzá).
-- Mindkettőt egy közös, később megépítendő Edge Function oldaná meg.
+**Három szerepkör** (`members` tábla: `user_id`, `role`, `status`, `display_name`):
+- **user** — saját jelölés + személyes ár-adat. (Később: sorozat-választás, üzenetküldés.)
+- **admin** — + törzsadat (sorozat/tétel/komponens) közvetlen létrehozása/szerkesztése, ☰ Listák bővítése, Excel-import, **sima user letiltása/visszaengedése**.
+- **owner (tulajdonos)** — + **admin-jog kiosztása/visszavonása** és a kód módosítása. A tulajdonos sora **védett**: senki (admin sem) nem tilthatja le / fokozhatja le / írhatja felül.
+
+**Szabályok:** admin **csak `user` sort** kezelhet (másik admint vagy a tulajdonost nem); admin-jogot **csak a tulajdonos** oszthat/vonhat vissza; **senki nem módosíthatja a saját szerepkörét**.
+
+**Letiltás vs. törlés — most CSAK a letiltás:** a letiltás visszafordítható (`status='disabled'`), és a letiltott fiók **belépéskor azonnal kiléptetve** („A fiókod fel van függesztve"), olvasásig sem jut. Valódi fiók-**törlés** tudatosan **később** (admin API / Edge Function — lásd 13.2).
+
+**Technikai megvalósítás:** RLS a `members`-en; a szerep-ellenőrzés **`SECURITY DEFINER` segédfüggvényekkel** (`my_role` / `is_staff` / `is_active`) az RLS-rekurzió elkerülésére; **oszlop-védő `BEFORE UPDATE` trigger** (tulajdonos-sor sérthetetlen, role-t csak owner, admin csak `status`). A törzstáblák (`series/issues/components/lists`) írás-policy-je **„staff + aktív"**. Felhasználó-kezelő felület: 🔧 → **„👥 Felhasználók"**. Az import-funkciók (mindkettő) csak PC/laptop/tablet nézetben (`desktop-only`). SQL: `laprol-lapra-jogosultsag-1-members.sql` (+ `-2-ar-modell`, `-3-display-name`).
+
+### 13.2 Fiókkezelés **[részben DÖNTVE — letiltás kész; törlés NYITOTT]**
+- **Letiltás/visszaengedés:** ✅ **megvalósítva** (13.1) — visszafordítható, RLS-szinten és belépéskor is kikényszerítve; admin a sima usereket, a tulajdonos az adminokat is.
+- **Valódi fióktörlés** (adminisztrátori és saját): továbbra is **[NYITOTT]**. A törléshez a titkos `service_role` kulcs kell (Supabase **Edge Function**), ami sosem kerülhet a böngészőbe. Egy közös, később megépítendő Edge Function oldaná meg. Ha „törlés" merül fel felhasználóra, addig **letiltás** a helyes válasz.
 
 ### 13.3 Felhasználói sorozat-választás (kiválasztás/bővítés/törlés) **[NYITOTT]**
 Igény: a nem-tulajdonos felhasználó a tulajdonos által felvitt sorozatok közül **kiválaszthassa**, melyiket szeretné a saját nyilvántartásába felvenni (nem mindegyiket látja automatikusan alapértelmezésben) — később bővíthet, vagy törölhet a választásából.
@@ -321,6 +345,7 @@ Alapötlet: a nem-tulajdonos felhasználó rövid üzenetet küldhessen a tulajd
 ---
 
 *Napló:*
+- v1.4 — **háromszintű jogosultság** (user/admin/owner; `members` tábla `role`/`status`/`display_name`; **letiltás** [nem törlés], letiltott fiók belépéskor kirúgva; felhasználó-kezelő UI „👥 Felhasználók"; `SECURITY DEFINER` segédfüggvények + oszlop-védő trigger; staff-alapú törzsadat-RLS; a tulajdonos sora védett). **Ár-modell szétválasztás:** „fedélár" → **Eredeti ár** (közös törzsadat), a személyes ár-adat (fizetett ár, beszerzési mennyiség, dátum, forrás) a **`member_issue_data`** táblába; **kétnézetes hero** („Eredeti ár" / „Fizetett ár alapján") + megjelenítési szabály: a „fizetve"/összeg **csak megvett tételre** (≥1 komponens `megvan`) számít. **Fájlszétbontás:** `index.html` → natív **ES modulok** (`js/`) + `styles.css`, build-eszköz nélkül. **Adatjavítás:** régi ezres-tagolási korrupció (II VH Repülők #5–60: 5→5990) egyszeri, forrás-alapú SQL-lel visszatöltve, `<100` szűrővel; a személyes fizetett ár teljessé téve. SQL-ek: `jogosultsag-1/2/3`, `arjavitas`, `fizetett-teljesseg`.
 - v1.3 — megosztott katalógus (13. fejezet): alapmodell megvalósítva (member_status, tulajdonos-only szerkesztés, nyitott regisztráció); négy új nyitott kérdés: admin/saját fióktörlés (Edge Function kell), felhasználói sorozat-választás (max 5 törlés/sorozat limit, tiszta újrafelvétel), üzenetküldés adminnak (max 150 karakter, koncepció szinten).
 - v1.2 — megvalósítva: összecsukható fülsáv (nyitott választónál a lista/szűrők/hero elrejtve, nagyobb „Sorozatok" gomb), színcsaládokba rendezett 24-es paletta, **komponensenkénti darabszám-számláló** (+/− a listában, 0-nál automatikus „hiányzik", 1 fölé visszanövelve „megvan"). A beszerzési mennyiség (szám) és a jelenlegi darabszám (komponens) szándékosan külön mező.
 - v1.1 — a „később megbeszélendő" csomag lezárva: 12 fölötti sorozatszám (színcsaládos paletta + összecsukható fülsáv); lapszám-beszúrás lezárva funkció nélkül (a lapszám eleve nem pozíció); többespéldány kezelése (mennyiség mező a számon, költségszámításba építve, részletek a jegyzetben).
