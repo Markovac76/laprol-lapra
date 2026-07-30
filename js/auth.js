@@ -2,7 +2,7 @@
    Bejelentkezés / munkamenet.
    ============================================================ */
 import { supabase } from "./supabase.js";
-import { esc } from "./state.js";
+import { state, esc } from "./state.js";
 import { loadData } from "./data.js";
 import { renderTabs, renderAll } from "./render.js";
 import { isStaff } from "./permissions.js";
