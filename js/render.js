@@ -99,31 +99,36 @@ export function renderList(){
     const istate=issueState(it,s);
     const dateHtml=it.date?`<span class="${future?"future":""}">${fmtDate(it.date)}</span>`:`<span style="color:var(--faint)">nincs dátum</span>`;
     const dbTag=(it.besz_menny&&it.besz_menny>1)?`<span class="dbtag">${it.besz_menny} db</span>`:"";
-    const money=[it.eredeti_ar!=null?`eredeti ár ${fmtFt(it.eredeti_ar)}`:null,(it.fizetett_ar!=null && hasOwnedComponent(it,s))?`fizetve ${fmtFt(it.fizetett_ar)}`:null].filter(Boolean).join(" · ");
+    const eredetiLine = it.eredeti_ar!=null ? `<span class="money">eredeti ár ${fmtFt(it.eredeti_ar)}</span>` : "";
+    const fizetveLine = (it.fizetett_ar!=null && hasOwnedComponent(it,s)) ? `<span class="money">fizetve ${fmtFt(it.fizetett_ar)}</span>` : "";
+    const moneyBlock = (eredetiLine||fizetveLine) ? `<div class="imoney">${eredetiLine}${fizetveLine}</div>` : "";
+    // A +/− léptetők a lenyíló panelbe kerültek; a listában csak a darabszám-kijelzés marad az ikonon.
     const marks=s.components.map(t=>{ const c=it.comps[t]||{status:null}; const stt=c.status; const cdb=(c.db==null?1:c.db);
       const showCnt = stt==="megvan" && cdb>1;
-      const showStep = !future && (state.adminMode || (stt==="megvan" && cdb>1));
-      const btn=`<button class="mark${stt?" m-"+stt:""}${showCnt?" has-cnt":""}" data-n="${it.n}" data-t="${t}" ${future?"disabled":""}
+      return `<button class="mark${stt?" m-"+stt:""}${showCnt?" has-cnt":""}" data-n="${it.n}" data-t="${t}" ${future?"disabled":""}
         title="${COMP_TYPES[t]||t}${stt?": "+stt:": jelöletlen"}${showCnt?" · "+cdb+" db":""}" aria-label="${COMP_TYPES[t]||t}">
         <span class="mrow">${ICONS[t]||ICONS.egyeb}${showCnt?`<span class="cnt">${cdb}</span>`:""}</span><span class="mlab">${MLAB[stt]||""}</span></button>`;
-      const step= showStep ? `<div class="stepper">
-        <button class="stepbtn" data-step="+" data-n="${it.n}" data-t="${t}" aria-label="Több">+</button>
-        <button class="stepbtn" data-step="-" data-n="${it.n}" data-t="${t}" aria-label="Kevesebb">−</button></div>` : "";
-      return `<div class="markwrap">${btn}${step}</div>`;
     }).join("");
     const open = state.openIssue===it.n;
     const panel = open ? `<div class="imgpanel">` + s.components.map((t,ci)=>{
         const c=it.comps[t]||{};
+        const cdb=(c.db==null?1:c.db);
         const img=c.kep_url?`<img src="${esc(c.kep_url)}" alt="${COMP_TYPES[t]||t}">`:`nincs adat`;
+        // A tényleges darabszám-állítás itt, a panelben — nagyobb, kényelmesen érinthető gombokkal.
+        const pstep = !future ? `<div class="pstepper">
+          <button class="pstepbtn" data-step="-" data-n="${it.n}" data-t="${t}" aria-label="Kevesebb">−</button>
+          <span class="pcount">${cdb} db</span>
+          <button class="pstepbtn" data-step="+" data-n="${it.n}" data-t="${t}" aria-label="Több">+</button></div>` : "";
         return `<div class="imgcard"><div class="imgbox">${img}</div>
           <div class="imgcap"><div class="cn">${COMP_TYPES[t]||t}</div>
-          <div class="cc">${scode}-${pad(it.n,4)}-${pad(ci+1,2)}</div></div></div>`;
+          <div class="cc">${scode}-${pad(it.n,4)}-${pad(ci+1,2)}</div></div>${pstep}</div>`;
       }).join("") + `</div>` : "";
     return `<div class="issue${istate?" i-"+istate:""}"><div class="ihead">
       <div class="num">#${it.n}</div>
       <div class="rmain">
         <div class="ititle ${it.name?"":"empty"}">${esc(it.name||"még nincs cím")}</div>
-        <div class="imeta">${dateHtml}${money?`<span class="money">${money}</span>`:""}${dbTag}<span class="cid">${scode}-${pad(it.n,4)}</span></div>
+        <div class="imeta">${dateHtml}${dbTag}<span class="cid">${scode}-${pad(it.n,4)}</span></div>
+        ${moneyBlock}
       </div>
       <div class="marks">${marks}
         ${state.adminMode?`<button class="rowedit" data-edit="${it.n}" title="Szerkesztés">✎</button>`:""}

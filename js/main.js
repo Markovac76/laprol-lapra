@@ -63,7 +63,7 @@ document.getElementById("a-item").onclick=()=>{ if(!S()){ alert("Előbb hozz lé
 document.getElementById("a-editseries").onclick=()=>{ if(!S()){ alert("Nincs sorozat, amit szerkeszteni lehetne."); return; } seriesForm(S()); };
 document.getElementById("a-series").onclick=()=>seriesForm(null);
 document.getElementById("a-lists").onclick=listsForm;
-document.getElementById("a-users").onclick=usersForm;
+document.getElementById("usersBtn").onclick=usersForm;
 document.getElementById("a-template").onclick=downloadTemplate;
 document.getElementById("a-upload").onclick=()=>document.getElementById("upl").click();
 document.getElementById("upl").addEventListener("change",function(){ const f=this.files&&this.files[0]; if(f) handleUpload(f).catch(err); this.value=""; });

@@ -17,13 +17,20 @@ export async function showApp(){
   state.role   = m?.role   || "user";
   state.status = m?.status || "active";
   if(state.status === "disabled"){ await supabase.auth.signOut(); showGate("A fiókod fel van függesztve."); return; }
-  try{ await loadData(); document.getElementById("admToggle").style.display = isStaff() ? "" : "none"; renderTabs(); renderAll(); }
+  try{
+    await loadData();
+    const staff = isStaff();
+    document.getElementById("admToggle").style.display = staff ? "" : "none";
+    document.getElementById("usersBtn").style.display  = staff ? "" : "none";
+    renderTabs(); renderAll();
+  }
   catch(e){ document.getElementById("list").innerHTML=`<div class="empty-state">Hiba a betöltéskor: ${esc(e.message||e)}</div>`; }
 }
 
 export function showGate(msg){
   document.getElementById("app").style.display="none";
   document.getElementById("gate").classList.remove("hidden");
+  document.documentElement.style.removeProperty("--accent");   // ne ragadjon rá az utolsó sorozat színe
   if(msg){ const e=document.getElementById("g-err"); if(e){ e.style.color=""; e.textContent=msg; } }
 }
 
