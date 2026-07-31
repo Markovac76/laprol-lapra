@@ -2,7 +2,7 @@
    Adatbetöltés a Supabase-ből, statisztika, újratöltés.
    ============================================================ */
 import { supabase } from "./supabase.js";
-import { state, OWNER_UID, PAL_FALLBACK, todayISO, issueState, hasOwnedComponent } from "./state.js";
+import { state, OWNER_UID, PAL_FALLBACK, todayISO, issueState, dominantType, hasOwnedComponent } from "./state.js";
 import { renderAll } from "./render.js";
 import { err } from "./modal.js";
 
@@ -25,12 +25,12 @@ export async function loadData(){
   const myStatus={};
   if(!ms.error && ms.data) ms.data.forEach(r=>{ myStatus[r.component_id]={status:r.status,db:(r.db==null?1:r.db),jegyzet:r.jegyzet}; });
   const myIssue={};   // szám-szintű SZEMÉLYES adat (member_issue_data)
-  if(!mid.error && mid.data) mid.data.forEach(r=>{ myIssue[r.issue_id]={fizetett_ar:r.fizetett_ar,besz_menny:(r.beszerzesi_mennyiseg==null?1:r.beszerzesi_mennyiseg),besz_datum:r.beszerzes_datuma,forras:r.forras}; });
+  if(!mid.error && mid.data) mid.data.forEach(r=>{ myIssue[r.issue_id]={fizetett_ar:r.fizetett_ar,besz_menny:(r.beszerzesi_mennyiseg==null?1:r.beszerzesi_mennyiseg),besz_datum:r.beszerzes_datuma,forras:r.forras,ar_auto:(r.ar_auto==null?true:r.ar_auto)}; });
   const byS={}, byI={};
   state.SERIES = s.data.map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,items:[]}; byS[r.id]=o; return o; });
   i.data.forEach(r=>{ const mi=myIssue[r.id]||{}; const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,
       eredeti_ar:r.eredeti_ar,
-      fizetett_ar:(mi.fizetett_ar==null?null:mi.fizetett_ar),besz_menny:(mi.besz_menny==null?1:mi.besz_menny),besz_datum:mi.besz_datum||null,forras:mi.forras||null,
+      fizetett_ar:(mi.fizetett_ar==null?null:mi.fizetett_ar),besz_menny:(mi.besz_menny==null?1:mi.besz_menny),besz_datum:mi.besz_datum||null,forras:mi.forras||null,ar_auto:(mi.ar_auto==null?true:mi.ar_auto),
       comps:{}}; byI[r.id]=o; const ser=byS[r.series_id]; if(ser) ser.items.push(o); });
   c.data.forEach(r=>{ const it=byI[r.issue_id]; if(!it) return;
     const my=myStatus[r.id]||{status:null,db:1,jegyzet:null};
@@ -40,28 +40,26 @@ export async function loadData(){
   if(state.activeIdx>=state.SERIES.length) state.activeIdx=0;
 }
 
-// A "Eredeti ár alapján" nézet referencia-komponense: magazin → könyv → első típus.
-export function refComponentType(s){
-  return s.components.includes("magazin") ? "magazin"
-       : s.components.includes("konyv")   ? "konyv"
-       : (s.components[0]||null);
-}
-
 export function stats(si){
   const s=state.SERIES[si]; const perType={}; s.components.forEach(t=>perType[t]={owned:0,total:s.items.length});
-  const refType=refComponentType(s);
-  let eredetiTotal=0, fizetettTotal=0, beszerzendo=0, next=null, hasFuture=false;
+  const dt=dominantType(s);   // a lapszám-színezéssel megegyező domináns komponens
+  let eredetiTotal=0, fizetettTotal=0, eredetiUnknown=false, fizetettUnknown=false, beszerzendo=0, next=null, hasFuture=false;
   for(const it of s.items){
     const future=it.date&&it.date>todayISO;
     if(future) hasFuture=true;
-    // Eredeti ár alapján: eredeti ár × a referencia-komponens AKTUÁLIS darabszáma, CSAK ha 'megvan'
-    if(it.eredeti_ar!=null && refType){
-      const rc=it.comps[refType];
-      if(rc && rc.status==="megvan") eredetiTotal += it.eredeti_ar * (rc.db||1);
+    // Eredeti ár alapján: a DOMINÁNS komponens 'megvan' (= zöld lapszám) → beszámít; szorzó a domináns darabszáma.
+    if(dt){
+      const dc=it.comps[dt];
+      if(dc && dc.status==="megvan"){
+        if(it.eredeti_ar!=null) eredetiTotal += it.eredeti_ar * (dc.db||1);
+        else eredetiUnknown=true;   // van bevont tétel, de "nem ismert" árral
+      }
     }
-    // Fizetett ár alapján: Σ (fizetett ár × beszerzési mennyiség) — CSAK ahol legalább
-    // egy komponens 'megvan' (különben semmi nem lett ténylegesen megvéve)
-    if(it.fizetett_ar!=null && hasOwnedComponent(it,s)) fizetettTotal += it.fizetett_ar * (it.besz_menny||1);
+    // Fizetett ár alapján: ≥1 komponens 'megvan' → beszámít; szorzó a beszerzési mennyiség.
+    if(hasOwnedComponent(it,s)){
+      if(it.fizetett_ar!=null) fizetettTotal += it.fizetett_ar * (it.besz_menny||1);
+      else fizetettUnknown=true;
+    }
     for(const t of s.components){ const st=it.comps[t]?it.comps[t].status:null;
       if(st==="megvan") perType[t].owned++; }
     // Beszerzendő: LAPSZÁM-szinten — ami megjelent, és se nem kész (zöld), se nem kihúzott (szürke)
@@ -69,7 +67,7 @@ export function stats(si){
     const anyOpen=s.components.some(t=>{const st=it.comps[t]?it.comps[t].status:null; return st!=="megvan"&&st!=="nemkell";});
     if(anyOpen && it.date && it.date>=todayISO){ if(!next||it.date<next.date) next=it; }
   }
-  return {perType,eredetiTotal,fizetettTotal,beszerzendo,next,hasFuture};
+  return {perType,eredetiTotal,fizetettTotal,eredetiUnknown,fizetettUnknown,beszerzendo,next,hasFuture};
 }
 
 export async function reload(){

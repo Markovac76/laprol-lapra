@@ -31,9 +31,11 @@ export function renderHero(){
   const closed = !st.hasFuture ? `<span class="closedtag">lezárt sorozat</span>` : "";
   const fizetettBasis = state.costBasis==="fizetett";
   const total = fizetettBasis ? st.fizetettTotal : st.eredetiTotal;
+  const unknown = fizetettBasis ? st.fizetettUnknown : st.eredetiUnknown;
   const basisLabel = fizetettBasis ? "Összeg — fizetett ár alapján" : "Összeg — eredeti ár alapján";
+  const unknownBadge = unknown ? `<span class="unknownbadge">+ nem ismert</span>` : "";
   const costBox = state.costVisible
-    ? `<div class="stat wide"><div class="k">${basisLabel}</div><div class="v">${fmtFt(total)||"0 Ft"}</div>
+    ? `<div class="stat wide"><div class="k">${basisLabel}</div><div class="v">${fmtFt(total)||"0 Ft"}${unknownBadge}</div>
          <div class="basisrow">
            <button class="basisbtn" data-basis="eredeti" aria-pressed="${!fizetettBasis}">Eredeti ár</button>
            <button class="basisbtn" data-basis="fizetett" aria-pressed="${fizetettBasis}">Fizetett ár</button>
@@ -99,9 +101,9 @@ export function renderList(){
     const istate=issueState(it,s);
     const dateHtml=it.date?`<span class="${future?"future":""}">${fmtDate(it.date)}</span>`:`<span style="color:var(--faint)">nincs dátum</span>`;
     const dbTag=(it.besz_menny&&it.besz_menny>1)?`<span class="dbtag">${it.besz_menny} db</span>`:"";
-    const eredetiLine = it.eredeti_ar!=null ? `<span class="money">eredeti ár ${fmtFt(it.eredeti_ar)}</span>` : "";
-    const fizetveLine = (it.fizetett_ar!=null && hasOwnedComponent(it,s)) ? `<span class="money">fizetve ${fmtFt(it.fizetett_ar)}</span>` : "";
-    const moneyBlock = (eredetiLine||fizetveLine) ? `<div class="imoney">${eredetiLine}${fizetveLine}</div>` : "";
+    const eredetiLine = `<span class="money">eredeti ár ${it.eredeti_ar!=null?fmtFt(it.eredeti_ar):"nem ismert"}</span>`;
+    const fizetveLine = hasOwnedComponent(it,s) ? `<span class="money">fizetve ${it.fizetett_ar!=null?fmtFt(it.fizetett_ar):"nem ismert"}</span>` : "";
+    const moneyBlock = `<div class="imoney">${eredetiLine}${fizetveLine}</div>`;
     // A +/− léptetők a lenyíló panelbe kerültek; a listában csak a darabszám-kijelzés marad az ikonon.
     const marks=s.components.map(t=>{ const c=it.comps[t]||{status:null}; const stt=c.status; const cdb=(c.db==null?1:c.db);
       const showCnt = stt==="megvan" && cdb>1;
@@ -122,7 +124,11 @@ export function renderList(){
         return `<div class="imgcard"><div class="imgbox">${img}</div>
           <div class="imgcap"><div class="cn">${COMP_TYPES[t]||t}</div>
           <div class="cc">${scode}-${pad(it.n,4)}-${pad(ci+1,2)}</div></div>${pstep}</div>`;
-      }).join("") + `</div>` : "";
+      }).join("") + `</div>
+      <div class="panelmoney">
+        <div class="pmrow"><span class="pmk">eredeti ár</span><span class="pmv">${it.eredeti_ar!=null?fmtFt(it.eredeti_ar):"nem ismert"}</span></div>
+        <div class="pmrow"><span class="pmk">fizetve</span><span class="pmv">${it.fizetett_ar!=null?fmtFt(it.fizetett_ar):"nem ismert"}</span><button class="pmedit" data-editprice="${it.n}" title="Saját beszerzési adat szerkesztése">✎</button></div>
+      </div>` : "";
     return `<div class="issue${istate?" i-"+istate:""}"><div class="ihead">
       <div class="num">#${it.n}</div>
       <div class="rmain">

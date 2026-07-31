@@ -73,6 +73,8 @@ header.top{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,va
 .basisbtn{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--muted);
   border-radius:8px;padding:6px 4px;font-size:11px;font-weight:600;cursor:pointer;line-height:1.1}
 .basisbtn[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:transparent}
+.unknownbadge{display:inline-block;margin-left:8px;font-size:11px;font-weight:600;vertical-align:middle;
+  color:var(--amber);background:var(--amber-d);border:1px solid var(--amber);border-radius:999px;padding:2px 9px}
 
 .controls{padding:2px 0 8px}
 .search{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:11px 13px;font-size:15px;margin-bottom:8px}
@@ -142,6 +144,15 @@ header.top{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,va
   border-radius:11px;font-size:22px;font-weight:700;line-height:1;cursor:pointer;padding:0}
 .pstepbtn:active{transform:scale(.92)}
 .pcount{font-family:"Space Grotesk";font-size:15px;font-weight:700;min-width:52px;text-align:center;color:var(--ink)}
+.panelmoney{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.pmrow{display:flex;align-items:center;gap:8px}
+.pmk{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);min-width:72px}
+.pmv{font-family:"Space Grotesk";font-size:14px;font-weight:700;color:var(--ink);flex:1}
+.pmedit{border:1px solid var(--line);background:var(--panel-2);color:var(--muted);border-radius:9px;
+  width:40px;height:36px;font-size:14px;cursor:pointer;padding:0}
+.pmedit:active{transform:scale(.94)}
+.ckrow{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin:4px 0 6px;font-weight:400}
+.ckrow input{width:auto}
 .costbtn{margin-top:6px;background:transparent;border:1px solid var(--line);color:var(--muted);
   border-radius:10px;padding:11px 14px;font-size:13.5px;font-weight:600;cursor:pointer}
 .costbtn.show{color:var(--accent);filter:brightness(1.25);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}

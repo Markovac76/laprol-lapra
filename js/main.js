@@ -1,10 +1,11 @@
 /* ============================================================
    Belépési pont: minden esemény-bekötés + indítás egy helyen.
    ============================================================ */
-import { state, S, nextStatus } from "./state.js";
+import { state, S, nextStatus, hasOwnedComponent } from "./state.js";
 import { SUPABASE_ANON_KEY } from "./supabase.js";
 import { renderAll, renderList, renderChips, renderTabs, applyPickerMode, syncHeadHeight } from "./render.js";
-import { upsertMyStatus } from "./personal.js";
+import { upsertMyStatus, applyAutoPrice } from "./personal.js";
+import { priceForm } from "./price-edit.js";
 import { itemForm, seriesForm, listsForm } from "./admin-forms.js";
 import { usersForm } from "./admin-users.js";
 import { downloadTemplate, handleUpload } from "./excel.js";
@@ -23,11 +24,16 @@ document.getElementById("list").addEventListener("click",async e=>{
   const exp=e.target.closest(".expander");
   if(exp){ const n=+exp.dataset.exp; state.openIssue=(state.openIssue===n)?null:n; renderList(); return; }
 
-  // +/− darabszám-léptető
-  const st=e.target.closest(".stepbtn");
+  // Saját beszerzési adat szerkesztése (mindenkinek) — a panel ✎ ikonja
+  const pe=e.target.closest("[data-editprice]");
+  if(pe){ const it=S().items.find(x=>x.n===+pe.dataset.editprice); if(it) priceForm(it); return; }
+
+  // +/− darabszám-léptető (a lenyíló panelben)
+  const st=e.target.closest(".pstepbtn");
   if(st){
     const it=S().items.find(x=>x.n===+st.dataset.n); const t=st.dataset.t;
     const comp=it&&it.comps[t]; if(!comp||!comp.id) return;
+    const prevOwned=hasOwnedComponent(it,S());
     const prevDb=(comp.db==null?1:comp.db), prevStatus=comp.status;
     let nextDb = prevDb + (st.dataset.step==="+" ? 1 : -1);
     if(nextDb<0) nextDb=0;
@@ -37,7 +43,8 @@ document.getElementById("list").addEventListener("click",async e=>{
     else if(prevDb===0 || prevStatus!=="megvan") nextSt="megvan";
     comp.db=nextDb; comp.status=nextSt; renderAll();
     const error=await upsertMyStatus(comp.id,{db:nextDb,status:nextSt});
-    if(error){ comp.db=prevDb; comp.status=prevStatus; renderAll(); alert("Mentés sikertelen: "+error.message); }
+    if(error){ comp.db=prevDb; comp.status=prevStatus; renderAll(); alert("Mentés sikertelen: "+error.message); return; }
+    await applyAutoPrice(it, S(), prevOwned); renderAll();
     return;
   }
 
@@ -46,13 +53,15 @@ document.getElementById("list").addEventListener("click",async e=>{
   const mk=e.target.closest(".mark"); if(!mk||mk.disabled) return;
   const it=S().items.find(x=>x.n===+mk.dataset.n); const t=mk.dataset.t;
   const comp=it.comps[t]; if(!comp||!comp.id) return;
+  const prevOwned=hasOwnedComponent(it,S());
   const prev=comp.status, prevDb=(comp.db==null?1:comp.db);
   const next=nextStatus(prev);                                   // jelöletlenre nem tér vissza
   // „megvan”-ra váltáskor a számláló mindig 1-ről indul (onnan lehet +/− gombbal emelni)
   const nextDb = (next==="megvan") ? Math.max(1, prevDb===0?1:prevDb) : prevDb;
   comp.status=next; comp.db=nextDb; renderAll();                 // optimista frissítés
   const error=await upsertMyStatus(comp.id,{status:next,db:nextDb});
-  if(error){ comp.status=prev; comp.db=prevDb; renderAll(); alert("Mentés sikertelen: "+error.message); }
+  if(error){ comp.status=prev; comp.db=prevDb; renderAll(); alert("Mentés sikertelen: "+error.message); return; }
+  await applyAutoPrice(it, S(), prevOwned); renderAll();         // B2: auto fizetett ár kitöltés/nullázás
 });
 
 /* ---- karbantartó eszköztár ---- */

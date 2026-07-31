@@ -127,8 +127,8 @@ ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új
         let it=s.items.find(x=>x.n===item.n), issueId;
         if(it){ issueId=it.id; if(Object.keys(item.p).length){ const {error}=await supabase.from("issues").update(item.p).eq("id",it.id); if(error) throw error; } upd++; }
         else { const {data,error}=await supabase.from("issues").insert({...item.p, series_id:s.id, lapszam:item.n}).select().single(); if(error) throw error; issueId=data.id; ins++; }
-        // Személyes fizetett ár (a feltöltő saját member_issue_data-jába)
-        if(Object.keys(item.pi).length){ const pierr=await upsertMyIssueData(issueId, item.pi); if(pierr) throw pierr; }
+        // Személyes fizetett ár (a feltöltő saját member_issue_data-jába) — explicit → kézi (ar_auto=false)
+        if(Object.keys(item.pi).length){ const pierr=await upsertMyIssueData(issueId, {...item.pi, ar_auto:false}); if(pierr) throw pierr; }
         for(const {t,cp} of item.comps){
           const cur=it?it.comps[t]:null;
           if(cur&&cur.id){ if(Object.keys(cp).length){ const {error}=await supabase.from("components").update(cp).eq("id",cur.id); if(error) throw error; } }

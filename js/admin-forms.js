@@ -77,7 +77,7 @@ export function itemForm(existing){
       eredeti_ar:v("f-eredeti")?parseInt(v("f-eredeti")):null };
     const personal={ fizetett_ar:v("f-fizetett")?parseInt(v("f-fizetett")):null,
       beszerzesi_mennyiseg: Math.max(1, parseInt(v("f-menny"))||1),
-      beszerzes_datuma:v("f-fdatum")||null, forras:v("f-forras")||null };
+      beszerzes_datuma:v("f-fdatum")||null, forras:v("f-forras")||null, ar_auto:false };
     try{
       let issueId = existing ? existing.id : null;
       if(existing){
