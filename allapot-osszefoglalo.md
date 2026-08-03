@@ -1,156 +1,133 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum
+# Collector app — állapot-összefoglaló / átadási dokumentum (v2)
 
-**Készült:** 2026. július 24. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan, tokenhatékonyan.
+**Frissítve:** 2026. augusztus 3. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
-> Ezt a fájlt told fel a Claude projektbe a többi mellé. Egy új beszélgetés elején hivatkozz rá: "olvasd el a kockarol-kockara / laprol-lapra állapot-összefoglalót, onnan tudod, hol tartunk."
+> Told fel ezt a fájlt a Claude projektbe (cseréld le a régi verziót). Új beszélgetés elején hivatkozz rá: "olvasd el az állapot-összefoglalót, onnan tudod, hol tartunk."
 
 ---
 
 ## 1. A nagy kép
 
-Egy **OM Curator** nevű személyes gyűjtemény-rendszerező **platform** épül, aminek modulok csatlakoznak hozzá. A platform maga még nincs megépítve — csak elvi szinten tervezett (lásd a Lapról Lapra spec 2. fejezetét).
-
-**Első modul: Lapról Lapra** — partwork (számozott, gyűjthető füzetsorozat) követő. **Éles, működő állapotban van.**
-
-**Második modul (tervezés alatt): Kockáról Kockára** — Lego-gyűjtemény nyilvántartó. Csak egy v0.1 vázlat készült, adatmodell még nincs kidolgozva.
+**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított. **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
 
 ---
 
-## 2. Lapról Lapra — technikai állapot (ÉLES)
+## 2. Lapról Lapra — ÉLES állapot
 
-### Élő rendszer
-- **URL:** `laprol-lapra.vercel.app` — telepíthető PWA-ként telefonon/tableten (saját ikonnal).
-- **GitHub repo:** `github.com/Markovac76/laprol-lapra` (privát).
-- **Supabase projekt:** „Laprol Lapra", Frankfurt régió, Free csomag.
-- **Felhasználó UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
+### Rendszer
+- **URL:** `laprol-lapra.vercel.app` (PWA, telepíthető)
+- **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
+- **Supabase:** „Laprol Lapra", Frankfurt, Free
+- **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
+- **Specifikáció:** jelenleg **v1.5** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 
-### Fájlszerkezet a projekt-mappában
+### Fájlszerkezet (FONTOS VÁLTOZÁS: nem egyetlen fájl többé!)
+A korábbi egyetlen `index.html` **szét lett bontva** natív ES modulokra (build-eszköz nélkül):
 ```
 laprol-lapra/
-├── index.html          ← a teljes app (HTML+CSS+JS egy fájlban, ES module)
-├── config.js            ← NINCS a git-ben (.gitignore); az anon kulcsot tartalmazza
-├── config.example.js    ← minta a config.js-hez, git-ben van
-├── vercel.json           ← buildCommand, ami env változóból generálja a config.js-t Vercelen
-├── manifest.json         ← PWA manifest
-├── icons/                ← 4 PNG (192/512, sima + maskable)
-├── .gitignore
-├── laprol-lapra-specifikacio.md / .pdf  ← a fő specifikáció (jelenleg v1.2)
-└── (archív SQL-ek, amiket egyszer lefuttattunk a Supabase-ben — lásd lent)
+├── index.html          ← csak markup + script betöltés
+├── styles.css
+├── config.js            ← NINCS git-ben, Vercel generálja env változóból
+├── config.example.js
+├── vercel.json
+├── manifest.json + icons/
+└── js/
+    ├── supabase.js, state.js, auth.js, permissions.js
+    ├── data.js, render.js, personal.js
+    ├── admin-forms.js, admin-users.js
+    ├── price-edit.js    ← új: mindenkinek elérhető ár-szerkesztő
+    ├── excel.js, main.js
 ```
+Ha bármit módosítasz, ebben a modul-szerkezetben kell — nem egyetlen nagy fájlban.
 
-### Munkafolyamat (FONTOS, ezt kövesd)
-1. Letöltött/módosított fájlokat bemásolod a projekt-mappába, **felülírva** a régieket.
-2. **A `config.js`-t SOHA nem küldöm/írom felül** — az egyszer lett létrehozva, benne az anon kulccsal, és érintetlen marad minden körben.
-3. VS Code terminálban:
-   ```
-   git add .
-   git commit -m "rövid leírás"
-   git push
-   ```
-4. A Vercel automatikusan újra deployol a push után (~30-60 mp), a `vercel.json` buildCommand-je legenerálja a `config.js`-t a Vercel **Environment Variables**-ben tárolt `SUPABASE_ANON_KEY`-ből.
-5. SQL-módosításokat **külön, a Supabase SQL Editorban** kell lefuttatni — ezek nem a git-push részei, hanem egyszeri, manuális lépések.
+### Munkafolyamat — VÁLTOZÁS: Claude Code-ban dolgozunk, nem itt
+A közelmúltbeli fejlesztés (jogosultsági réteg, ár-modell, UX-javítások) **Claude Code-ban** történt, nem a Home/chat felületen. A minta:
+1. Home-felületen (itt) átbeszéljük/kidolgozzuk a döntéseket.
+2. Elkészül egy pontos, másolható instrukció-fájl (`claude-code-N-lepes-....md`).
+3. Ezt bemásolod a Code-nak, ő megépíti, kérdez ha kell, majd commit+push.
+4. Te éles teszteléssel (bejelentkezve!) ellenőrződ — a Code anonim/publikus adatot lát csak, a személyes/védett adatot NEKED kell tesztelned.
+5. Ha minden jó, a Code frissíti a specifikációt is, és jelzi az állapot-összefoglaló frissítésének szükségességét.
 
-### Supabase séma (jelenlegi állapot)
-Táblák: `series`, `issues`, `components`, `lists`, `counters` — mind RLS-sel védve (`auth.uid() = user_id`).
-
-**series:** id, user_id, kiado (→lists.ertek), megnevezes, megjelenites (max 16 kar.), szin (hex), components (text[]), sort_order, kod_szam (int, soha vissza nem forgó számláló), created_at
-
-**issues:** id, user_id, series_id, lapszam, cim, megjelenes (date), fedelar (int), beszerzesi_ar (int), beszerzes_datuma (date), forras (→lists.ertek), **mennyiseg** (int, default 1 — hány db-ot vettél)
-
-**components:** id, user_id, issue_id, tipus (magazin/modell/konyv/egyeb), status (megvan/hianyzik/nemkell/null), azonosito, azonosito_tipus (→lists.ertek), ar, kep_url (még nem használt — képkezelés még nincs megépítve), jegyzet, cimkek (text[], még nem használt), kulso_ref (még nem használt), **db** (int, default 1 — élő készlet-számláló)
-
-**lists:** id, user_id, tipus (kiado/komponens/azonosito/forras), ertek, megjelenites, sort_order — bővíthető a ☰ Listák felületen
-
-**counters:** user_id, next_series_no — a sorozat kód-számláló állapota
-
-### Elvégzett SQL-ek (időrendben, mind lefuttatva)
-1. Alap táblák (series/issues/components) + RLS
-2. Listatár (lists) + kezdő értékek + `issues.forras` mező
-3. `components.azonosito_tipus` mező
-4. Kód-számláló (`series.kod_szam` + `counters` tábla) + visszatöltés
-5. `issues.mennyiseg` mező
-6. `components.db` mező
+**SQL-migrációk módja is így megy:** a Code ír egy `.sql` fájlt a mappába, TE futtatod a Supabase SQL Editorban (dry-run előbb, ha van benne), majd jelented az eredményt.
 
 ---
 
-## 3. Lapról Lapra — elkészült funkciók
+## 3. Adatmodell — jelentős bővülés a legutóbbi körben
 
-- **Bejelentkezés** (e-mail+jelszó, tartós munkamenet — `persistSession`)
-- **Komponens-modell**: egy szám (issue) egy vagy több komponensből áll (magazin/modell/könyv/egyéb), mindegyiknek saját státusza
-- **Hierarchia-alapú lapszám-színezés**: a domináns komponens (nem-magazin, ha van ilyen) dönti el a szín; ha domináns=megvan→zöld, nemkell→szürke, hiány+magazin megvan→sárga, hiány+egyéb→piros, jelöletlen/jövőbeli→semleges
-- **Körbeforgó jelölés**: jelöletlen→megvan→hiány→nemkell→megvan…, jelöletlenre nem tér vissza (csak szerkesztőben reset-elhető)
-- **Komponensenkénti darabszám-számláló**: +/− gombok, 0-nál automatikusan „hiányzik", visszanövelve „megvan"
-- **Tapadó fejléc** a listánál (oszlopnevek fent maradnak görgetéskor)
-- **Lenyíló képsáv** komponensenként (UI kész, de **kép-feltöltés/tárolás még NINCS megépítve** — ez a legnagyobb nyitott munka)
-- **Rejthető belekerülési költség** (gomb, sorozatváltáskor visszaáll rejtettre)
-- **Adaptív statisztika**: van jövőbeli szám→"Következő megjelenés", nincs→"Beszerzendő lapszám" (lapszám-alapú számolás, nem komponens-alapú)
-- **"Lezárt sorozat" címke**, ha nincs jövőbeli dátum
-- **Összecsukható fülsáv**: csak az aktív sorozat füle nagy, "Sorozatok (n)" gomb nyitja a többit; nyitva a lista/szűrők/hero el vannak rejtve
-- **Színcsaládos paletta**: 24 szín, 6 családban (Kék/Vörös/Lila/Zöld/Barna/Magenta), csoportosítva a választóban
-- **Karbantartó mód** (🔧): tétel szerkesztése/törlése/új, sorozat szerkesztése/törlése/új (kiadó listából, komponens-választó, szín), ☰ Listák (bővíthető listák), Excel-sablon letöltés + feltöltés (csak asztali)
-- **Excel-import biztonság**: feltöltés előtt megerősítő ablak (célsorozat + hatás előnézete), hibatűrő dátum-felismerés (magyar hónapnevek is), ezres tagolás kezelése az áraknál
-- **PWA**: telepíthető telefonon/tableten, saját ikonnal
+### Táblák (a korábbi `series/issues/components/lists/counters` mellett ÚJAK):
 
-## 4. Lapról Lapra — NYITOTT/nem megépített dolgok
+**members** — a háromszintű jogosultság: `user_id`, `role` ('user'/'admin'/'owner'), `status` ('active'/'disabled'), `display_name`. SECURITY DEFINER függvények (`my_role()`, `is_staff()`, `is_active()`) kerülik el az RLS-rekurziót. A tulajdonos sora triggerrel védett (senki, még ő maga sem tudja lefokozni/letiltani magát).
 
-1. **Képkezelés** — ez a legnagyobb hátralévő munka. Terv (a specifikációban rögzítve): Supabase Storage, **privát** tároló, **felhasználónkénti mappa** (mappa neve = UID), automatikus átméretezés feltöltés előtt (max 1200px, JPEG), drag&drop asztalin / kamera telefonon, kép cseréje/törlése gombokkal. **Még semmi nincs megépítve belőle**, csak a `kep_url` oszlop létezik üresen.
-2. **Címkerendszer** — a `cimkek` mező létezik, de a logika (hierarchia/szinonimák) nincs kidolgozva. Ez platform-szintű feladat lesz (lásd lent).
-3. Kép nagyítása teljes képernyőn (kisebb, függő feature a képkezeléshez)
-4. Kettőnél több nem-magazin komponens esetén a hierarchia pontosítása (jelenleg nincs ilyen eset)
-5. Hordozhatóság/exportálás — nincs kidolgozva
-6. Több felhasználós adattárolási modell — jelenleg egy közös Supabase projekt, RLS-sel elválasztva; nyitott kérdés, hogy ez maradjon-e így vagy legyen platform-vezérelt saját projekt később
+**member_status** — a régi, komponens-szintű személyes állapot (megvan/hiányzik/nem kell + darabszám + jegyzet), user_id-vel elkülönítve. Ez tette lehetővé a **megosztott katalógust**: a sorozatokat/tételeket a staff viszi fel, MINDENKI látja, de a jelölés személyes.
+
+**member_issue_data** — ÚJ, szám-szintű személyes adat: `fizetett_ar`, `beszerzesi_mennyiseg`, `beszerzes_datuma`, `forras`. Az `issues.fedelar` átnevezve `eredeti_ar`-ra (törzsadat, csak staff szerkeszti). A régi `issues.beszerzesi_ar` stb. oszlopok holtan megmaradtak (nem törölve, biztonsági okból).
+
+### RLS-modell összefoglalva
+`series/issues/components/lists` írása: `is_staff() AND is_active()`. Olvasása: mindenki (megosztott katalógus elve). `member_status`/`member_issue_data`: mindenki csak a sajátját (upsert minta).
 
 ---
 
-## 5. OM Curator platform — elvi döntések (még nincs építve)
+## 4. Elkészült funkciók (a korábbi listát kiegészítve)
 
-A platform **"karmester, nem tulajdonos"**: a modulok birtokolják a saját adatukat, a platform csak kapcsolatot teremt és egységesít.
+**Alapfunkciók** (mint eddig): komponens-modell, hierarchia-szín, körbeforgó jelölés, tapadó fejléc, lenyíló képsáv (kép nélkül még), rejthető belekerülési költség, adaptív statisztika, összecsukható fülsáv, színcsaládos paletta, Excel-import biztonsággal, PWA.
 
-**Három feladata:** térkép (mi hol érhető el), kapcsolat-tár (logikai láncok), fogalomtár/egységesítő (címke-kanonizálás, pl. "ferrari"/"Ferrari" ugyanaz).
-
-**"Modulok közti kapcsolat" — három elv** (a Lego/BrickLink-példából jött):
-1. **Azonosító mező tudatosan általános** — bármilyen külső rendszer kódja lehet (ISBN-től BrickLink-kódig), nem csak könyves azonosítók.
-2. **Címkézés: "tágabb/szűkebb fogalom" (thesaurus) modell**, NEM szigorú fa, NEM lapos lista. Egy címke több tágabb fogalomhoz is tartozhat, tágabb fogalomra keresve lemegy a szűkebbekre is. *(Példa: platform-keresés "Star Wars — Új remény"-re több modulból hoz találatot.)* Ez a logika **kizárólag a platformon** él, a modulban a címke sima szabad szöveg marad.
-3. **"Kezdeményez → jóváhagy → befogad" folyamat:**
-   - Új kapcsolat: a modul csak **javasolja**, sosem automatikus.
-   - Meglévő kapcsolat sérülése (drift, pl. egy Lego-darab eltörik): platform **értesít**, nem ír felül automatikusan semmit.
-   - **A jóváhagyási állapot (a kapcsolat maga) kizárólag a platformon él, egyetlen példányban** — a modulok csak "ablakok" rá, nem másolatok. Akárhonnan (platform vagy bármelyik modul felülete) fogadod el, mindig ugyanazt az állapotot látod.
-   - Fontos tisztázott pont: a platform **nem tart élő, folyamatos másolatot** a modulok adatából — csak amikor ténylegesen lekérdezed, akkor nyúl oda ("kinyúl és behúzza, majd elengedi"). A függőben lévő javaslatok viszont a platform saját, központi listájában élnek, modultól függetlenül elérhetően.
-
-**Kockáról Kockára modul (2. modul, tervezés alatt):**
-- Név eldőlt: **Kockáról Kockára**
-- Irány: **kézzel kitölthető BrickLink-kód mezővel indul**, élő API-összekötés **later/később** (a BrickLink hivatalos API-ja OAuth 1.0, kézi aláírással — nem triviális, külön fejlesztési szakasz, valószínűleg proxy-réteggel, mint a NovelAI-nál volt)
-- Alternatíva/kiegészítés később: Brickset API (készlet-szintű adatokra, egyszerűbb hitelesítéssel)
-- Van egy `kockarol-kockara-specifikacio.md` v0.1 fájl a projektben — csak vázlat, 5 nyitott kérdéssel (mit tart nyilván pontosan, adatmodell váza, címkézés viszonya a BrickLink kategóriákhoz, önálló felvitel vs. csak Lapról Lapra-forrásból, mit jelent "megvan" egy készletnél)
+**ÚJ ebben a körben:**
+- **Háromszintű jogosultság** (user/admin/owner) + felhasználó-kezelő felület (önálló 👥 gomb a fejlécben, staffnak) — letiltás/visszaengedés (userre), admin-jog ki/beadás (csak owner).
+- **Letiltott user azonnal kizárva** bejelentkezéskor ("A fiókod fel van függesztve").
+- **Ár-modell szétválasztva:** Eredeti ár (törzsadat) vs. Fizetett ár (személyes, `member_issue_data`).
+- **Automatikus fizetett ár kitöltés:** első "megvan" jelöléskor = eredeti ár; csak első alkalommal tölt; ha minden jelölés visszavonásra kerül, visszaáll "nem ismert"-re.
+- **"Nem ismert" ár kezelése** végig a felületen (NULL → felirat, nem üres/hibás).
+- **Mindenkinek elérhető ár-szerkesztő** a lenyíló panelben (fizetett ár, mennyiség, dátum, forrás) — plain user is használja, nem csak staff.
+- **Hero összeg-számítás javítva:** a domináns komponens szerint számol (nem csak magazin/könyv), "+nem ismert" badge, ha van kihagyott tétel.
+- **Kétnézetes hero:** "Eredeti ár alapján" / "Fizetett ár alapján" választó.
+- **UX-javítások:** nagyobb fejléc-ikonok (46×44px), gate accent-szín reset kilépéskor, kétsoros ár-megjelenítés telefonon, darabszám +/− áthelyezve a fő listából a lenyíló panelbe.
 
 ---
 
-## 6. "Később megbeszélendő" — már mind eldőlt és megépült ebben a beszélgetésben
-(csak a rendszerezés kedvéért, hogy tudd, ezek nem nyitottak már)
-- 12 fölötti sorozatszám kezelése → színcsaládos paletta + összecsukható fülsáv (MEGÉPÍTVE)
-- Lapszám beszúrása résbe → lezárva, nem kell hozzá funkció (a lapszám eleve nem pozíció)
-- Többespéldány kezelése → mennyiség (számon) + darabszám (komponensen) két külön mező (MEGÉPÍTVE)
+## 5. NYITOTT/nem megépített dolgok — Lapról Lapra
+
+Prioritási javaslat (a Code ajánlása alapján, sorrend nincs kőbe vésve):
+
+1. **Képkezelés** — a LEGNAGYOBB nyitott munka. Terv kész a specifikációban (Supabase Storage, privát/megosztott katalógus miatt most feltehetően KÖZÖS tárolás, nem felhasználónkénti — ezt érdemes újra átgondolni a megosztott katalógus fényében, mielőtt építeni kezditek).
+2. **Excel komponens-státusz átkötése** a személyes `member_status`-ra (jelenleg a holt `components.status`-t használja az import — ELLENŐRIZENDŐ, hogy ez tényleg így van-e még, vagy időközben javításra került).
+3. **Felhasználói sorozat-választás** (13.3 a specifikációban): user kiválaszthatja, mely staff-jóváhagyott sorozatokat karbantartja saját maga; max 5× törlés limit; tiszta újrafelvétel.
+4. **Üzenetküldés az adminnak** (13.4): max 150 karakter, user → staff.
+5. **Valódi fióktörlés** (Edge Function kell, service_role kulccsal — eddig csak letiltás épült meg).
+6. **Felhasználói sablon-beküldés** új sorozat igényléséhez (user tölt ki sablont, staff jóváhagyja/javítja) — koncepció megvan, nincs építve.
+7. **Címkerendszer** — platform-szintű, még nem szabványosítva.
+8. **Hordozhatóság/export** — nincs kidolgozva.
 
 ---
 
-## 7. Munkastílus / amit érdemes tudni rólam (a tulajdonosról)
+## 6. OM Curator platform — elvi döntések (nincs építve)
 
-- Kezdő vagyok fejlesztésben, VS Code + GitHub + Vercel + Supabase alapszinten megy már (végigcsináltuk lépésről lépésre).
-- Szeretem, ha **előbb megbeszéljük/ötleteljük** a dolgokat, és csak utána kódolunk — "gyűjtsd össze a hibákat/kéréseket, majd egyszerre nézzük át" mintát használtunk sokszor, ez jól bevált.
-- A specifikációt élő dokumentumként kezeljük, minden döntés bekerül, verziószámmal.
-- Fontos nekem a **konzisztencia** és a **"keep it simple"** elv — ha egy funkció bonyolítana valamit, inkább kérdezzek rá és a projekt-elvekhez (platform-szint vs. modul-szint) igazítsam.
-- Token-tudatos vagyok — kértem, hogy tömörebben válaszoljak, kevesebb ismétléssel/fejezetcímmel, amikor a kérdés nem indokol hosszú, strukturált választ.
+Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-specifikacio.md` 2. fejezetét: "karmester, nem tulajdonos" elv, három feladat (térkép/kapcsolat-tár/fogalomtár), "Modulok közti kapcsolat" három elve (általános azonosító, tágabb/szűkebb címke-modell, kezdeményez→jóváhagy→befogad).
+
+**Kockáról Kockára** (2. modul): név eldőlt, BrickLink-irány (kézi kód, API később) rögzítve `kockarol-kockara-specifikacio.md` v0.1-ben. Adatmodell még nincs kidolgozva.
 
 ---
 
-## 8. Javasolt következő lépések (döntsd el, mivel folytatod)
+## 7. Munkastílus / amit tudni érdemes rólam (a tulajdonosról)
 
-**A) Lapról Lapra — képkezelés megépítése.** Ez a legnagyobb elmaradt Lapról Lapra munka; a terv már rögzítve van a specifikációban (5.3 fejezet), csak meg kell építeni: Storage bucket létrehozása (SQL/Supabase UI), feltöltés/átméretezés logika, a lenyíló panel bekötése.
-
-**B) Kockáról Kockára — adatmodell kidolgozása.** A v0.1 vázlat 5 nyitott kérdéséből indulva, ötletelős módban (nem kódolva), hasonlóan ahhoz, ahogy a Lapról Laprát is felépítettük.
-
-**C) OM Curator platform — magának a platformnak a specifikálása**, most hogy két modul körvonalazódik, talán érdemesebb lenne konkrétan nekiállni.
+- Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és ÚJABBAN a **Claude Code**-ot is.
+- **Előbb megbeszélés/ötletelés, utána kód** — ez különösen fontos maradt; hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.5).
+- **Token-tudatos vagyok** — kértem tömörebb válaszokat, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ. Ha egy válasz nagy tokenhányadot emészt fel, szólok, és kérem az okok elemzését.
+- **A Claude Code-dal külön munkamenetben dolgozom** — a Home-felület (ez itt) és a Code egymástól független kontextussal bír; a köztük lévő hidat ez a dokumentum és a specifikáció adja.
+- Fontos nekem a **konzisztencia** és a **"keep it simple"** elv.
 
 ---
 
-*Ha új beszélgetést nyitsz: told fel ezt a fájlt (ha még nincs a projektben), és írd meg, melyik iránnyal (A/B/C) szeretnéd folytatni.*
+## 8. Javasolt következő lépések
+
+**A) Képkezelés megépítése** — a legnagyobb elmaradt munka; FONTOS: a megosztott katalógus miatt a régi terv (felhasználónkénti privát mappa) újragondolandó — valószínűleg KÖZÖS, staff által feltöltött képek, mindenki látja (ugyanaz a minta, mint a sorozatok/tételek).
+
+**B) A nyitott Lapról Lapra funkciók** (5. pont) valamelyike — sorrend rád van bízva.
+
+**C) Kockáról Kockára adatmodell kidolgozása** — ötletelős módban, ahogy a Lapról Laprát is felépítettük.
+
+**D) OM Curator platform specifikálása** — most, hogy két modul körvonalazódik.
+
+---
+
+*Ha új beszélgetést nyitsz: told fel ezt a fájlt + a legfrissebb `laprol-lapra-specifikacio.md`-t (kérd el a pontos, friss verziót akár a Code-tól, akár töltsd le a repóból), és írd meg, melyik iránnyal folytatnád.*
