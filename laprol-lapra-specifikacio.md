@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.4 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.5 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -119,11 +119,18 @@ RBA — II. vh. repülők (60) · Centuria — Forma 1 (60) · Hachette — Disn
 
 **Származtatott statisztikák:** belekerülési költség (Σ fizetett ár × mennyiség) · jelenlegi összérték (Σ aktuális érték) · a kettő különbsége (nyereség / ráfizetés).
 
-**Sorozat-összeg — kétféle nézet (választható) [DÖNTVE, v1.4]:** a hero összeg-doboza két alapon számol, kapcsolóval:
-- **„Eredeti ár alapján"** (alapértelmezett): Σ eredeti ár × a **referencia-komponens** aktuális darabszáma, **csak a `megvan` állapotúakra**. Referencia-komponens: **magazin** → ha nincs, **könyv** → ha az sincs, az első komponens-típus.
-- **„Fizetett ár alapján":** Σ fizetett ár × beszerzési mennyiség, a saját rögzített tételekre.
+**Sorozat-összeg — kétféle nézet (választható) [DÖNTVE, v1.4 · v1.5-ben pontosítva]:** a hero összeg-doboza két alapon számol, kapcsolóval:
+- **„Eredeti ár alapján"** (alapértelmezett): Σ eredeti ár × a **domináns komponens** aktuális darabszáma, **csak ha a domináns komponens `megvan`** (azaz a lapszám zöld — a színezéssel megegyező logika, 6.3–6.4). *(v1.5 javítás: korábban külön magazin/könyv-referenciát nézett, ami zöld lapszámot is kihagyhatott, ha épp a magazin „nem kell".)*
+- **„Fizetett ár alapján":** Σ fizetett ár × beszerzési mennyiség, a saját tételekre (ahol ≥1 komponens `megvan`).
+- **„+nem ismert" jelzés [DÖNTVE, v1.5]:** ha egy bevont tételnek az aktuális nézet szerinti ára NULL („nem ismert"), az kimarad a Ft-összegből, de az összeg mellé **„+nem ismert"** badge kerül.
 
 **Megjelenítési szabály [DÖNTVE, v1.4]:** a **„fizetve X Ft"** felirat (lista) és a **„Fizetett ár alapján"** összeg **csak azt a tételt** veszi figyelembe, amelynél **legalább egy komponens `megvan`**. Ha semmi nincs megvan állapotban (hiányzik/jelöletlen), a „fizetve" nem jelenik meg és nem számít az összegbe — hiszen ténylegesen semmi nem lett megvéve.
+
+**„Nem ismert" ár megjelenítése [DÖNTVE, v1.5]:** a NULL `eredeti_ar` / `fizetett_ar` a felületen **„nem ismert"** felirattal jelenik meg (nem üresen/kötőjellel).
+
+**Fizetett ár — automatikus kitöltés/nullázás [DÖNTVE, v1.5]:** amikor egy tétel **először** kap ≥1 `megvan` komponenst és a felhasználónak még nincs `fizetett_ar` értéke → automatikus kitöltés: `fizetett_ar = eredeti_ar` (vagy „nem ismert", ha az is az). Ha már van értéke (auto vagy kézi), további `megvan` **nem** írja felül. Ha az **összes** `megvan`-t visszavonja, a fizetett ár visszaáll „nem ismert"-re — de **csak ha auto-kitöltésű volt**; a kézzel beírt árat megőrzi. Az auto/kézi megkülönböztetést a `member_issue_data.ar_auto` mező adja. A logika kliens-oldali (a gyors jelölés/léptetés kezelőjében).
+
+**Fizetett ár — kézi szerkesztése MINDENKINEK [DÖNTVE, v1.5]:** a lenyíló panelben egy **✎** ikonról bárki (nem csak staff) szerkesztheti a **saját** `fizetett_ar` (+ beszerzési mennyiség, dátum, forrás) mezőit — kizárólag a `member_issue_data` saját sorát, a törzsadatot soha. Az ár: nem-negatív egész (0 megengedett) **vagy** „nem ismert". Kézi mentés → `ar_auto=false`.
 
 ### 5.6 Közös listatár (kötött, bővíthető listák) **[DÖNTVE]**
 A szabad szöveges mezők elgépelhetők, és ez később a címkerendszert is összezavarná. Ezért egy **közös listatár** (egy tábla, több listatípussal) szolgálja ki a választható értékeket:
@@ -181,8 +188,8 @@ Egy komponensből több példány is lehet (pl. 4 magazint veszel a melléklet m
 
 - A számláló **komponensenként** él, alapértelmezetten **1**.
 - „Megvan"-ra jelöléskor mindig **1-ről indul** — onnan emelhető.
-- A listában **+/− gombokkal** léptethető; a darabszám a jelölő gombon látszik (ikon balra, szám jobbra), **csak ha 1-nél több**.
-- A +/− gombok akkor láthatók, ha a darabszám 1-nél több, **vagy** ha be van kapcsolva a karbantartó mód (így lehet 1-ről feljebb lépni anélkül, hogy a böngésző nézet zsúfolt lenne).
+- A darabszám a jelölő gombon látszik (ikon balra, szám jobbra), **csak ha 1-nél több** — a fő listában ez **csak kijelzés**, nincs léptető.
+- A tényleges **+/− léptetés a lenyíló panelben** történik (nagyobb, kényelmesen érinthető gombok), minden komponensnél; így 1-ről is emelhető, a böngésző-nézet zsúfolása nélkül. **[v1.5: a léptetők a listából a panelbe kerültek.]**
 - **0-ra csökkentve** a komponens automatikusan **„hiányzik"** állapotba vált; **1 fölé visszanövelve** automatikusan **„megvan"**-ra. Negatívba nem megy.
 - A számláló a *jelenlegi készletet* mutatja; a **beszerzéskori** mennyiség (a költségszámításhoz) külön mező a **számon** (5.2). A kettő szándékosan külön: az egyik „mennyit vettem", a másik „mennyi van most".
 - Az egyes példányok részletes sorsa (mi tört el, mi cserélődött el) továbbra is a szabad **jegyzet** mezőbe írható, strukturálás nélkül.
@@ -207,9 +214,9 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 - **Adaptív statisztika:** van jövőbeli szám → „Következő megjelenés"; nincs → „Beszerzendő (hiányzó + jelöletlen)". **[DÖNTVE]**
 - **Szűrők:** Mind / Megvan / Hiányzik / Nem kell / Várható (a Várható elrejtve, ha nincs jövőbeli). **[DÖNTVE]**
 - **Keresés** név/szám szerint.
-- **Lista (kompakt):** egy sor / lapszám — szám, cím, adatok, jobbra **komponensenként egy-egy ikonos jelölő** (a gomb alatt rövid felirat: megvan / hiány / nem kell). Ha egy komponensből 1-nél több van, a **darabszám a gombon** jelenik meg az ikon mellett, alatta **+/− léptetőkkel** (lásd 6.5). **[DÖNTVE]**
+- **Lista (kompakt):** egy sor / lapszám — szám, cím, **ár két külön sorban** (eredeti ár / fizetve — 5.5), jobbra **komponensenként egy-egy ikonos jelölő** (a gomb alatt rövid felirat: megvan / hiány / nem kell). Ha egy komponensből 1-nél több van, a **darabszám a gombon** jelenik meg (csak kijelzés; a léptetés a panelben — 6.5). **[DÖNTVE · v1.5]**
 - **Tapadó fejléc:** a lista fölött rögzített sáv nevezi meg az oszlopokat (Magazin / Modell / Könyv) — mint Excelben a fagyasztott sor. **[DÖNTVE]**
-- **Lenyíló képsáv:** a sor végén nyíl; lenyitva komponensenként **egy-egy azonos méretű kép** (egy komponensnél középre húzva), alatta a **komponens neve és kódja**; ha nincs kép: „nincs adat". **Alapból csukott, egyszerre csak egy nyitható**, sorozat-/szűrő-/keresésváltáskor visszazár. **[DÖNTVE]**
+- **Lenyíló panel:** a sor végén nyíl; lenyitva komponensenként **egy-egy azonos méretű kép** (alatta a komponens neve/kódja; ha nincs kép: „nincs adat"), **komponensenkénti +/− darabszám-léptető** (6.5), és egy **személyes ár-blokk** (eredeti ár + saját fizetett ár, **✎** ikonnal szerkeszthető — 5.5). **Alapból csukott, egyszerre csak egy nyitható**, sorozat-/szűrő-/keresésváltáskor visszazár. **[DÖNTVE · v1.5]**
 - **Karbantartó mód:** tétel/komponens szerkesztése-törlése, új tétel, új sorozat, sorozat szerkesztése; **státusz-reset**; a **listatár bővítése**. *(Építés alatt — 5b.)*
 - **Excel-alapú betöltés (csak asztali/laptop, telefonon rejtve):** sablon letöltése (**a sorozat komponens-készletéből származtatva**) + kitöltött fájl feltöltése; sorszám szerinti, nem-romboló frissítés. **[DÖNTVE]**
 - **Kép csatolása:** komponens-szinten (Supabase Storage). *(Építés alatt.)*
@@ -323,7 +330,7 @@ A sorozatokat/tételeket a **tulajdonos/admin** viszi fel — minden bejelentkez
 
 **Letiltás vs. törlés — most CSAK a letiltás:** a letiltás visszafordítható (`status='disabled'`), és a letiltott fiók **belépéskor azonnal kiléptetve** („A fiókod fel van függesztve"), olvasásig sem jut. Valódi fiók-**törlés** tudatosan **később** (admin API / Edge Function — lásd 13.2).
 
-**Technikai megvalósítás:** RLS a `members`-en; a szerep-ellenőrzés **`SECURITY DEFINER` segédfüggvényekkel** (`my_role` / `is_staff` / `is_active`) az RLS-rekurzió elkerülésére; **oszlop-védő `BEFORE UPDATE` trigger** (tulajdonos-sor sérthetetlen, role-t csak owner, admin csak `status`). A törzstáblák (`series/issues/components/lists`) írás-policy-je **„staff + aktív"**. Felhasználó-kezelő felület: 🔧 → **„👥 Felhasználók"**. Az import-funkciók (mindkettő) csak PC/laptop/tablet nézetben (`desktop-only`). SQL: `laprol-lapra-jogosultsag-1-members.sql` (+ `-2-ar-modell`, `-3-display-name`).
+**Technikai megvalósítás:** RLS a `members`-en; a szerep-ellenőrzés **`SECURITY DEFINER` segédfüggvényekkel** (`my_role` / `is_staff` / `is_active`) az RLS-rekurzió elkerülésére; **oszlop-védő `BEFORE UPDATE` trigger** (tulajdonos-sor sérthetetlen, role-t csak owner, admin csak `status`). A törzstáblák (`series/issues/components/lists`) írás-policy-je **„staff + aktív"**. Felhasználó-kezelő felület: **önálló „👥" fejléc-gomb** a 🔧 mellett (staff-only, saját ablakban — v1.5). Az import-funkciók (mindkettő) csak PC/laptop/tablet nézetben (`desktop-only`). SQL: `laprol-lapra-jogosultsag-1-members.sql` (+ `-2-ar-modell`, `-3-display-name`).
 
 ### 13.2 Fiókkezelés **[részben DÖNTVE — letiltás kész; törlés NYITOTT]**
 - **Letiltás/visszaengedés:** ✅ **megvalósítva** (13.1) — visszafordítható, RLS-szinten és belépéskor is kikényszerítve; admin a sima usereket, a tulajdonos az adminokat is.
@@ -345,6 +352,7 @@ Alapötlet: a nem-tulajdonos felhasználó rövid üzenetet küldhessen a tulajd
 ---
 
 *Napló:*
+- v1.5 — **UX-csomag:** a „Felhasználók" önálló 👥 fejléc-gomb lett (a 🔧 eszköztárból kivéve, staff-only); kilépéskor a sorozat-accent visszaáll semlegesre; nagyobb fejléc-ikonok és „összeg" gomb; a lista „eredeti ár / fizetve" **két külön sorban**; a **+/− léptetők a listából a lenyíló panelbe** kerültek (nagyobb gombok). **Ár-logika:** **„nem ismert"** felirat a NULL árakra; **automatikus fizetett-ár** kitöltés (első `megvan`-ná váláskor `fizetett_ar = eredeti_ar`) és nullázás (minden `megvan` visszavonásakor — a kézi árat `ar_auto` jelző őrzi); **személyes ár-szerkesztő MINDENKINEK** a panel ✎ ikonjáról (csak `member_issue_data`); az **„Eredeti ár alapján"** szorzó a **domináns** komponens (a színezéssel egyezően), nem magazin/könyv; **„+nem ismert" badge** a NULL-áras bevont tételekre. SQL: `laprol-lapra-ar-auto.sql` (ar_auto oszlop). Fix: a panel-léptető szelektora (`.pstepbtn`).
 - v1.4 — **háromszintű jogosultság** (user/admin/owner; `members` tábla `role`/`status`/`display_name`; **letiltás** [nem törlés], letiltott fiók belépéskor kirúgva; felhasználó-kezelő UI „👥 Felhasználók"; `SECURITY DEFINER` segédfüggvények + oszlop-védő trigger; staff-alapú törzsadat-RLS; a tulajdonos sora védett). **Ár-modell szétválasztás:** „fedélár" → **Eredeti ár** (közös törzsadat), a személyes ár-adat (fizetett ár, beszerzési mennyiség, dátum, forrás) a **`member_issue_data`** táblába; **kétnézetes hero** („Eredeti ár" / „Fizetett ár alapján") + megjelenítési szabály: a „fizetve"/összeg **csak megvett tételre** (≥1 komponens `megvan`) számít. **Fájlszétbontás:** `index.html` → natív **ES modulok** (`js/`) + `styles.css`, build-eszköz nélkül. **Adatjavítás:** régi ezres-tagolási korrupció (II VH Repülők #5–60: 5→5990) egyszeri, forrás-alapú SQL-lel visszatöltve, `<100` szűrővel; a személyes fizetett ár teljessé téve. SQL-ek: `jogosultsag-1/2/3`, `arjavitas`, `fizetett-teljesseg`.
 - v1.3 — megosztott katalógus (13. fejezet): alapmodell megvalósítva (member_status, tulajdonos-only szerkesztés, nyitott regisztráció); négy új nyitott kérdés: admin/saját fióktörlés (Edge Function kell), felhasználói sorozat-választás (max 5 törlés/sorozat limit, tiszta újrafelvétel), üzenetküldés adminnak (max 150 karakter, koncepció szinten).
 - v1.2 — megvalósítva: összecsukható fülsáv (nyitott választónál a lista/szűrők/hero elrejtve, nagyobb „Sorozatok" gomb), színcsaládokba rendezett 24-es paletta, **komponensenkénti darabszám-számláló** (+/− a listában, 0-nál automatikus „hiányzik", 1 fölé visszanövelve „megvan"). A beszerzési mennyiség (szám) és a jelenlegi darabszám (komponens) szándékosan külön mező.
