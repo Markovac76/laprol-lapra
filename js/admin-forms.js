@@ -154,7 +154,13 @@ export function seriesForm(existing){
       else {
         const so=state.SERIES.length;
         const kodSzam=await nextSeriesNo();
-        const {error}=await supabase.from("series").insert({...payload, sort_order:so, kod_szam:kodSzam}); if(error) throw error;
+        const {data,error}=await supabase.from("series").insert({...payload, sort_order:so, kod_szam:kodSzam}).select().single();
+        if(error) throw error;
+        // Új sorozat automatikusan bekerül a létrehozó saját fülsávjába (member_series) —
+        // különben a fülsáv-választás bevezetése után rögtön eltűnne a saját szeme elől.
+        const {error:mserr}=await supabase.from("member_series")
+          .upsert({user_id:state.myId, series_id:data.id, is_selected:true}, {onConflict:"user_id,series_id"});
+        if(mserr) throw mserr;
       }
       closeModal(); await reload(); if(!s) state.activeIdx=state.SERIES.length-1; renderAll();
     }catch(e){ err(e); }

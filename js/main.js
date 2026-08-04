@@ -8,6 +8,7 @@ import { upsertMyStatus, applyAutoPrice } from "./personal.js";
 import { priceForm } from "./price-edit.js";
 import { itemForm, seriesForm, listsForm } from "./admin-forms.js";
 import { usersForm } from "./admin-users.js";
+import { mySeriesForm } from "./my-series.js";
 import { downloadTemplate, handleUpload } from "./excel.js";
 import { err } from "./modal.js";
 import { showApp, loginWithPassword, registerWithPassword, logout, initSession } from "./auth.js";
@@ -73,6 +74,7 @@ document.getElementById("a-editseries").onclick=()=>{ if(!S()){ alert("Nincs sor
 document.getElementById("a-series").onclick=()=>seriesForm(null);
 document.getElementById("a-lists").onclick=listsForm;
 document.getElementById("usersBtn").onclick=usersForm;
+document.getElementById("mySeriesBtn").onclick=mySeriesForm;
 document.getElementById("a-template").onclick=downloadTemplate;
 document.getElementById("a-upload").onclick=()=>document.getElementById("upl").click();
 document.getElementById("upl").addEventListener("change",function(){ const f=this.files&&this.files[0]; if(f) handleUpload(f).catch(err); this.value=""; });

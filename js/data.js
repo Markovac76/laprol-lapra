@@ -11,13 +11,14 @@ export async function loadData(){
   const { data: userData } = await supabase.auth.getUser();
   state.myId = userData?.user?.id || null;
   state.isOwner = state.myId === OWNER_UID;
-  const [s,i,c,l,ms,mid]=await Promise.all([
+  const [s,i,c,l,ms,mid,msel]=await Promise.all([
     supabase.from("series").select("*").order("sort_order"),
     supabase.from("issues").select("*"),
     supabase.from("components").select("*"),
     supabase.from("lists").select("*").order("sort_order"),
     supabase.from("member_status").select("*").eq("user_id",state.myId),
     supabase.from("member_issue_data").select("*").eq("user_id",state.myId),
+    supabase.from("member_series").select("series_id").eq("user_id",state.myId).eq("is_selected",true),
   ]);
   if(s.error||i.error||c.error){ throw (s.error||i.error||c.error); }
   state.LISTS={};
@@ -26,8 +27,10 @@ export async function loadData(){
   if(!ms.error && ms.data) ms.data.forEach(r=>{ myStatus[r.component_id]={status:r.status,db:(r.db==null?1:r.db),jegyzet:r.jegyzet}; });
   const myIssue={};   // szám-szintű SZEMÉLYES adat (member_issue_data)
   if(!mid.error && mid.data) mid.data.forEach(r=>{ myIssue[r.issue_id]={fizetett_ar:r.fizetett_ar,besz_menny:(r.beszerzesi_mennyiseg==null?1:r.beszerzesi_mennyiseg),besz_datum:r.beszerzes_datuma,forras:r.forras,ar_auto:(r.ar_auto==null?true:r.ar_auto)}; });
+  // A fülsáv csak a SAJÁT, bepipált sorozatokból épül (member_series.is_selected) — nem az összesből.
+  const selectedIds = new Set((msel.data||[]).map(r=>r.series_id));
   const byS={}, byI={};
-  state.SERIES = s.data.map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,items:[]}; byS[r.id]=o; return o; });
+  state.SERIES = s.data.filter(r=>selectedIds.has(r.id)).map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,items:[]}; byS[r.id]=o; return o; });
   i.data.forEach(r=>{ const mi=myIssue[r.id]||{}; const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,
       eredeti_ar:r.eredeti_ar,
       fizetett_ar:(mi.fizetett_ar==null?null:mi.fizetett_ar),besz_menny:(mi.besz_menny==null?1:mi.besz_menny),besz_datum:mi.besz_datum||null,forras:mi.forras||null,ar_auto:(mi.ar_auto==null?true:mi.ar_auto),

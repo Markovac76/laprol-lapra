@@ -150,7 +150,7 @@ export function syncHeadHeight(){
 }
 
 export function renderAll(){
-  if(!state.SERIES.length){ document.getElementById("hero").innerHTML=""; document.getElementById("chips").innerHTML=""; document.getElementById("listhead").innerHTML=""; document.getElementById("list").innerHTML=`<div class="empty-state">Nincs még sorozat.</div>`; return; }
+  if(!state.SERIES.length){ document.getElementById("hero").innerHTML=""; document.getElementById("chips").innerHTML=""; document.getElementById("listhead").innerHTML=""; document.getElementById("list").innerHTML=`<div class="empty-state">Még nincs kiválasztott sorozatod — nyisd meg a „📚 Sorozataim” gombot a fejlécben.</div>`; return; }
   setAccent(); renderTabs(); renderHero(); renderChips(); renderListHead(); renderList(); applyPickerMode(); syncHeadHeight();
 }
 
