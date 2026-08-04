@@ -7,11 +7,12 @@ import { supabase } from "./supabase.js";
 import { state, esc, listName } from "./state.js";
 import { openModal, err, sheet } from "./modal.js";
 import { reload } from "./data.js";
+import { proposeSeriesForm } from "./series-proposal.js";
 
 export async function mySeriesForm(){
   openModal(`<h2>Sorozataim</h2><p class="msub">Betöltés…</p>`);
   const [{data:series,error:se},{data:mine,error:me}] = await Promise.all([
-    supabase.from("series").select("id,megnevezes,megjelenites,kiado").order("sort_order"),
+    supabase.from("series").select("id,megnevezes,megjelenites,kiado,lifecycle").order("sort_order"),
     supabase.from("member_series").select("*").eq("user_id",state.myId),
   ]);
   if(se||me){ err(se||me); return; }
@@ -20,12 +21,19 @@ export async function mySeriesForm(){
 
 function render(series, mine){
   const byId={}; mine.forEach(m=>byId[m.series_id]=m);
-  const rows = series.map(s=>{
+  // Publikálatlan sorozat csak akkor jelenik meg, ha valaha volt hozzá saját sorunk
+  // (grandfather-hozzáférés) — brand new usernek egyáltalán nem választható.
+  const visible = series.filter(s=>s.lifecycle!=="unpublished" || !!byId[s.id]);
+  const rows = visible.map(s=>{
     const m=byId[s.id];
     const selected = !!(m && m.is_selected);
-    const blocked = !!(m && !m.is_selected && m.delete_count>=5);
+    const deleteBlocked = !!(m && !m.is_selected && m.delete_count>=5);
+    const unpublishedBlocked = s.lifecycle==="unpublished" && !selected;
+    const blocked = deleteBlocked || unpublishedBlocked;
     const dcount = m ? m.delete_count : 0;
-    const note = blocked
+    const note = unpublishedBlocked
+      ? `<span class="unote" style="color:#f3b6b6">publikálatlan — nem választható újra</span>`
+      : deleteBlocked
       ? `<span class="unote" style="color:#f3b6b6">5/5 törlés — nem választható újra</span>`
       : (dcount>0 ? `<span class="unote">${dcount}/5 törlés felhasználva</span>` : "");
     return `<label class="serieschoice${blocked?" blocked":""}">
@@ -37,10 +45,12 @@ function render(series, mine){
   openModal(`<h2>Sorozataim</h2>
     <p class="msub">Válaszd ki, mely sorozatokat szeretnéd a fülsávodban látni.</p>
     ${rows||'<p class="msub">Nincs elérhető sorozat.</p>'}
+    <div class="modrow"><button class="btn ghost" id="ms-propose">+ Új sorozat javaslása</button></div>
     <div class="modrow"><button class="btn" onclick="closeModal()">Kész</button></div>`);
   sheet.querySelectorAll('input[type=checkbox][data-id]').forEach(cb=>{
     cb.onchange=()=>onToggle(cb, series, mine);
   });
+  document.getElementById("ms-propose").onclick=proposeSeriesForm;
 }
 
 async function onToggle(cb, series, mine){

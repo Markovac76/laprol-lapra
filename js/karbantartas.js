@@ -1,0 +1,269 @@
+/* ============================================================
+   Karbantartás — sorozat-életciklus (staff-only).
+   Három fül: Aktív sorozatok / Munka sorozatok (a pool) / Publikálatlan.
+   Ebben a lépésben a draft_series CSAK a sorozat-szintű mezőket hordozza
+   (kiadó/név/megjelenítendő név/szín/komponens-készlet) — a szám/komponens-
+   szintű draft-szerkesztés és a diff/verzió/felkiáltójel-mechanizmus a
+   következő lépésben épül rá ugyanerre a "Publikálás" akcióra.
+   ============================================================ */
+import { supabase } from "./supabase.js";
+import { state, esc, listName, opts, fmtDate, DISPLAY_MAX, PAL12, PAL_FAMILIES } from "./state.js";
+import { openModal, err, sheet } from "./modal.js";
+import { reload } from "./data.js";
+import { isStaff } from "./permissions.js";
+import { nextSeriesNo } from "./admin-forms.js";
+
+let currentTab = "aktiv";
+
+function nameOf(members, uid){
+  if(!uid) return "—";
+  const m=members.find(x=>x.user_id===uid);
+  return (m && m.display_name) || (uid.slice(0,8)+"…");
+}
+
+export async function karbantartasForm(){
+  openModal(`<h2>Karbantartás</h2><p class="msub">Betöltés…</p>`);
+  const [{data:series,error:se},{data:drafts,error:de},{data:memberSeries,error:mse},{data:members,error:mee}] = await Promise.all([
+    supabase.from("series").select("*").order("sort_order"),
+    supabase.from("draft_series").select("*").order("created_at"),
+    supabase.from("member_series").select("series_id,is_selected"),
+    supabase.from("members").select("user_id,display_name"),
+  ]);
+  if(se||de||mse||mee){ err(se||de||mse||mee); return; }
+  renderMain(series||[], drafts||[], memberSeries||[], members||[]);
+}
+
+function renderMain(series, drafts, memberSeries, members){
+  const poolCount = drafts.filter(d=>d.pool_status==="incoming"||d.pool_status==="claimed").length;
+  const body = currentTab==="aktiv" ? renderAktiv(series,drafts,memberSeries)
+    : currentTab==="munka" ? renderMunka(drafts,members)
+    : renderPublikalatlan(series,memberSeries);
+  openModal(`<h2>Karbantartás</h2>
+    <p class="msub">Sorozatok életciklusa — javaslatok, szerkesztések, publikálás.</p>
+    <div class="statrow" id="kb-tabs">
+      <button type="button" data-tab="aktiv" aria-pressed="${currentTab==="aktiv"}">Aktív sorozatok</button>
+      <button type="button" data-tab="munka" aria-pressed="${currentTab==="munka"}">Munka sorozatok (${poolCount}/20)</button>
+      <button type="button" data-tab="publikalatlan" aria-pressed="${currentTab==="publikalatlan"}">Publikálatlan</button>
+    </div>
+    <div id="kb-body" style="margin-top:12px">${body}</div>
+    <div class="modrow"><button class="btn" onclick="closeModal()">Bezár</button></div>`);
+
+  document.getElementById("kb-tabs").addEventListener("click",e=>{
+    const b=e.target.closest("button[data-tab]"); if(!b) return;
+    currentTab=b.dataset.tab; renderMain(series,drafts,memberSeries,members);
+  });
+  sheet.querySelectorAll("#kb-body [data-act]").forEach(b=>{
+    b.onclick=()=>handleAction(b.dataset.act, b.dataset.id, series, drafts);
+  });
+}
+
+/* ---- Aktív sorozatok ---- */
+function renderAktiv(series, drafts, memberSeries){
+  const active = series.filter(s=>s.lifecycle==="active");
+  const editingSourceIds = new Set(drafts.filter(d=>d.pool_type==="edit").map(d=>d.source_series_id));
+  const rows = active.map(s=>{
+    const cnt = memberSeries.filter(m=>m.series_id===s.id && m.is_selected).length;
+    const since = s.created_at ? fmtDate(s.created_at.slice(0,10)) : "—";
+    const inProgress = editingSourceIds.has(s.id);
+    return `<div class="userrow"><div class="uinfo">
+        <div class="uname">${esc(s.megjelenites||s.megnevezes)}${s.kiado?` <span class="sc-kiado">· ${esc(listName("kiado",s.kiado))}</span>`:""}</div>
+        <div class="unote">${cnt} aktív felhasználó · aktív ${since} óta</div>
+      </div>
+      <div class="uactions">
+        ${inProgress ? `<span class="unote">szerkesztés már folyamatban</span>`
+          : `<button data-act="startedit" data-id="${s.id}">Szerkesztés indítása</button>`}
+        <button class="danger" data-act="unpublish" data-id="${s.id}">Publikálatlanná tétel</button>
+      </div></div>`;
+  }).join("");
+  return rows || `<p class="msub">Nincs aktív sorozat.</p>`;
+}
+
+/* ---- Munka sorozatok (a pool, három alcsoportban) ---- */
+function renderMunka(drafts, members){
+  const groups=[["incoming","Beérkezett"],["claimed","Munkaanyag / foglalva"],["ready","Publikálásra váró"]];
+  return groups.map(([st,label])=>{
+    const items=drafts.filter(d=>d.pool_status===st);
+    const rows=items.map(d=>{
+      const typeLabel = d.pool_type==="new" ? "Új javaslat" : `Szerkesztés: ${esc(d.megnevezes)}`;
+      const who = `beküldte: ${esc(nameOf(members,d.submitted_by))} · ${fmtDate((d.created_at||"").slice(0,10))||""}`;
+      let actions="";
+      if(st==="incoming"){
+        actions = `<button data-act="claim" data-id="${d.id}">Felveszem</button>`;
+        if(d.submitted_by===state.myId || isStaff()) actions += `<button class="danger" data-act="delete" data-id="${d.id}">Törlés</button>`;
+      } else if(st==="claimed"){
+        actions = d.claimed_by===state.myId
+          ? `<button data-act="edit" data-id="${d.id}">Szerkesztés</button>
+             <button data-act="ready" data-id="${d.id}">Kész</button>
+             <button data-act="release" data-id="${d.id}">Elengedem</button>`
+          : `<span class="unote">🔒 ${esc(nameOf(members,d.claimed_by))} dolgozik rajta</span>`;
+      } else if(st==="ready"){
+        actions = `<button data-act="publish" data-id="${d.id}">Publikálás</button>`;
+      }
+      return `<div class="userrow"><div class="uinfo"><div class="uname">${typeLabel}</div><div class="unote">${who}</div></div>
+        <div class="uactions">${actions}</div></div>`;
+    }).join("") || `<p class="msub">Nincs tétel.</p>`;
+    return `<h4 class="poolgrp">${label} (${items.length})</h4>${rows}`;
+  }).join("");
+}
+
+/* ---- Publikálatlan ---- */
+function renderPublikalatlan(series, memberSeries){
+  const list = series.filter(s=>s.lifecycle==="unpublished");
+  const rows = list.map(s=>{
+    const cnt = memberSeries.filter(m=>m.series_id===s.id && m.is_selected).length;
+    return `<div class="userrow"><div class="uinfo"><div class="uname">${esc(s.megjelenites||s.megnevezes)}</div>
+        <div class="unote">${cnt} aktív felhasználó még rajta van</div></div>
+      <div class="uactions"><button data-act="republish" data-id="${s.id}">Újra publikálás</button></div></div>`;
+  }).join("");
+  return rows || `<p class="msub">Nincs publikálatlan sorozat.</p>`;
+}
+
+/* ---- Akciók ---- */
+async function handleAction(act, id, series, drafts){
+  if(act==="startedit"){ const s=series.find(x=>x.id===id); if(s) await startEdit(s); return; }
+  if(act==="unpublish"){ const s=series.find(x=>x.id===id); if(s) await unpublish(s); return; }
+  if(act==="republish"){ const s=series.find(x=>x.id===id); if(s) await republish(s); return; }
+  const d=drafts.find(x=>x.id===id); if(!d) return;
+  if(act==="claim")   return claim(d);
+  if(act==="delete")  return deleteDraft(d);
+  if(act==="edit")    return editDraftForm(d);
+  if(act==="ready")   return markReady(d);
+  if(act==="release") return release(d);
+  if(act==="publish") return publish(d);
+}
+
+async function startEdit(s){
+  try{
+    const { error } = await supabase.from("draft_series").insert({
+      pool_type:"edit", pool_status:"claimed", source_series_id:s.id,
+      submitted_by: state.myId, claimed_by: state.myId, claimed_at: new Date().toISOString(),
+      kiado:s.kiado, megnevezes:s.megnevezes, megjelenites:s.megjelenites, szin:s.szin, components:s.components,
+    });
+    if(error) throw error;
+  }catch(e){ err(e); return; }
+  currentTab="munka"; await karbantartasForm();
+}
+
+async function unpublish(s){
+  if(!confirm(`Publikálatlanná teszed a(z) „${s.megnevezes}” sorozatot? A már kiválasztó felhasználók megtartják a hozzáférést, újak nem választhatják.`)) return;
+  try{
+    const { error } = await supabase.from("series").update({lifecycle:"unpublished"}).eq("id",s.id);
+    if(error) throw error;
+    await reload();
+  }catch(e){ err(e); }
+  await karbantartasForm();
+}
+
+async function republish(s){
+  try{
+    const { error } = await supabase.from("series").update({lifecycle:"active"}).eq("id",s.id);
+    if(error) throw error;
+    await reload();
+  }catch(e){ err(e); }
+  await karbantartasForm();
+}
+
+async function claim(d){
+  try{
+    const { error } = await supabase.from("draft_series")
+      .update({ pool_status:"claimed", claimed_by:state.myId, claimed_at:new Date().toISOString() })
+      .eq("id", d.id).eq("pool_status","incoming");
+    if(error) throw error;
+  }catch(e){ err(e); }
+  await karbantartasForm();
+}
+
+async function markReady(d){
+  try{
+    const { error } = await supabase.from("draft_series")
+      .update({ pool_status:"ready", ready_at:new Date().toISOString() }).eq("id", d.id);
+    if(error) throw error;
+  }catch(e){ err(e); }
+  await karbantartasForm();
+}
+
+async function release(d){
+  try{
+    const { error } = await supabase.from("draft_series")
+      .update({ pool_status:"incoming", claimed_by:null, claimed_at:null }).eq("id", d.id);
+    if(error) throw error;
+  }catch(e){ err(e); }
+  await karbantartasForm();
+}
+
+async function deleteDraft(d){
+  if(!confirm(`Biztosan törlöd ezt a tételt: „${d.megnevezes}”?`)) return;
+  try{
+    const { error } = await supabase.from("draft_series").delete().eq("id", d.id);
+    if(error) throw error;
+  }catch(e){ err(e); }
+  await karbantartasForm();
+}
+
+// Publikálás: diff/verzió/felkiáltójel NÉLKÜL (ez a következő lépésben épül rá
+// ugyanerre az akcióra) — egyszerűen felülírja/létrehozza az élő mezőket.
+async function publish(d){
+  try{
+    if(d.pool_type==="new"){
+      const kodSzam = await nextSeriesNo();
+      const { count } = await supabase.from("series").select("*",{count:"exact",head:true});
+      const { error } = await supabase.from("series").insert({
+        kiado:d.kiado, megnevezes:d.megnevezes, megjelenites:d.megjelenites, szin:d.szin,
+        components:d.components, sort_order:count||0, kod_szam:kodSzam, lifecycle:"active",
+      });
+      if(error) throw error;
+    } else {
+      const { error } = await supabase.from("series").update({
+        kiado:d.kiado, megnevezes:d.megnevezes, megjelenites:d.megjelenites, szin:d.szin, components:d.components,
+      }).eq("id", d.source_series_id);
+      if(error) throw error;
+    }
+    const { error: delerr } = await supabase.from("draft_series").delete().eq("id", d.id);
+    if(delerr) throw delerr;
+    await reload();
+  }catch(e){ err(e); }
+  await karbantartasForm();
+}
+
+/* ---- Draft mezőinek szerkesztése (a claim-elő sajátja) ---- */
+function editDraftForm(d){
+  let color = d.szin || PAL12[0];
+  let comps = (d.components||[]).slice();
+  const compList = (state.LISTS.komponens||[{ertek:"magazin",nev:"Magazin"},{ertek:"modell",nev:"Modell"},{ertek:"konyv",nev:"Könyv"},{ertek:"egyeb",nev:"Egyéb"}]);
+
+  openModal(`<h2>${d.pool_type==="new"?"Új javaslat szerkesztése":"Szerkesztés: "+esc(d.megnevezes)}</h2>
+    <p class="msub">Munkaanyag — csak neked látszik, amíg nem publikálod.</p>
+    <div class="field"><label>Kiadó</label><select id="d-kiado"><option value="">—</option>${opts("kiado",d.kiado)}</select></div>
+    <div class="field"><label>Megnevezés (teljes név)</label><input id="d-name" value="${esc(d.megnevezes||"")}"></div>
+    <div class="field"><label>Megjelenítendő név a fülön (max ${DISPLAY_MAX}) — <span id="d-count">${(d.megjelenites||"").length}/${DISPLAY_MAX}</span></label>
+      <input id="d-display" maxlength="${DISPLAY_MAX}" value="${esc(d.megjelenites||"")}"></div>
+    <div class="field"><label>Komponensek (miből áll egy szám)</label><div class="compchecks" id="d-comps">
+      ${compList.map(o=>`<button type="button" class="compcheck" data-t="${esc(o.ertek)}" aria-pressed="${comps.includes(o.ertek)}">${esc(o.nev)}</button>`).join("")}</div></div>
+    <div class="field"><label>Szín</label>
+      <div id="d-sw">${PAL_FAMILIES.map(f=>`<div class="swfam"><span class="swfam-nev">${f.nev}</span>
+        <div class="swatches">${f.szinek.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-pressed="${c===color}"></button>`).join("")}</div></div>`).join("")}</div></div>
+    <div class="modrow"><button class="btn ghost" id="d-back">Vissza</button><button class="btn" id="d-save">Mentés</button></div>`);
+
+  const dEl=document.getElementById("d-display"), cEl=document.getElementById("d-count");
+  dEl.addEventListener("input",()=>cEl.textContent=`${dEl.value.length}/${DISPLAY_MAX}`);
+  document.getElementById("d-comps").addEventListener("click",e=>{ const b=e.target.closest(".compcheck"); if(!b) return;
+    const t=b.dataset.t; if(comps.includes(t)) comps=comps.filter(x=>x!==t); else comps.push(t);
+    b.setAttribute("aria-pressed", comps.includes(t)); });
+  document.getElementById("d-sw").addEventListener("click",e=>{ const b=e.target.closest(".swatch"); if(!b) return;
+    color=b.dataset.c; sheet.querySelectorAll("#d-sw .swatch").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
+  document.getElementById("d-back").onclick=()=>karbantartasForm();
+  document.getElementById("d-save").onclick=async ()=>{
+    const nm=document.getElementById("d-name").value.trim();
+    if(!nm){ alert("A megnevezés kötelező."); return; }
+    if(!comps.length){ alert("Legalább egy komponens kell."); return; }
+    const disp=(dEl.value.trim()||nm).slice(0,DISPLAY_MAX);
+    try{
+      const { error } = await supabase.from("draft_series").update({
+        kiado: document.getElementById("d-kiado").value||null,
+        megnevezes: nm, megjelenites: disp, szin: color, components: comps,
+      }).eq("id", d.id);
+      if(error) throw error;
+    }catch(e){ err(e); return; }
+    await karbantartasForm();
+  };
+}

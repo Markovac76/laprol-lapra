@@ -22,6 +22,7 @@ export async function showApp(){
     const staff = isStaff();
     document.getElementById("admToggle").style.display = staff ? "" : "none";
     document.getElementById("usersBtn").style.display  = staff ? "" : "none";
+    document.getElementById("kbToggle").style.display  = staff ? "" : "none";
     renderTabs(); renderAll();
   }
   catch(e){ document.getElementById("list").innerHTML=`<div class="empty-state">Hiba a betöltéskor: ${esc(e.message||e)}</div>`; }

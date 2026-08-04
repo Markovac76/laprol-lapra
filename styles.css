@@ -238,6 +238,10 @@ footer{color:var(--faint);font-size:11.5px;text-align:center;padding:8px 0 26px}
 .uactions button.danger{color:#f3b6b6;border-color:#6b3a3a;background:transparent}
 .uactions .unote{font-size:11px;color:var(--faint);text-align:center}
 
+/* --- Karbantartás (életciklus-pool) --- */
+.poolgrp{margin:14px 0 6px;font-size:12.5px;color:var(--accent);filter:brightness(1.2)}
+.poolgrp:first-child{margin-top:0}
+
 /* --- Sorozataim (member_series választó) --- */
 .serieschoice{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
   border-radius:10px;background:var(--panel-2);margin-bottom:8px;cursor:pointer}

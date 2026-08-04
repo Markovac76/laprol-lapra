@@ -1,13 +1,13 @@
 /* ============================================================
-   Karbantartás — űrlapok: tétel, sorozat, listatár, sorozat-kód számláló.
-   (A felhasználó-kezelés külön modulba kerül: admin-users.js — a
-    háromszintű jogosultság bekötésekor.)
+   Karbantartás — űrlapok: tétel, listatár, sorozat-kód számláló.
+   (A sorozat-szintű létrehozás/szerkesztés a Karbantartás pool-on át megy —
+    lásd karbantartas.js + series-proposal.js. A felhasználó-kezelés külön
+    modulban: admin-users.js.)
    ============================================================ */
 import { supabase } from "./supabase.js";
-import { state, S, COMP_TYPES, DISPLAY_MAX, PAL12, PAL_FAMILIES, esc, pad, opts } from "./state.js";
+import { state, S, COMP_TYPES, esc, pad, opts } from "./state.js";
 import { openModal, closeModal, err, sheet } from "./modal.js";
 import { reload } from "./data.js";
-import { renderAll } from "./render.js";
 import { canEditMaster } from "./permissions.js";
 import { upsertMyStatus, upsertMyIssueData } from "./personal.js";
 
@@ -110,67 +110,6 @@ export function itemForm(existing){
     if(!confirm(`Biztosan törlöd a #${existing.n} tételt?`)) return;
     try{ const {error}=await supabase.from("issues").delete().eq("id",existing.id); if(error) throw error;
       closeModal(); await reload(); }catch(e){ err(e); }
-  };
-}
-
-/* ---- Sorozat: új / szerkesztés ---- */
-export function seriesForm(existing){
-  const s=existing;
-  let color = s ? s.accent : PAL12[0];
-  let comps = s ? s.components.slice() : ["magazin"];
-  const compList = (state.LISTS.komponens||[{ertek:"magazin",nev:"Magazin"},{ertek:"modell",nev:"Modell"},{ertek:"konyv",nev:"Könyv"},{ertek:"egyeb",nev:"Egyéb"}]);
-  openModal(`<h2>${s?"Sorozat szerkesztése":"Új sorozat"}</h2>
-    <p class="msub">${s?"A jelenlegi sorozat adatai.":"Válaszd ki, mely komponensekből áll egy szám."}</p>
-    <div class="field"><label>Kiadó</label><select id="s-kiado"><option value="">—</option>${opts("kiado", s?s.kiado:"")}</select></div>
-    <div class="field"><label>Megnevezés (teljes név)</label><input id="s-name" value="${s?esc(s.sorozat):""}" placeholder="pl. Star Wars űrhajók"></div>
-    <div class="field"><label>Megjelenítendő név a fülön (max ${DISPLAY_MAX}) — <span id="s-count">${s&&s.display?s.display.length:0}/${DISPLAY_MAX}</span></label>
-      <input id="s-display" maxlength="${DISPLAY_MAX}" value="${s?esc(s.display||""):""}"></div>
-    <div class="field"><label>Komponensek (miből áll egy szám)</label><div class="compchecks" id="s-comps">
-      ${compList.map(o=>`<button type="button" class="compcheck" data-t="${esc(o.ertek)}" aria-pressed="${comps.includes(o.ertek)}">${esc(o.nev)}</button>`).join("")}</div></div>
-    <div class="field"><label>Szín <span style="color:var(--faint);font-weight:400">— rokon sorozatoknak érdemes egy családból választani</span></label>
-      <div id="s-sw">${PAL_FAMILIES.map(f=>`
-        <div class="swfam"><span class="swfam-nev">${f.nev}</span>
-          <div class="swatches">${f.szinek.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-pressed="${c===color}"></button>`).join("")}</div>
-        </div>`).join("")}</div></div>
-    <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="s-save">${s?"Mentés":"Létrehozás"}</button></div>
-    ${s?`<div class="modrow"><button class="btn danger" id="s-del">Sorozat törlése</button></div>`:""}`);
-
-  const dEl=document.getElementById("s-display"), cEl=document.getElementById("s-count");
-  dEl.addEventListener("input",()=>cEl.textContent=`${dEl.value.length}/${DISPLAY_MAX}`);
-  document.getElementById("s-comps").addEventListener("click",e=>{ const b=e.target.closest(".compcheck"); if(!b) return;
-    const t=b.dataset.t; if(comps.includes(t)) comps=comps.filter(x=>x!==t); else comps.push(t);
-    b.setAttribute("aria-pressed", comps.includes(t)); });
-  document.getElementById("s-sw").addEventListener("click",e=>{ const b=e.target.closest(".swatch"); if(!b) return;
-    color=b.dataset.c; sheet.querySelectorAll("#s-sw .swatch").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
-
-  document.getElementById("s-save").onclick=async ()=>{
-    const nm=document.getElementById("s-name").value.trim();
-    if(!nm){ alert("A megnevezés kötelező."); return; }
-    if(!comps.length){ alert("Legalább egy komponens kell."); return; }
-    const disp=(dEl.value.trim()||nm).slice(0,DISPLAY_MAX);
-    const payload={ kiado:document.getElementById("s-kiado").value||null, megnevezes:nm, megjelenites:disp, szin:color, components:comps };
-    try{
-      if(s){ const {error}=await supabase.from("series").update(payload).eq("id",s.id); if(error) throw error; }
-      else {
-        const so=state.SERIES.length;
-        const kodSzam=await nextSeriesNo();
-        const {data,error}=await supabase.from("series").insert({...payload, sort_order:so, kod_szam:kodSzam}).select().single();
-        if(error) throw error;
-        // Új sorozat automatikusan bekerül a létrehozó saját fülsávjába (member_series) —
-        // különben a fülsáv-választás bevezetése után rögtön eltűnne a saját szeme elől.
-        const {error:mserr}=await supabase.from("member_series")
-          .upsert({user_id:state.myId, series_id:data.id, is_selected:true}, {onConflict:"user_id,series_id"});
-        if(mserr) throw mserr;
-      }
-      closeModal(); await reload(); if(!s) state.activeIdx=state.SERIES.length-1; renderAll();
-    }catch(e){ err(e); }
-  };
-  const sd=document.getElementById("s-del");
-  if(sd) sd.onclick=async ()=>{
-    if(state.SERIES.length<=1){ alert("Legalább egy sorozatnak maradnia kell."); return; }
-    if(!confirm(`Biztosan törlöd a(z) „${s.sorozat}” sorozatot és MINDEN tételét?`)) return;
-    try{ const {error}=await supabase.from("series").delete().eq("id",s.id); if(error) throw error;
-      closeModal(); state.activeIdx=0; await reload(); }catch(e){ err(e); }
   };
 }
 
