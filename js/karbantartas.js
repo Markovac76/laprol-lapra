@@ -1,17 +1,17 @@
 /* ============================================================
    Karbantartás — sorozat-életciklus (staff-only).
    Három fül: Aktív sorozatok / Munka sorozatok (a pool) / Publikálatlan.
-   Ebben a lépésben a draft_series CSAK a sorozat-szintű mezőket hordozza
-   (kiadó/név/megjelenítendő név/szín/komponens-készlet) — a szám/komponens-
-   szintű draft-szerkesztés és a diff/verzió/felkiáltójel-mechanizmus a
-   következő lépésben épül rá ugyanerre a "Publikálás" akcióra.
+   A draft_series a sorozat-szintű mezőket hordozza; a szám/komponens-szintű
+   tételek a draft_issues/draft_components táblákban élnek (draft-items.js).
+   A "Publikálás" a publish_draft_series(uuid) SQL-függvényt hívja — a teljes
+   diff/verzióemelés/change_log egy tranzakcióban fut a szerveren.
    ============================================================ */
 import { supabase } from "./supabase.js";
 import { state, esc, listName, opts, fmtDate, DISPLAY_MAX, PAL12, PAL_FAMILIES } from "./state.js";
 import { openModal, err, sheet } from "./modal.js";
 import { reload } from "./data.js";
 import { isStaff } from "./permissions.js";
-import { nextSeriesNo } from "./admin-forms.js";
+import { fetchDraftItems, renderDraftItemsList, draftItemForm } from "./draft-items.js";
 
 let currentTab = "aktiv";
 
@@ -132,14 +132,40 @@ async function handleAction(act, id, series, drafts){
   if(act==="publish") return publish(d);
 }
 
+// Élő sorozat "Szerkesztés indítása": a draft_series létrehozása mellett a
+// jelenlegi élő szám/komponens adatok MÁSOLATA is bekerül a draftba (tömeges
+// insert, nem soronkénti — egy 200+ tételes sorozatnál ez percekig tartana
+// soronként), hogy legyen mihez képest diffelni publikáláskor.
 async function startEdit(s){
   try{
-    const { error } = await supabase.from("draft_series").insert({
+    const { data: draft, error } = await supabase.from("draft_series").insert({
       pool_type:"edit", pool_status:"claimed", source_series_id:s.id,
       submitted_by: state.myId, claimed_by: state.myId, claimed_at: new Date().toISOString(),
       kiado:s.kiado, megnevezes:s.megnevezes, megjelenites:s.megjelenites, szin:s.szin, components:s.components,
-    });
+    }).select().single();
     if(error) throw error;
+
+    const { data: liveIssues, error: ie } = await supabase.from("issues").select("*").eq("series_id", s.id);
+    if(ie) throw ie;
+    if(liveIssues && liveIssues.length){
+      const issueIds = liveIssues.map(x=>x.id);
+      const { data: liveComps, error: ce } = await supabase.from("components").select("*").in("issue_id", issueIds);
+      if(ce) throw ce;
+
+      const issuePayload = liveIssues.map(li=>({
+        draft_series_id: draft.id, source_issue_id: li.id, lapszam: li.lapszam, cim: li.cim,
+        megjelenes: li.megjelenes, eredeti_ar: li.eredeti_ar,
+      }));
+      const { data: newDraftIssues, error: dierr } = await supabase.from("draft_issues").insert(issuePayload).select();
+      if(dierr) throw dierr;
+
+      const map={}; newDraftIssues.forEach(di=>{ map[di.source_issue_id]=di.id; });
+      const compPayload = (liveComps||[]).map(lc=>({
+        draft_issue_id: map[lc.issue_id], source_component_id: lc.id, tipus: lc.tipus,
+        azonosito_tipus: lc.azonosito_tipus, azonosito: lc.azonosito,
+      }));
+      if(compPayload.length){ const {error:dcerr}=await supabase.from("draft_components").insert(compPayload); if(dcerr) throw dcerr; }
+    }
   }catch(e){ err(e); return; }
   currentTab="munka"; await karbantartasForm();
 }
@@ -200,37 +226,33 @@ async function deleteDraft(d){
   await karbantartasForm();
 }
 
-// Publikálás: diff/verzió/felkiáltójel NÉLKÜL (ez a következő lépésben épül rá
-// ugyanerre az akcióra) — egyszerűen felülírja/létrehozza az élő mezőket.
+// Publikálás — a teljes diff/verzióemelés/change_log/élő-frissítés egy
+// tranzakcióban fut a szerveren (publish_draft_series), hogy félbeszakadás
+// (hálózati hiba, bezárt tab) ne hagyhasson inkonzisztens állapotot.
 async function publish(d){
+  const what = d.pool_type==="new" ? `az új „${d.megnevezes}” sorozatot` : `a(z) „${d.megnevezes}” szerkesztését`;
+  if(!confirm(`Publikálod ${what}? Azonnal élesbe kerül, és mindenkinek látszik, akit érint.`)) return;
   try{
-    if(d.pool_type==="new"){
-      const kodSzam = await nextSeriesNo();
-      const { count } = await supabase.from("series").select("*",{count:"exact",head:true});
-      const { error } = await supabase.from("series").insert({
-        kiado:d.kiado, megnevezes:d.megnevezes, megjelenites:d.megjelenites, szin:d.szin,
-        components:d.components, sort_order:count||0, kod_szam:kodSzam, lifecycle:"active",
-      });
-      if(error) throw error;
-    } else {
-      const { error } = await supabase.from("series").update({
-        kiado:d.kiado, megnevezes:d.megnevezes, megjelenites:d.megjelenites, szin:d.szin, components:d.components,
-      }).eq("id", d.source_series_id);
-      if(error) throw error;
-    }
-    const { error: delerr } = await supabase.from("draft_series").delete().eq("id", d.id);
-    if(delerr) throw delerr;
+    const { error } = await supabase.rpc("publish_draft_series", { p_draft_id: d.id });
+    if(error) throw error;
     await reload();
-  }catch(e){ err(e); }
+  }catch(e){ err(e); return; }
   await karbantartasForm();
 }
 
-/* ---- Draft mezőinek szerkesztése (a claim-elő sajátja) ---- */
-function editDraftForm(d){
+/* ---- Draft mezőinek + tételeinek szerkesztése (a claim-elő sajátja) ---- */
+async function editDraftForm(d){
   let color = d.szin || PAL12[0];
   let comps = (d.components||[]).slice();
   const compList = (state.LISTS.komponens||[{ertek:"magazin",nev:"Magazin"},{ertek:"modell",nev:"Modell"},{ertek:"konyv",nev:"Könyv"},{ertek:"egyeb",nev:"Egyéb"}]);
 
+  openModal(`<h2>${d.pool_type==="new"?"Új javaslat szerkesztése":"Szerkesztés: "+esc(d.megnevezes)}</h2><p class="msub">Betöltés…</p>`);
+  let items;
+  try{ items = await fetchDraftItems(d.id); }catch(e){ err(e); return; }
+  renderEditDraft(d, color, comps, compList, items);
+}
+
+function renderEditDraft(d, color, comps, compList, items){
   openModal(`<h2>${d.pool_type==="new"?"Új javaslat szerkesztése":"Szerkesztés: "+esc(d.megnevezes)}</h2>
     <p class="msub">Munkaanyag — csak neked látszik, amíg nem publikálod.</p>
     <div class="field"><label>Kiadó</label><select id="d-kiado"><option value="">—</option>${opts("kiado",d.kiado)}</select></div>
@@ -242,7 +264,10 @@ function editDraftForm(d){
     <div class="field"><label>Szín</label>
       <div id="d-sw">${PAL_FAMILIES.map(f=>`<div class="swfam"><span class="swfam-nev">${f.nev}</span>
         <div class="swatches">${f.szinek.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-pressed="${c===color}"></button>`).join("")}</div></div>`).join("")}</div></div>
-    <div class="modrow"><button class="btn ghost" id="d-back">Vissza</button><button class="btn" id="d-save">Mentés</button></div>`);
+    <div class="modrow"><button class="btn ghost" id="d-back">Vissza</button><button class="btn" id="d-save">Mezők mentése</button></div>
+    <div class="msub" style="margin:16px 0 2px;color:var(--accent);filter:brightness(1.2);font-weight:600">Tételek (${items.length})</div>
+    <div id="d-items">${renderDraftItemsList(items, comps)}</div>
+    <div class="modrow"><button class="btn ghost" id="d-additem">+ Új tétel</button></div>`);
 
   const dEl=document.getElementById("d-display"), cEl=document.getElementById("d-count");
   dEl.addEventListener("input",()=>cEl.textContent=`${dEl.value.length}/${DISPLAY_MAX}`);
@@ -264,6 +289,11 @@ function editDraftForm(d){
       }).eq("id", d.id);
       if(error) throw error;
     }catch(e){ err(e); return; }
-    await karbantartasForm();
+    d = {...d, kiado:document.getElementById("d-kiado").value||null, megnevezes:nm, megjelenites:disp, szin:color, components:comps};
+    await editDraftForm(d);
   };
+  document.getElementById("d-additem").onclick=()=>draftItemForm(d.id, null, comps, ()=>editDraftForm(d));
+  sheet.querySelectorAll("#d-items [data-diedit]").forEach(b=>{
+    b.onclick=()=>{ const it=items.find(x=>x.id===b.dataset.diedit); if(it) draftItemForm(d.id, it, comps, ()=>editDraftForm(d)); };
+  });
 }

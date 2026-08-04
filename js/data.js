@@ -11,7 +11,7 @@ export async function loadData(){
   const { data: userData } = await supabase.auth.getUser();
   state.myId = userData?.user?.id || null;
   state.isOwner = state.myId === OWNER_UID;
-  const [s,i,c,l,ms,mid,msel]=await Promise.all([
+  const [s,i,c,l,ms,mid,msel,msn]=await Promise.all([
     supabase.from("series").select("*").order("sort_order"),
     supabase.from("issues").select("*"),
     supabase.from("components").select("*"),
@@ -19,6 +19,7 @@ export async function loadData(){
     supabase.from("member_status").select("*").eq("user_id",state.myId),
     supabase.from("member_issue_data").select("*").eq("user_id",state.myId),
     supabase.from("member_series").select("series_id").eq("user_id",state.myId).eq("is_selected",true),
+    supabase.from("member_seen").select("*").eq("user_id",state.myId),
   ]);
   if(s.error||i.error||c.error){ throw (s.error||i.error||c.error); }
   state.LISTS={};
@@ -27,19 +28,29 @@ export async function loadData(){
   if(!ms.error && ms.data) ms.data.forEach(r=>{ myStatus[r.component_id]={status:r.status,db:(r.db==null?1:r.db),jegyzet:r.jegyzet}; });
   const myIssue={};   // szám-szintű SZEMÉLYES adat (member_issue_data)
   if(!mid.error && mid.data) mid.data.forEach(r=>{ myIssue[r.issue_id]={fizetett_ar:r.fizetett_ar,besz_menny:(r.beszerzesi_mennyiseg==null?1:r.beszerzesi_mennyiseg),besz_datum:r.beszerzes_datuma,forras:r.forras,ar_auto:(r.ar_auto==null?true:r.ar_auto)}; });
+  // Verziókövetés: "utoljára látott verzió" entitásonként — hiányzó sor = 0
+  // (még sosem látta), ezt a kiválasztáskori seed_member_seen() előzi meg,
+  // hogy ne jelezzen hamisan olyasmit, amit a user sosem látott másképp.
+  const seenMap={};
+  if(!msn.error && msn.data) msn.data.forEach(r=>{ seenMap[r.entity_type+":"+r.entity_id]=r.last_seen_version; });
+  const seenOf=(type,id)=> seenMap[type+":"+id] ?? 0;
   // A fülsáv csak a SAJÁT, bepipált sorozatokból épül (member_series.is_selected) — nem az összesből.
   const selectedIds = new Set((msel.data||[]).map(r=>r.series_id));
   const byS={}, byI={};
-  state.SERIES = s.data.filter(r=>selectedIds.has(r.id)).map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,items:[]}; byS[r.id]=o; return o; });
+  state.SERIES = s.data.filter(r=>selectedIds.has(r.id)).map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,version:r.version||1,changed:(r.version||1)>seenOf("series",r.id),items:[]}; byS[r.id]=o; return o; });
   i.data.forEach(r=>{ const mi=myIssue[r.id]||{}; const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,
-      eredeti_ar:r.eredeti_ar,
+      eredeti_ar:r.eredeti_ar, version:r.version||1, ownChanged:(r.version||1)>seenOf("issue",r.id),
       fizetett_ar:(mi.fizetett_ar==null?null:mi.fizetett_ar),besz_menny:(mi.besz_menny==null?1:mi.besz_menny),besz_datum:mi.besz_datum||null,forras:mi.forras||null,ar_auto:(mi.ar_auto==null?true:mi.ar_auto),
       comps:{}}; byI[r.id]=o; const ser=byS[r.series_id]; if(ser) ser.items.push(o); });
   c.data.forEach(r=>{ const it=byI[r.issue_id]; if(!it) return;
     const my=myStatus[r.id]||{status:null,db:1,jegyzet:null};
-    it.comps[r.tipus]={id:r.id,status:my.status,azonosito:r.azonosito,azonosito_tipus:r.azonosito_tipus,note:my.jegyzet,kep_url:r.kep_url,db:my.db};
+    it.comps[r.tipus]={id:r.id,status:my.status,azonosito:r.azonosito,azonosito_tipus:r.azonosito_tipus,note:my.jegyzet,kep_url:r.kep_url,db:my.db,
+      version:r.version||1,changed:(r.version||1)>seenOf("component",r.id)};
   });
-  state.SERIES.forEach(x=>x.items.sort((a,b)=>a.n-b.n));
+  state.SERIES.forEach(x=>{ x.items.sort((a,b)=>a.n-b.n);
+    x.items.forEach(it=>{ it.changed = it.ownChanged || Object.values(it.comps).some(c=>c.changed); });
+    x.anyChanged = x.changed || x.items.some(it=>it.changed);
+  });
   if(state.activeIdx>=state.SERIES.length) state.activeIdx=0;
 }
 

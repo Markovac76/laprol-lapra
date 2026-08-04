@@ -138,19 +138,3 @@ export function listsForm(){
     }catch(e){ err(e); }
   });
 }
-
-/* ---- Soha vissza nem forgó sorozat-kód számláló ---- */
-export async function nextSeriesNo(){
-  const uid=(await supabase.auth.getUser()).data.user.id;
-  let {data,error}=await supabase.from("counters").select("*").eq("user_id",uid).maybeSingle();
-  if(error) throw error;
-  if(!data){
-    const ins=await supabase.from("counters").insert({user_id:uid,next_series_no:2}).select().single();
-    if(ins.error) throw ins.error;
-    return 1;
-  }
-  const no=data.next_series_no;
-  const {error:upErr}=await supabase.from("counters").update({next_series_no:no+1}).eq("user_id",uid);
-  if(upErr) throw upErr;
-  return no;
-}

@@ -11,6 +11,7 @@ import { usersForm } from "./admin-users.js";
 import { mySeriesForm } from "./my-series.js";
 import { karbantartasForm } from "./karbantartas.js";
 import { downloadTemplate, handleUpload } from "./excel.js";
+import { showIssueChangePopup } from "./changes.js";
 import { err } from "./modal.js";
 import { showApp, loginWithPassword, registerWithPassword, logout, initSession } from "./auth.js";
 
@@ -18,11 +19,14 @@ import { showApp, loginWithPassword, registerWithPassword, logout, initSession }
 document.getElementById("tabtoggle").addEventListener("click",()=>{ state.tabsOpen=!state.tabsOpen; renderTabs(); applyPickerMode(); syncHeadHeight(); });
 document.getElementById("tabnow").addEventListener("click",()=>{ state.tabsOpen=!state.tabsOpen; renderTabs(); applyPickerMode(); syncHeadHeight(); });
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return; state.activeIdx=+b.dataset.i; state.costVisible=false; state.costBasis="eredeti"; state.openIssue=null; state.tabsOpen=false; window.scrollTo({top:0}); renderAll();});
-document.getElementById("chips").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return; state.filter=b.dataset.f; state.openIssue=null; renderChips(); renderList();});
+document.getElementById("chips").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b||b.id==="collectedChgBtn")return; state.filter=b.dataset.f; state.openIssue=null; renderChips(); renderList();});
 document.getElementById("search").addEventListener("input",e=>{state.query=e.target.value.trim(); state.openIssue=null; renderList();});
 
 /* ---- lista: jelölés, darabszám-léptető, szerkesztés, képsáv ---- */
 document.getElementById("list").addEventListener("click",async e=>{
+  const chg=e.target.closest("[data-changeissue]");
+  if(chg){ const it=S().items.find(x=>x.n===+chg.dataset.changeissue); if(it) showIssueChangePopup(it, S()); return; }
+
   const exp=e.target.closest(".expander");
   if(exp){ const n=+exp.dataset.exp; state.openIssue=(state.openIssue===n)?null:n; renderList(); return; }
 

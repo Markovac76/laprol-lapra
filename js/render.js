@@ -3,6 +3,7 @@
    ============================================================ */
 import { state, S, COMP_TYPES, todayISO, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent } from "./state.js";
 import { stats } from "./data.js";
+import { showSeriesChangePopup, showIssueChangePopup, showCollectedChanges } from "./changes.js";
 
 function setAccent(){ document.documentElement.style.setProperty("--accent",S().accent); }
 
@@ -18,7 +19,7 @@ export function renderTabs(){
   el.hidden = !state.tabsOpen;
   el.innerHTML=state.SERIES.map((s,i)=>`
     <button class="tab" role="tab" data-i="${i}" aria-selected="${i===state.activeIdx}" style="--tabc:${s.accent}">
-      <span class="lbl">${esc(s.display||s.sorozat)}</span></button>`).join("");
+      <span class="lbl">${esc(s.display||s.sorozat)}</span>${s.anyChanged?'<span class="chgdot" title="Változás történt">!</span>':""}</button>`).join("");
 }
 
 export function renderHero(){
@@ -44,7 +45,7 @@ export function renderHero(){
     : `<div class="stat"><div class="k">Összeg</div>
          <button class="costbtn show" id="costToggle">összeg megjelenítése</button></div>`;
   document.getElementById("hero").innerHTML=`
-    <div class="kiado">${esc(s.kiado?listName("kiado",s.kiado):"")}</div>
+    <div class="kiado">${esc(s.kiado?listName("kiado",s.kiado):"")}${s.changed?`<button class="chgbtn" id="heroChgBtn" title="Mi változott?">!</button>`:""}</div>
     <div class="name display">${esc(s.sorozat)}${closed}</div>
     ${bars}
     <div class="stats">
@@ -55,6 +56,8 @@ export function renderHero(){
   const cb=document.getElementById("costToggle");
   if(cb) cb.onclick=()=>{ state.costVisible=!state.costVisible; renderHero(); };
   document.querySelectorAll(".basisbtn").forEach(b=>{ b.onclick=()=>{ state.costBasis=b.dataset.basis; renderHero(); }; });
+  const hcb=document.getElementById("heroChgBtn");
+  if(hcb) hcb.onclick=()=>showSeriesChangePopup(s);
 }
 
 const FILTERS=[["mind","Mind"],["megvan","Megvan"],["hianyzik","Hiányzik"],["nemkell","Nem kell"],["varhato","Várható"]];
@@ -65,7 +68,10 @@ export function renderChips(){
   const c=id=> id==="mind"?s.items.length : id==="varhato"?s.items.filter(it=>it.date&&it.date>=todayISO).length : s.items.filter(it=>issueHasStatus(it,s,id)).length;
   const fl=FILTERS.filter(([id])=>id!=="varhato"||c("varhato")>0);
   if(state.filter==="varhato"&&c("varhato")===0) state.filter="mind";
-  document.getElementById("chips").innerHTML=fl.map(([id,l])=>`<button class="chip" data-f="${id}" aria-pressed="${state.filter===id}">${l}<span class="n">${c(id)}</span></button>`).join("");
+  const chgBtn = s.anyChanged ? `<button class="chip chgchip" id="collectedChgBtn" title="Összes változás ebben a sorozatban">!</button>` : "";
+  document.getElementById("chips").innerHTML=fl.map(([id,l])=>`<button class="chip" data-f="${id}" aria-pressed="${state.filter===id}">${l}<span class="n">${c(id)}</span></button>`).join("")+chgBtn;
+  const gb=document.getElementById("collectedChgBtn");
+  if(gb) gb.onclick=()=>showCollectedChanges(s);
 }
 
 function matches(it){ const s=S();
@@ -130,7 +136,7 @@ export function renderList(){
         <div class="pmrow"><span class="pmk">fizetve</span><span class="pmv">${it.fizetett_ar!=null?fmtFt(it.fizetett_ar):"nem ismert"}</span><button class="pmedit" data-editprice="${it.n}" title="Saját beszerzési adat szerkesztése">✎</button></div>
       </div>` : "";
     return `<div class="issue${istate?" i-"+istate:""}"><div class="ihead">
-      <div class="num">#${it.n}</div>
+      <div class="num">#${it.n}${it.changed?`<button class="chgbtn onnum" data-changeissue="${it.n}" title="Mi változott?">!</button>`:""}</div>
       <div class="rmain">
         <div class="ititle ${it.name?"":"empty"}">${esc(it.name||"még nincs cím")}</div>
         <div class="imeta">${dateHtml}${dbTag}<span class="cid">${scode}-${pad(it.n,4)}</span></div>

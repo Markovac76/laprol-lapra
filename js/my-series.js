@@ -61,6 +61,10 @@ async function onToggle(cb, series, mine){
       const { error } = await supabase.from("member_series")
         .upsert({ user_id: state.myId, series_id: id, is_selected: true, selected_at: new Date().toISOString() }, { onConflict: "user_id,series_id" });
       if(error) throw error;
+      // Baseline: a jelenlegi verzióra állítja a "látott" jelzőt minden tételen,
+      // hogy ne jelezzen hamisan olyan változásra, amit sosem látott másképp.
+      const { error: seenErr } = await supabase.rpc("seed_member_seen", { p_series_id: id });
+      if(seenErr) throw seenErr;
     }catch(e){ err(e); }
     await mySeriesForm(); await reload();
     return;
