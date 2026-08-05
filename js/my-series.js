@@ -27,18 +27,14 @@ function render(series, mine){
   const rows = visible.map(s=>{
     const m=byId[s.id];
     const selected = !!(m && m.is_selected);
-    const deleteBlocked = !!(m && !m.is_selected && m.delete_count>=5);
     const unpublishedBlocked = s.lifecycle==="unpublished" && !selected;
     const deleteMarkedBlocked = !!s.force_delete_requested_at && !selected;
-    const blocked = deleteBlocked || unpublishedBlocked || deleteMarkedBlocked;
-    const dcount = m ? m.delete_count : 0;
+    const blocked = unpublishedBlocked || deleteMarkedBlocked;
     const note = deleteMarkedBlocked
       ? `<span class="unote" style="color:#f3b6b6">törlésre jelölve — nem választható</span>`
       : unpublishedBlocked
       ? `<span class="unote" style="color:#f3b6b6">publikálatlan — nem választható újra</span>`
-      : deleteBlocked
-      ? `<span class="unote" style="color:#f3b6b6">5/5 törlés — nem választható újra</span>`
-      : (dcount>0 ? `<span class="unote">${dcount}/5 törlés felhasználva</span>` : "");
+      : "";
     return `<label class="serieschoice${blocked?" blocked":""}">
       <input type="checkbox" data-id="${s.id}" ${selected?"checked":""} ${blocked?"disabled":""}>
       <span class="sc-name">${esc(s.megjelenites||s.megnevezes)}${s.kiado?` <span class="sc-kiado">· ${esc(listName("kiado",s.kiado))}</span>`:""}</span>
@@ -58,7 +54,6 @@ function render(series, mine){
 
 async function onToggle(cb, series, mine){
   const id=cb.dataset.id;
-  const m=mine.find(x=>x.series_id===id);
   if(cb.checked){
     try{
       const { error } = await supabase.from("member_series")
@@ -73,10 +68,10 @@ async function onToggle(cb, series, mine){
     return;
   }
   const s=series.find(x=>x.id===id);
-  askDeselect(s, m, series, mine);
+  askDeselect(s, series, mine);
 }
 
-function askDeselect(s, m, series, mine){
+function askDeselect(s, series, mine){
   openModal(`<h2>Leválasztás</h2>
     <p class="msub">Leválasztod a(z) „${esc(s.megjelenites||s.megnevezes)}” sorozatot a fülsávodból.
       Mi legyen a hozzá tartozó saját adataiddal (jelölések, árak)?</p>
@@ -86,14 +81,14 @@ function askDeselect(s, m, series, mine){
     </div>
     <div class="modrow"><button class="btn danger" id="ds-delete">Törlöm a saját adataimat is</button></div>`);
   document.getElementById("ds-cancel").onclick=()=>render(series, mine);
-  document.getElementById("ds-keep").onclick=()=>confirmDeselect(s.id, m, false);
-  document.getElementById("ds-delete").onclick=()=>confirmDeselect(s.id, m, true);
+  document.getElementById("ds-keep").onclick=()=>confirmDeselect(s.id, false);
+  document.getElementById("ds-delete").onclick=()=>confirmDeselect(s.id, true);
 }
 
-async function confirmDeselect(seriesId, m, purge){
+async function confirmDeselect(seriesId, purge){
   try{
     const { error } = await supabase.from("member_series")
-      .update({ is_selected:false, deselected_at:new Date().toISOString(), delete_count:(m?m.delete_count:0)+1 })
+      .update({ is_selected:false, deselected_at:new Date().toISOString() })
       .eq("user_id",state.myId).eq("series_id",seriesId);
     if(error) throw error;
     if(purge) await purgePersonalData(seriesId);
