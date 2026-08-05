@@ -1,12 +1,23 @@
 /* ============================================================
    Excel: sablon letöltése + kitöltött fájl feltöltése (csak asztali/tablet).
    Hibatűrő dátum- és szám-felismerés (magyar hónapnevek, ezres tagolás).
+
+   Sorozatkezelés-összehangolás (v1.6): a törzsadat-mezők (cím/dátum/eredeti
+   ár/azonosító) egy MEGLÉVŐ tételen mostantól egy szerkesztési draftba
+   kerülnek, a szokásos publikálás-folyamaton (diff/verzió/felkiáltójel)
+   mennek át — nem íródnak felül közvetlenül és észrevétlenül. ÚJ tétel
+   törzsadata továbbra is közvetlenül jön létre (nincs mit megvédeni,
+   senkinek nincs még adata rajta). A személyes rétegek (fizetett ár,
+   komponens-státusz) MINDIG közvetlenek, függetlenül új/meglévő tételtől —
+   ezek sosem mennek a draft-on át. (Mellékes javítás: korábban a
+   komponens-státusz a holt `components.status` oszlopba íródott, a
+   személyes `member_status` helyett — ez itt is javítva.)
    ============================================================ */
 import { supabase } from "./supabase.js";
-import { S, COMP_TYPES, esc } from "./state.js";
+import { state, S, COMP_TYPES, esc } from "./state.js";
 import { openModal, closeModal, err } from "./modal.js";
 import { reload } from "./data.js";
-import { upsertMyIssueData } from "./personal.js";
+import { upsertMyIssueData, upsertMyStatus } from "./personal.js";
 
 let _xlsx=null;
 async function xlsx(){ if(!_xlsx) _xlsx=await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm"); return _xlsx; }
@@ -87,15 +98,15 @@ export async function handleUpload(file){
       const name=String(row[1]??"").trim(), date=coerceDate(row[2]);
       if(row[2] && String(row[2]).trim() && !date) dateWarnings.push(n);
       const er=parseHuNumber(row[3]), fiz=parseHuNumber(row[4]);
-      const p={}; if(name) p.cim=name; if(date) p.megjelenes=date;   // TÖRZSADAT (issues)
+      const p={}; if(name) p.cim=name; if(date) p.megjelenes=date;   // TÖRZSADAT (issues → új: közvetlen, meglévő: draft)
       if(er!=null) p.eredeti_ar=er;
-      const pi={}; if(fiz!=null) pi.fizetett_ar=fiz;                 // SZEMÉLYES (member_issue_data)
+      const pi={}; if(fiz!=null) pi.fizetett_ar=fiz;                 // SZEMÉLYES (member_issue_data) — mindig közvetlen
       const comps=[];
       for(let ci=0; ci<s.components.length; ci++){
         const t=s.components[ci];
         const st=normStatus(row[5+ci*2]); const az=String(row[6+ci*2]??"").trim();
-        const cp={}; if(st!==undefined) cp.status=st; if(az) cp.azonosito=az;
-        comps.push({t,cp});
+        // status: SZEMÉLYES (member_status) — mindig közvetlen. azonosito: TÖRZSADAT (components).
+        comps.push({t, status:st, azonosito: az||null});
       }
       const existing=s.items.find(x=>x.n===n);
       plan.push({n, p, pi, comps, isNew:!existing});
@@ -107,35 +118,130 @@ export async function handleUpload(file){
   const warnBlock = dateWarnings.length
     ? `<p class="msub" style="color:#f0cd8a">⚠ ${dateWarnings.length} sor dátuma nem volt felismerhető (#${dateWarnings.slice(0,8).join(", #")}${dateWarnings.length>8?"…":""}) — ezeknél a dátum üresen marad, a többi mező feltöltődik.</p>`
     : "";
+  const draftNote = updated>0
+    ? `<p class="msub">A ${updated} meglévő tétel törzsadat-módosítása (cím/dátum/ár/azonosító) egy <b>szerkesztési draftba</b> kerül a Karbantartásban — csak publikálás után lesz élő, addig átnézhető. A saját jelöléseid és fizetett áraid MINDIG azonnal frissülnek, draft nélkül.</p>`
+    : "";
   openModal(`<h2>Feltöltés megerősítése</h2>
     <p class="msub">Ez a fájl a <b>„${esc(s.sorozat)}”</b> sorozatba kerül.</p>
     ${warnBlock}
     <div class="example" style="font-size:13px">
 ${plan.length} sor feldolgozva a fájlból:
-  • ${added} új tétel jön létre
-  • ${updated} meglévő tétel frissül (felülíródik)
+  • ${added} új tétel jön létre (azonnal élő)
+  • ${updated} meglévő tétel — törzsadata draftba, személyes adata azonnal frissül
 ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új)":" (frissül)"}`).join("\n")}${plan.length>5?"\n  …":""}
 </div>
+    ${draftNote}
     <p class="msub" style="margin-top:10px">Ha ez nem a várt sorozat vagy a szám nem stimmel, inkább <b>Mégse</b>, és ellenőrizd, melyik fület nyitottad meg feltöltés előtt.</p>
     <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="up-confirm">Feltöltés a(z) „${esc(s.display||s.sorozat)}” sorozatba</button></div>`);
 
   document.getElementById("up-confirm").onclick=async ()=>{
     closeModal();
     try{
-      let ins=0, upd=0;
+      // A draftot csak akkor hozzuk létre/claim-eljük, ha ténylegesen kell —
+      // egy tisztán státusz-only import (nincs törzsadat-mező egy sorban sem)
+      // ne hagyjon üres, zavaró tételt a Karbantartás pool-jában.
+      let draftId=null;
+
+      let ins=0, draftUpd=0;
       for(const item of plan){
-        let it=s.items.find(x=>x.n===item.n), issueId;
-        if(it){ issueId=it.id; if(Object.keys(item.p).length){ const {error}=await supabase.from("issues").update(item.p).eq("id",it.id); if(error) throw error; } upd++; }
-        else { const {data,error}=await supabase.from("issues").insert({...item.p, series_id:s.id, lapszam:item.n}).select().single(); if(error) throw error; issueId=data.id; ins++; }
-        // Személyes fizetett ár (a feltöltő saját member_issue_data-jába) — explicit → kézi (ar_auto=false)
-        if(Object.keys(item.pi).length){ const pierr=await upsertMyIssueData(issueId, {...item.pi, ar_auto:false}); if(pierr) throw pierr; }
-        for(const {t,cp} of item.comps){
-          const cur=it?it.comps[t]:null;
-          if(cur&&cur.id){ if(Object.keys(cp).length){ const {error}=await supabase.from("components").update(cp).eq("id",cur.id); if(error) throw error; } }
-          else { const {error}=await supabase.from("components").insert({...cp, issue_id:issueId, tipus:t}); if(error) throw error; }
+        if(item.isNew){
+          const {data,error}=await supabase.from("issues").insert({...item.p, series_id:s.id, lapszam:item.n}).select().single();
+          if(error) throw error; const issueId=data.id;
+          if(Object.keys(item.pi).length){ const pierr=await upsertMyIssueData(issueId, {...item.pi, ar_auto:false}); if(pierr) throw pierr; }
+          for(const c of item.comps){
+            const cpayload={}; if(c.azonosito) cpayload.azonosito=c.azonosito;
+            const {data:cd,error:cerr}=await supabase.from("components").insert({...cpayload, issue_id:issueId, tipus:c.t}).select().single();
+            if(cerr) throw cerr;
+            if(c.status!==undefined){ const serr=await upsertMyStatus(cd.id, {status:c.status}); if(serr) throw serr; }
+          }
+          ins++;
+        } else {
+          const liveIssue = s.items.find(x=>x.n===item.n);
+          // Személyes réteg: mindig azonnal, draft nélkül.
+          if(Object.keys(item.pi).length){ const pierr=await upsertMyIssueData(liveIssue.id, {...item.pi, ar_auto:false}); if(pierr) throw pierr; }
+          for(const c of item.comps){
+            if(c.status===undefined) continue;
+            const liveComp=liveIssue.comps[c.t]; if(!liveComp||!liveComp.id) continue;
+            const serr=await upsertMyStatus(liveComp.id, {status:c.status}); if(serr) throw serr;
+          }
+          // Törzsadat: a szerkesztési draftba (csak most, ha tényleg kell — létrehozás/claim lazy).
+          const hasMasterChange = Object.keys(item.p).length>0 || item.comps.some(c=>c.azonosito);
+          if(hasMasterChange){
+            if(!draftId) draftId = await findOrCreateEditDraft(s);
+            await upsertDraftIssue(draftId, liveIssue, item.p, item.comps);
+            draftUpd++;
+          }
         }
       }
-      await reload(); alert(`Feltöltve „${s.sorozat}” sorozatba.\nÚj: ${ins}, frissítve: ${upd}`);
+      await reload();
+      const msg = draftUpd>0
+        ? `Feltöltve.\nÚj tétel (azonnal élő): ${ins}\nMeglévő tétel törzsadat-módosítása (${draftUpd} db) egy szerkesztési draftba került a Karbantartásban — nézd át és publikáld, ha jó.\nA saját jelöléseid/áraid azonnal frissültek.`
+        : `Feltöltve.\nÚj tétel: ${ins}\nA saját jelöléseid/áraid a meglévő tételeken azonnal frissültek.`;
+      alert(msg);
     }catch(e){ err(e); }
   };
+}
+
+// Megkeresi vagy létrehozza az "edit" típusú draftot ehhez a sorozathoz —
+// ugyanaz a claim-elv, mint a Karbantartás "Szerkesztés indítása" gombjánál.
+async function findOrCreateEditDraft(s){
+  const { data: existing, error } = await supabase.from("draft_series")
+    .select("*").eq("source_series_id", s.id).eq("pool_type","edit").maybeSingle();
+  if(error) throw error;
+  if(existing){
+    if(existing.pool_status==="ready"){
+      throw new Error("Ez a sorozat már publikálásra vár a Karbantartásban — előbb intézd el ott, mielőtt Excel-importot indítasz.");
+    }
+    if(existing.claimed_by && existing.claimed_by!==state.myId){
+      throw new Error("Valaki már szerkeszti ezt a sorozatot a Karbantartásban — fejezze be előbb, vagy engedje el a foglalást.");
+    }
+    if(!existing.claimed_by){
+      const {error:uerr}=await supabase.from("draft_series")
+        .update({pool_status:"claimed", claimed_by:state.myId, claimed_at:new Date().toISOString()}).eq("id",existing.id);
+      if(uerr) throw uerr;
+    }
+    return existing.id;
+  }
+  const { data: created, error: cerr } = await supabase.from("draft_series").insert({
+    pool_type:"edit", pool_status:"claimed", source_series_id:s.id,
+    submitted_by: state.myId, claimed_by: state.myId, claimed_at: new Date().toISOString(),
+    kiado:s.kiado, megnevezes:s.sorozat, megjelenites:s.display, szin:s.accent, components:s.components,
+  }).select().single();
+  if(cerr) throw cerr;
+  return created.id;
+}
+
+// Egy meglévő élő tétel törzsadat-módosítása a draftban — insert vagy update
+// a draft_issues/draft_components sorokon, source_*_id-vel az élőre mutatva.
+async function upsertDraftIssue(draftId, liveIssue, masterFields, comps){
+  const { data: existingDI, error } = await supabase.from("draft_issues")
+    .select("*").eq("draft_series_id", draftId).eq("source_issue_id", liveIssue.id).maybeSingle();
+  if(error) throw error;
+
+  const payload = {
+    lapszam: liveIssue.n,
+    cim: masterFields.cim ?? liveIssue.name,
+    megjelenes: masterFields.megjelenes ?? liveIssue.date,
+    eredeti_ar: masterFields.eredeti_ar ?? liveIssue.eredeti_ar,
+  };
+  let draftIssueId;
+  if(existingDI){
+    const {error:uerr}=await supabase.from("draft_issues").update(payload).eq("id",existingDI.id); if(uerr) throw uerr;
+    draftIssueId=existingDI.id;
+  } else {
+    const {data,error:ierr}=await supabase.from("draft_issues")
+      .insert({draft_series_id:draftId, source_issue_id:liveIssue.id, ...payload}).select().single();
+    if(ierr) throw ierr; draftIssueId=data.id;
+  }
+
+  for(const c of comps){
+    if(!c.azonosito) continue;
+    const liveComp=liveIssue.comps[c.t]; if(!liveComp||!liveComp.id) continue;
+    const { data: existingDC, error: dcerr } = await supabase.from("draft_components")
+      .select("*").eq("draft_issue_id", draftIssueId).eq("source_component_id", liveComp.id).maybeSingle();
+    if(dcerr) throw dcerr;
+    const cpayload = { azonosito_tipus: liveComp.azonosito_tipus||null, azonosito: c.azonosito, tipus: c.t };
+    if(existingDC){ const {error:ucerr}=await supabase.from("draft_components").update(cpayload).eq("id",existingDC.id); if(ucerr) throw ucerr; }
+    else { const {error:icerr}=await supabase.from("draft_components").insert({draft_issue_id:draftIssueId, source_component_id:liveComp.id, ...cpayload}); if(icerr) throw icerr; }
+  }
 }

@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.5 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.6 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -103,11 +103,13 @@ Egy szám egy vagy több komponensből áll (pl. **magazin** + **modell**, vagy 
 
 > Ez leváltja a korábbi „két fix képmező" ötletet: a kép mostantól **komponens-szintű**, így akárhány melléklet is viheti a sajátját.
 
-**Képkezelés terve [DÖNTVE, építés előtt]:**
-- Tárolás: **Supabase Storage**, **privát** tárolóban, **felhasználónkénti mappával** (a mappa neve a felhasználó UID-je); csak a saját mappa írható/olvasható. Megjelenítéskor rövid életű, aláírt hivatkozás.
-- **Feltöltés előtti automatikus átméretezés:** hosszabbik oldal max **1200 px**, JPEG — kb. 150–250 kB/kép (az 1 GB ingyenes keretbe több ezer kép fér).
-- Feltöltés helye: a **lenyíló képsáv**. Asztalin **drag & drop** + fájlválasztó; telefonon/tableten koppintásra **kamera vagy galéria**.
-- Kép **cseréje és törlése** a képen lévő kis gombokkal.
+**Képkezelés [DÖNTVE, megvalósítva — v1.6]:**
+- Tárolás: **Supabase Storage, KÖZÖS, publikus bucket** (`component-images`) — a megosztott katalógus elvéhez igazítva. *(Eltérés a korábbi tervtől: az eredetileg elgondolt felhasználónkénti privát mappa + aláírt URL a megosztott katalógus fényében feleslegesen bonyolult lett volna — a kép mostantól közös adat, mint a sorozat/tétel törzsadata.)* A `kep_url` állandó publikus URL, minden cserénél cache-busting query-paraméterrel frissítve.
+- **Feltöltés előtti automatikus átméretezés:** kliens-oldali (`<canvas>`), hosszabbik oldal max **1200 px**, JPEG, kb. 150–250 kB/kép.
+- **Staff bármikor közvetlenül feltölthet/cserélhet** képet bármelyik komponensre — ez a sorozat draft/publikálás-ciklusától **független**, azonnal az élő komponensre hat.
+- **Felhasználói képjavaslat (workflow):** bármely user javasolhat cserét/új képet, de **csak** olyan komponensre, ami a saját, `member_series`-ben bepipált sorozatához tartozik. `components.upload_enabled` (alapból `false`) szabályozza, engedélyezett-e a javaslás; ha a komponensen még nincs kép, a feltöltés **automatikusan engedélyezett**, admin beavatkozása nélkül — ha már van valódi kép, staffnak explicit be kell kapcsolnia komponensenként. Egyszerre max. **egy** függő javaslat lehet egy komponensen (DB-szinten kikényszerítve, parciális unique index).
+- Az admin **helyben, a lenyíló képsávban** bírálja el a javaslatot — a jelenlegi és a javasolt kép egymás mellett, Elfogad/Elutasít gombbal (nincs külön review-queue felület). **Nincs értesítés** a userek felé egyik döntés esetén sem: jóváhagyáskor a user egyszerűen látja az új képet legközelebb, elutasításkor marad a régi (vagy „nincs kép").
+- Tábla: `image_proposals` (`component_id`, `proposed_by`, `status`: pending/approved/rejected, `created_at`, `decided_at`, `decided_by`). SQL: `laprol-lapra-sorozatkezeles-4-kepjavaslat.sql`.
 
 ### 5.4 Kezdő adat (az eredeti Excelből)
 RBA — II. vh. repülők (60) · Centuria — Forma 1 (60) · Hachette — Disney könyvek (80).
@@ -235,7 +237,7 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 - **Supabase (a modul saját projektje):** adatbázis + Storage (képek) + Auth (privát bejelentkezés). **[DÖNTVE]**
 - A felület **közvetlenül** a Supabase-hez fordul — nincs külön proxy. **[DÖNTVE]**
 - **Privát**, **szinkron** telefon és gép közt (közös háttér). **[DÖNTVE]**
-- **Felület felépítése [DÖNTVE, v1.4]:** natív **ES modulok**, **build-eszköz nélkül**. `index.html` (markup) + `styles.css` + `js/` mappa: `state`, `supabase`, `modal`, `permissions`, `data`, `render`, `personal`, `admin-forms`, `admin-users`, `excel`, `auth`, `main`. A `supabase-js` és az `xlsx` CDN-ről, ESM-ként. (A mutálható app-állapot egy közös `state` objektumban.)
+- **Felület felépítése [DÖNTVE, v1.4, bővítve v1.6]:** natív **ES modulok**, **build-eszköz nélkül**. `index.html` (markup) + `styles.css` + `js/` mappa: `state`, `supabase`, `modal`, `permissions`, `data`, `render`, `personal`, `price-edit`, `admin-forms`, `admin-users`, `excel`, `auth`, `main` (alap), · `my-series`, `series-proposal` (sorozat-választás/javaslás), `karbantartas`, `draft-items` (életciklus, draft-szerkesztés), `changes` (verziókövetés/felkiáltójel), `component-images`, `image-resize` (képkezelés — v1.6). A `supabase-js` és az `xlsx` CDN-ről, ESM-ként. (A mutálható app-állapot egy közös `state` objektumban.)
 - **Jogosultság:** háromszintű szerep a `members` táblában, RLS-sel és belépéskori ellenőrzéssel — lásd 13.
 
 ---
@@ -266,7 +268,7 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
    - **Darabszám** a **komponensen** (6.5) — „mennyi van most": komponensenként külön él és a listában +/− gombokkal léptethető, mert a magazinok és a mellékletek sorsa eltérhet. 0-nál automatikusan „hiányzik".
    Az egyes példányok részletes sorsa (mi tört el, mi cserélődött el) továbbra is a **szabad jegyzet mezőbe** írható, strukturálás nélkül. *(A platform-fejezet „drift" elvéhez kapcsolódik: mennyiségi árnyalat nélkül a modulok-közti értesítés is csak megvan/nincs-meg szinten tudna jelezni.)*
 5. **Több felhasználó — adattárolási modell** **[NYITOTT]**
-   Jelenleg: **egy közös Supabase-projekt**, felhasználónként szétválasztott adattal (RLS + saját mappa a képeknek). Alternatíva: **felhasználónként saját Supabase-projekt**.
+   Jelenleg: **egy közös Supabase-projekt**, felhasználónként szétválasztott személyes adattal (RLS), közös törzsadattal és közös, publikus Storage bucket-tel a képeknek (5.3, v1.6 — nem felhasználónkénti mappa, ahogy korábban itt szerepelt). Alternatíva: **felhasználónként saját Supabase-projekt**.
    - *Saját projekt mellett:* teljes adatszétválasztás, külön tárhelykeret, illeszkedik a „modul birtokolja az adatot" elvhez.
    - *Ellene:* magas belépési küszöb (fiók + projekt + SQL-ek + kulcsok kézzel); minden jövőbeli adatbázis-módosítást **minden felhasználónak** külön le kellene futtatnia; az ingyenes projektet a Supabase **egy hét inaktivitás után felfüggeszti**.
    - **A tulajdonos iránya:** a **platform** (OM Curator) legyen a fő belépési pont, onnan érhetők el a modulok. Aki közvetlenül a modult használja, az is **adjon adatot a platformnak**. A platform később **automatikusan létrehozhatná** a felhasználó Supabase-projektjét, és **heti ütemezett feladattal** forgalmat generálna, hogy ne függessze fel a szolgáltató. *(Részletek a platform-specifikációba.)*
@@ -281,6 +283,7 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 9. **Kép nagyítása:** a lenyíló képsávban a képre koppintva teljes képernyős nézet — hasznos lehet, még nem épült meg.
 10. **Kettőnél több nem-magazin komponens** esetén a hierarchia pontosítása (jelenleg nem aktuális).
 11. **További „nagy kép" szempontok**, ha felmerülnek.
+12. **Excel-import összehangolása a draft/pool-folyamattal — DÖNTVE, DE MÉG NEM ÉPÍTVE [NYITOTT, megvalósítás]** A sorozatkezelés-újratervezés (13.5–13.7) idején megszületett a döntés: publikált sorozatra irányuló import, MEGLÉVŐ tételek módosítása → automatikusan nyisson/töltsön egy szerkesztési draftot, a szokásos publikálás-folyamat (diff+verzióemelés+felkiáltójel) fusson le rá; ÚJ tétel/komponens hozzáadása → közvetlen írás, nincs mit védeni; nem publikált (munkaanyag) sorozatra irányuló import → változatlanul közvetlen írás. **Ez a döntés még nincs átvezetve a kódba** — a `js/excel.js` ma is minden esetben közvetlenül ír az élő `issues`/`components` táblákba, a draft/verzió/felkiáltójel-mechanizmus teljes megkerülésével. Lásd `allapot-osszefoglalo.md` 5. és 8. pontja.
 
 ---
 
@@ -336,12 +339,16 @@ A sorozatokat/tételeket a **tulajdonos/admin** viszi fel — minden bejelentkez
 - **Letiltás/visszaengedés:** ✅ **megvalósítva** (13.1) — visszafordítható, RLS-szinten és belépéskor is kikényszerítve; admin a sima usereket, a tulajdonos az adminokat is.
 - **Valódi fióktörlés** (adminisztrátori és saját): továbbra is **[NYITOTT]**. A törléshez a titkos `service_role` kulcs kell (Supabase **Edge Function**), ami sosem kerülhet a böngészőbe. Egy közös, később megépítendő Edge Function oldaná meg. Ha „törlés" merül fel felhasználóra, addig **letiltás** a helyes válasz.
 
-### 13.3 Felhasználói sorozat-választás (kiválasztás/bővítés/törlés) **[NYITOTT]**
-Igény: a nem-tulajdonos felhasználó a tulajdonos által felvitt sorozatok közül **kiválaszthassa**, melyiket szeretné a saját nyilvántartásába felvenni (nem mindegyiket látja automatikusan alapértelmezésben) — később bővíthet, vagy törölhet a választásából.
-- **Egy sorozatból csak egy aktív választás lehet** — nem választható be kétszer ugyanaz.
-- **Törlés-korlát:** ha egy felhasználó sokszor törli, majd újra felveszi ugyanazt a sorozatot, az zavart okozhat a kód-hivatkozásoknál (platform-integráció szempontjából). **Javasolt limit: max. 5 törlés** sorozatonként/felhasználónként — ez látszódjon is a sorozat-kezelő felületen (pl. "3/5 törlés felhasználva").
-- **Újra felvételkor tiszta lap:** ha egy felhasználó töröl egy sorozatot a saját nyilvántartásából, majd újra hozzáadja, **ne emlékezzen a korábbi jelöléseire** — teljesen új, üres állapotból induljon (nem a régi `member_status` sorok élednek újra, hanem törlődnek/érvénytelenednek, és a következő felvételkor friss kezdés van).
-- Nyitott technikai kérdés: ez egy új kapcsoló-tábla igényét veti fel (pl. `member_series` — melyik felhasználó melyik sorozatot választotta be, hányszor törölte), amit még nem terveztünk meg részletesen.
+### 13.3 Felhasználói sorozat-választás **[DÖNTVE, megvalósítva — v1.6]**
+A user a publikált sorozatok közül aktívan **kiválasztja**, melyiket akarja a saját fülsávjában látni — a fülsáv mostantól kizárólag a `member_series.is_selected=true` sorokból épül, NEM az összes publikált sorozatból. Ez minden bejelentkezett usernek elérhető, staffnak is (**📚 Sorozataim** fejléc-gomb).
+
+Tábla: `member_series` (`user_id`, `series_id`, `is_selected`, `selected_at`, `deselected_at`). Leválasztáskor (checkbox kikapcsolása) a UI megkérdezi: „Megtartod vagy törlöd a hozzá tartozó saját adataidat (jelölések, árak)?" — törlés esetén a `member_status`/`member_issue_data` sorok törlődnek erre a sorozatra nézve; megtartás esetén érintetlenek maradnak, csak a fülsávban nem látszanak, amíg újra be nem választja. Újra-kiválasztáskor a `member_series` sor frissül (nem új sor jön létre) és a `member_seen` baseline újraszeeddelődik (lásd 13.6).
+
+**A korábban tervezett 5×-ös törlési limit ELVETVE [DÖNTVE, v1.6 pontosítás]:** a leválasztás/újra-választás korlátlan — eleve adott, melyik felhasználó melyik sorozatot használja és honnan, ez nem terheli a rendszert, a limit feleslegesnek bizonyult.
+
+Egy sorozatból csak egy aktív választás lehet (a `member_series` elsődleges kulcsa `user_id, series_id`). Publikálatlan sorozatot csak az választhat, akinek már volt rajta saját sora (grandfather-hozzáférés) — új user nem választhatja.
+
+Új sorozat létrehozásakor a létrehozó automatikusan bekerül a saját fülsávjába, hogy ne tűnjön el rögtön a szeme elől.
 
 ### 13.4 Üzenetküldés az adminisztrátornak **[NYITOTT, koncepció]**
 Alapötlet: a nem-tulajdonos felhasználó rövid üzenetet küldhessen a tulajdonosnak.
@@ -349,9 +356,68 @@ Alapötlet: a nem-tulajdonos felhasználó rövid üzenetet küldhessen a tulajd
 - Az adminisztrátornál megjelenik: **ki küldte** + **az üzenet szövege**.
 - A részletek (hol jelenik meg az adminnak, olvasottság-jelzés, válaszolhat-e, értesítés-e vagy csak belépéskor látható lista) **külön átbeszélendő**, mielőtt tervezünk rá adatmodellt.
 
+### 13.5 Sorozat-életciklus és Karbantartás **[DÖNTVE, megvalósítva — v1.6]**
+A sorozat/szám/komponens törzsadata egy és ugyanaz mindenki számára — nincs userenkénti másolat. A törzsadat módosítása admin/owner kizárólagos joga, de **soha nem írja felül automatikusan/észrevétlenül a user saját adatait** — helyette jelez (13.6), a user pedig tudatosan nyugtázza.
+
+Egy sorozat mindig pontosan egy állapotban van:
+1. **Beérkezett** (lock nélküli, bárki claim-elheti)
+2. **Munkaanyag / foglalva** (lock-olva egy adott admin/owner-nél)
+3. **Publikálásra váró**
+4. **Aktív / publikált**
+5. **Publikálatlan** (korábban publikált volt, admin levette; grandfather-userek megtartják a hozzáférést — 13.3)
+
+Beérkezett + Munkaanyag/foglalva együtt max. **20 tétel** lehet (globális limit, DB-triggerrel kikényszerítve; Publikálásra váró és Publikálatlan nem számít bele). A pool kétféle eredetű tételt tartalmaz: **„Új javaslat"** (user vagy admin/owner nyújt be egy teljesen új sorozatot sablonnal — ez az egyetlen út, ahogy új sorozat a rendszerbe kerülhet, admin/owner sem hozhat létre közvetlenül publikált sorozatot) és **„Szerkesztés"** (admin/owner egy már élő, publikált sorozaton indít módosítást — ez azonnal draftot hoz létre és claim-eli az indítónál, az élő verzió eközben zavartalanul elérhető marad mindenkinek).
+
+Állapotátmenetek: Beérkezett → **claim** → Munkaanyag; Munkaanyag → **kész** → Publikálásra váró; Munkaanyag → **elenged** → vissza Beérkezettbe (a munkával együtt); Beérkezett → beküldő törölheti sajátját, vagy staff bárkiét; Publikálásra váró → **publikálás** → Aktív (13.6); Aktív → **publikálatlanná tétel** → Publikálatlan; Publikálatlan → **újra publikálás** (direkt) VAGY **force-törlés** (13.7, owner-only).
+
+**Karbantartás** — új, önálló, staff-only menüpont (🗂️ fejléc-gomb), három füllel:
+1. **Aktív sorozatok** — publikált sorozatok, aktív-felhasználó számláló, „Szerkesztés indítása" (draftot hoz létre), „Publikálatlanná tétel".
+2. **Munka sorozatok** — a pool, három alcsoportban (Beérkezett / Munkaanyag-foglalva / Publikálásra váró), eredet-típussal és beküldő/claim-elő névvel.
+3. **Publikálatlan** — grandfather-userek száma, „Újra publikálás", owner-nek törlés-indítás/végleges törlés (13.7).
+
+SQL: `laprol-lapra-sorozatkezeles-2-eletciklus.sql`.
+
+### 13.6 Draft-mechanizmus, verziókövetés és felkiáltójel-jelzés **[DÖNTVE, megvalósítva — v1.6]**
+**Draft-tárolás:** külön `draft_series`/`draft_issues`/`draft_components` táblák (nem a `series/issues/components` sémán belüli flag), saját (ideiglenes) UUID-kkel, `source_series_id`/`source_issue_id`/`source_component_id` mezővel az élő párra mutatva (nullable — null = új tétel a draft-on belül). A draft csak **törzsadat-mezőket** hordoz, személyes réteg nincs rajta (publikálás előtt még senkinek nincs saját adata az új/módosuló tételen).
+
+**Kritikus szabály:** publikáláskor az élő Szám/Komponens sorok UUID-je **fix marad** — a publikálás mező-szinten frissíti (UPDATE) az élő sorokat, sorhoz-sort párosítva a draft `source_*_id` mezője alapján. Ha a draft-ban új tétel szerepel (nincs élő párja), az új, valódi UUID-t kap. Ez azért létfontosságú, mert a `member_status`/`member_issue_data` a komponens/szám UUID-jára hivatkozik.
+
+**Publikálás** (`publish_draft_series(uuid)` SQL-függvény, EGY tranzakcióban):
+1. Mezőnként összehasonlítja a draftot az élő verzióval.
+2. Minden változott mezőről bejegyzés kerül a `change_log` táblába (`entity_type`: series/issue/component, `entity_id`, `field_name`, `old_value`, `new_value`, `version`, `changed_at`, `is_current` — ha egy mező többször változott, minden bejegyzés megmarad, csak az aktuális van megjelölve).
+3. Az érintett entitás (`series`/`issues`/`components` — mindháromnak van `version` oszlopa) verziószáma eggyel nő.
+4. Az élő sorok frissülnek a draft tartalmával; a draft törlődik.
+5. Új tétel/komponens (nincs élő párja) új UUID-vel, `version=1`, diff/change_log nélkül kerül be (senkinek nincs még adata rajta).
+6. Első alkalommal publikált sorozatnál (Új javaslat típus) nincs diff, nincs értesítés.
+
+**„Utoljára látott verzió"** (`member_seen`: `user_id`, `entity_type`, `entity_id`, `last_seen_version`) — userenkénti, entitásonkénti nyilvántartás. **Baseline-probléma és megoldása:** ha valaki most választ be egy sorozatot, aminek tételei már magasabb verziónál tartanak, hamis „változott!" jelzést kapna, ha a baseline hiányozna. Ezért kiválasztáskor/újra-kiválasztáskor a `seed_member_seen(series_id)` SQL-függvény feltölti a `member_seen` sorokat a sorozat MINDEN tételére a JELENLEGI verzióra.
+
+**Felkiáltójel-jelzés, három helyen + egy gyűjtő nézet:**
+1. **Fülsáv** — a sorozat fülének sarkán, ha a sorozaton BÁRMI változott (sorozat-szintű mező VAGY bármelyik szám/komponens).
+2. **Hero** — ha a SOROZAT saját mezői változtak; kattintva mezőnkénti „régi érték → új érték" popup, OK nyugtázza (`member_seen` frissül a sorozatra), Mégse-re megmarad.
+3. **Tétel sorszáma mellett** — ha a SZÁM vagy annak komponense változott; ugyanaz az OK/Mégse logika, OK egyszerre nyugtázza a számot és minden komponensét.
+4. **Gyűjtött elfogadás** — a szűrő-sorban egy önálló „!" gomb: legörgethető lista MINDEN változásról a sorozaton belül, egy gombnyomással (`seed_member_seen`) mind elfogadható.
+
+A jelzés mindenhol megjelenik, függetlenül attól, van-e a usernek saját adata az adott tételen — nincs szűrés eszerint.
+
+**Mellékes javítás (v1.6):** a sorozat-kód számláló a publikálás szerver-oldalra költözésével **globálissá** vált (`global_counters` + `next_series_no()`) — a korábbi, felhasználónkénti számláló (`counters` tábla) ütköző kódokat adhatott volna ki két staff-tag egyidejű publikálásánál; a régi tábla érintetlenül, holtan megmaradt.
+
+SQL: `laprol-lapra-sorozatkezeles-3-verziokoves.sql`.
+
+### 13.7 Force-törlés **[DÖNTVE, megvalósítva — v1.6]**
+Végleges törlés csak **publikálatlan** sorozatra, kizárólag **owner** jogosultsággal (`start_force_delete`/`finalize_delete_series` SQL-függvények, owner-ellenőrzéssel a függvényen belül — a `series` táblán nincs is kliens-DELETE RLS-policy, kizárólag ezeken a függvényeken át törölhető).
+
+- **0 aktív `member_series.is_selected=true` sor** → azonnali törlés, egyszerű megerősítéssel.
+- **Van még aktív kiválasztás** → owner elindítja a törlést (`force_delete_requested_at`/`_by`/`_grace_end` mezők, +14 nap): a türelmi idő alatt a sorozat nem választható be újonnan, nem szerkeszthető (DB-trigger blokkolja a draft-claim-et és a publikálást is, nemcsak a UI), és az érintett, még kiválasztó userek **minden belépéskor kötelezően nyugtázandó** felugró ablakot kapnak (háttérre kattintva nem zárható, csak a saját OK gombjával — csak az adott munkamenetre tűnik el).
+- **Védőháló:** ha valahogy mégis módosítás történne a türelmi idő alatt (elvileg blokkolva, de a `publish_draft_series` is újraellenőrzi), a force-törlési jelzők nullázódnak — a folyamatot újra kellene indítani.
+- 14 nap letelte előtt owner sem hajthatja végre a törlést; utána a sorozat nevének pontos begépelésével véglegesítheti — ekkor törlődik a sorozat és minden hozzá kapcsolódó, még meglévő felhasználói adat (`member_status`, `member_issue_data`, `member_series`, `member_seen`, `change_log`, esetleges elakadt draft) is.
+
+SQL: `laprol-lapra-sorozatkezeles-5-force-torles.sql`.
+
 ---
 
 *Napló:*
+- v1.6 — **Sorozatkezelés teljes újratervezése és megvalósítása** (5 lépésben): **(1)** kiválasztás rétege — `member_series`, „📚 Sorozataim" választó, a fülsáv innentől csak a saját bepipált sorozatokból épül (13.3, az 5×-ös törlési limit később elvetve). **(2)** sorozat-életciklus állapotgép (Beérkezett/Munkaanyag/Publikálásra váró/Aktív/Publikálatlan) + „🗂️ Karbantartás" staff-only menüpont, `draft_series` pool — a régi közvetlen „+ Új sorozat"/„✎ Sorozat" gombok megszűntek, minden sorozat-törzsadat-módosítás a pool-on megy át (13.5). **(3)** `draft_issues`/`draft_components` — a szerkesztés-indítás a teljes élő adatot átmásolja a draftba; `publish_draft_series()` SQL-függvény egy tranzakcióban diffel/verzióz/frissít; felkiáltójel-mechanizmus (`change_log`, `member_seen`) négy helyen (13.6). Mellékesen javítva: a sorozat-kód számláló globálissá vált. **(4)** teljes képkezelés-csővezeték a semmiből: közös, publikus Storage bucket, kliens-oldali átméretezés, staff közvetlen feltöltés, user-javaslat workflow helyi (nem külön queue) elbírálással (5.3). **(5)** force-törlés — owner-only, 0 aktív kiválasztásnál azonnali, egyébként 14 napos türelmi idővel, kétszintű védőhálóval (13.7); mellékesen lezárva egy talált RLS-rés (a `series` tábla eddig staffnak közvetlen törlést is engedett volna). SQL-ek: `laprol-lapra-sorozatkezeles-1` … `-6` (az utolsó a törlési limit utólagos elvetése).
 - v1.5 — **UX-csomag:** a „Felhasználók" önálló 👥 fejléc-gomb lett (a 🔧 eszköztárból kivéve, staff-only); kilépéskor a sorozat-accent visszaáll semlegesre; nagyobb fejléc-ikonok és „összeg" gomb; a lista „eredeti ár / fizetve" **két külön sorban**; a **+/− léptetők a listából a lenyíló panelbe** kerültek (nagyobb gombok). **Ár-logika:** **„nem ismert"** felirat a NULL árakra; **automatikus fizetett-ár** kitöltés (első `megvan`-ná váláskor `fizetett_ar = eredeti_ar`) és nullázás (minden `megvan` visszavonásakor — a kézi árat `ar_auto` jelző őrzi); **személyes ár-szerkesztő MINDENKINEK** a panel ✎ ikonjáról (csak `member_issue_data`); az **„Eredeti ár alapján"** szorzó a **domináns** komponens (a színezéssel egyezően), nem magazin/könyv; **„+nem ismert" badge** a NULL-áras bevont tételekre. SQL: `laprol-lapra-ar-auto.sql` (ar_auto oszlop). Fix: a panel-léptető szelektora (`.pstepbtn`).
 - v1.4 — **háromszintű jogosultság** (user/admin/owner; `members` tábla `role`/`status`/`display_name`; **letiltás** [nem törlés], letiltott fiók belépéskor kirúgva; felhasználó-kezelő UI „👥 Felhasználók"; `SECURITY DEFINER` segédfüggvények + oszlop-védő trigger; staff-alapú törzsadat-RLS; a tulajdonos sora védett). **Ár-modell szétválasztás:** „fedélár" → **Eredeti ár** (közös törzsadat), a személyes ár-adat (fizetett ár, beszerzési mennyiség, dátum, forrás) a **`member_issue_data`** táblába; **kétnézetes hero** („Eredeti ár" / „Fizetett ár alapján") + megjelenítési szabály: a „fizetve"/összeg **csak megvett tételre** (≥1 komponens `megvan`) számít. **Fájlszétbontás:** `index.html` → natív **ES modulok** (`js/`) + `styles.css`, build-eszköz nélkül. **Adatjavítás:** régi ezres-tagolási korrupció (II VH Repülők #5–60: 5→5990) egyszeri, forrás-alapú SQL-lel visszatöltve, `<100` szűrővel; a személyes fizetett ár teljessé téve. SQL-ek: `jogosultsag-1/2/3`, `arjavitas`, `fizetett-teljesseg`.
 - v1.3 — megosztott katalógus (13. fejezet): alapmodell megvalósítva (member_status, tulajdonos-only szerkesztés, nyitott regisztráció); négy új nyitott kérdés: admin/saját fióktörlés (Edge Function kell), felhasználói sorozat-választás (max 5 törlés/sorozat limit, tiszta újrafelvétel), üzenetküldés adminnak (max 150 karakter, koncepció szinten).
