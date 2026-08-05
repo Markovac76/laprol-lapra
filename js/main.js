@@ -12,8 +12,12 @@ import { mySeriesForm } from "./my-series.js";
 import { karbantartasForm } from "./karbantartas.js";
 import { downloadTemplate, handleUpload } from "./excel.js";
 import { showIssueChangePopup } from "./changes.js";
+import { uploadLiveImage, proposeImage, approveProposal, rejectProposal, setUploadEnabled } from "./component-images.js";
+import { reload } from "./data.js";
 import { err } from "./modal.js";
 import { showApp, loginWithPassword, registerWithPassword, logout, initSession } from "./auth.js";
+
+let imgTarget=null;   // {componentId, mode:"upload"|"propose"} — a rejtett #imgUpl célja
 
 /* ---- fülsáv / szűrők / keresés ---- */
 document.getElementById("tabtoggle").addEventListener("click",()=>{ state.tabsOpen=!state.tabsOpen; renderTabs(); applyPickerMode(); syncHeadHeight(); });
@@ -54,6 +58,25 @@ document.getElementById("list").addEventListener("click",async e=>{
     return;
   }
 
+  // Kép: staff közvetlen feltöltés/csere, vagy user javaslat — közös rejtett file-inputon át
+  const iu=e.target.closest("[data-imgupload]"), ipr=e.target.closest("[data-imgpropose]");
+  if(iu||ipr){
+    imgTarget={ componentId: iu ? iu.dataset.imgupload : ipr.dataset.imgpropose, mode: iu?"upload":"propose" };
+    document.getElementById("imgUpl").click(); return;
+  }
+  const ia=e.target.closest("[data-imgapprove]"), ir=e.target.closest("[data-imgreject]");
+  if(ia||ir){
+    const id = ia ? ia.dataset.imgapprove : ir.dataset.imgreject;
+    const it=S().items.find(x=>Object.values(x.comps).some(c=>c.pending&&c.pending.id===id));
+    const comp=it&&Object.values(it.comps).find(c=>c.pending&&c.pending.id===id);
+    if(!comp) return;
+    try{ ia ? await approveProposal(comp.pending) : await rejectProposal(comp.pending); await reload(); }
+    catch(e2){ err(e2); }
+    return;
+  }
+  const it2=e.target.closest("[data-imgtoggle]");
+  if(it2){ try{ await setUploadEnabled(it2.dataset.imgtoggle, it2.dataset.current!=="1"); await reload(); }catch(e2){ err(e2); } return; }
+
   const ed=e.target.closest("[data-edit]");
   if(ed){ const it=S().items.find(x=>x.n===+ed.dataset.edit); if(it) itemForm(it); return; }
   const mk=e.target.closest(".mark"); if(!mk||mk.disabled) return;
@@ -82,6 +105,16 @@ document.getElementById("kbToggle").onclick=karbantartasForm;
 document.getElementById("a-template").onclick=downloadTemplate;
 document.getElementById("a-upload").onclick=()=>document.getElementById("upl").click();
 document.getElementById("upl").addEventListener("change",function(){ const f=this.files&&this.files[0]; if(f) handleUpload(f).catch(err); this.value=""; });
+document.getElementById("imgUpl").addEventListener("change",async function(){
+  const f=this.files&&this.files[0]; this.value="";
+  if(!f||!imgTarget) return;
+  const {componentId,mode}=imgTarget; imgTarget=null;
+  try{
+    if(mode==="upload") await uploadLiveImage(componentId,f);
+    else await proposeImage(componentId,f);
+    await reload();
+  }catch(e){ err(e); }
+});
 
 /* ---- bejelentkezés ---- */
 let registerMode=false;

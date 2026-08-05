@@ -4,6 +4,8 @@
 import { state, S, COMP_TYPES, todayISO, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent } from "./state.js";
 import { stats } from "./data.js";
 import { showSeriesChangePopup, showIssueChangePopup, showCollectedChanges } from "./changes.js";
+import { isStaff } from "./permissions.js";
+import { publicUrl, proposedPath } from "./component-images.js";
 
 function setAccent(){ document.documentElement.style.setProperty("--accent",S().accent); }
 
@@ -90,6 +92,31 @@ const ICONS={
 const MLAB={megvan:"megvan",hianyzik:"hiány",nemkell:"nem kell"};
 const CHEV='<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
 
+// Kép feltöltés/csere/javaslás vezérlők egy komponensen — a szerep (staff/user)
+// és a jelenlegi állapot (van-e függő javaslat, van-e már élő kép) dönti el.
+function imageControlsHtml(c, componentId){
+  const staff = isStaff();
+  if(c.pending){
+    if(staff){
+      const thumb = publicUrl(proposedPath(componentId, c.pending.id));
+      return `<div class="imgctrl pending">
+        <img class="imgthumb" src="${esc(thumb)}" alt="Javasolt kép">
+        <div class="modrow"><button class="btn" data-imgapprove="${c.pending.id}">Elfogad</button><button class="btn danger" data-imgreject="${c.pending.id}">Elutasít</button></div>
+      </div>`;
+    }
+    const mine = c.pending.proposed_by===state.myId;
+    return `<div class="unote">${mine?"A javaslatod":"Javaslat"} elbírálás alatt.</div>`;
+  }
+  if(staff){
+    const toggle = c.kep_url ? `<button class="imgtogglebtn" data-imgtoggle="${componentId}" data-current="${c.upload_enabled?1:0}">${c.upload_enabled?"🔓 userek javasolhatnak":"🔒 userek nem javasolhatnak"}</button>` : "";
+    return `<div class="imgctrl"><button class="imgbtn" data-imgupload="${componentId}">Kép feltöltése/csere</button>${toggle}</div>`;
+  }
+  if(c.upload_enabled || !c.kep_url){
+    return `<div class="imgctrl"><button class="imgbtn" data-imgpropose="${componentId}">${c.kep_url?"Csere javaslása":"Kép javaslása"}</button></div>`;
+  }
+  return "";
+}
+
 export function renderListHead(){
   const s=S();
   document.getElementById("listhead").innerHTML =
@@ -105,6 +132,7 @@ export function renderList(){
   list.innerHTML=items.map(it=>{
     const future=it.date&&it.date>todayISO;
     const istate=issueState(it,s);
+    const hasPendingImg = isStaff() && s.components.some(t=>it.comps[t] && it.comps[t].pending);
     const dateHtml=it.date?`<span class="${future?"future":""}">${fmtDate(it.date)}</span>`:`<span style="color:var(--faint)">nincs dátum</span>`;
     const dbTag=(it.besz_menny&&it.besz_menny>1)?`<span class="dbtag">${it.besz_menny} db</span>`:"";
     const eredetiLine = `<span class="money">eredeti ár ${it.eredeti_ar!=null?fmtFt(it.eredeti_ar):"nem ismert"}</span>`;
@@ -129,7 +157,8 @@ export function renderList(){
           <button class="pstepbtn" data-step="+" data-n="${it.n}" data-t="${t}" aria-label="Több">+</button></div>` : "";
         return `<div class="imgcard"><div class="imgbox">${img}</div>
           <div class="imgcap"><div class="cn">${COMP_TYPES[t]||t}</div>
-          <div class="cc">${scode}-${pad(it.n,4)}-${pad(ci+1,2)}</div></div>${pstep}</div>`;
+          <div class="cc">${scode}-${pad(it.n,4)}-${pad(ci+1,2)}</div></div>${pstep}
+          ${c.id?imageControlsHtml(c,c.id):""}</div>`;
       }).join("") + `</div>
       <div class="panelmoney">
         <div class="pmrow"><span class="pmk">eredeti ár</span><span class="pmv">${it.eredeti_ar!=null?fmtFt(it.eredeti_ar):"nem ismert"}</span></div>
@@ -144,7 +173,7 @@ export function renderList(){
       </div>
       <div class="marks">${marks}
         ${state.adminMode?`<button class="rowedit" data-edit="${it.n}" title="Szerkesztés">✎</button>`:""}
-        <button class="expander" data-exp="${it.n}" aria-expanded="${open}" aria-label="Képek">${CHEV}</button>
+        <button class="expander" data-exp="${it.n}" aria-expanded="${open}" aria-label="Képek">${CHEV}${hasPendingImg?'<span class="chgdot img" title="Függő képjavaslat">📷</span>':""}</button>
       </div>
     </div>${panel}</div>`;
   }).join("");

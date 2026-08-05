@@ -11,7 +11,7 @@ export async function loadData(){
   const { data: userData } = await supabase.auth.getUser();
   state.myId = userData?.user?.id || null;
   state.isOwner = state.myId === OWNER_UID;
-  const [s,i,c,l,ms,mid,msel,msn]=await Promise.all([
+  const [s,i,c,l,ms,mid,msel,msn,ip]=await Promise.all([
     supabase.from("series").select("*").order("sort_order"),
     supabase.from("issues").select("*"),
     supabase.from("components").select("*"),
@@ -20,6 +20,7 @@ export async function loadData(){
     supabase.from("member_issue_data").select("*").eq("user_id",state.myId),
     supabase.from("member_series").select("series_id").eq("user_id",state.myId).eq("is_selected",true),
     supabase.from("member_seen").select("*").eq("user_id",state.myId),
+    supabase.from("image_proposals").select("*").eq("status","pending"),
   ]);
   if(s.error||i.error||c.error){ throw (s.error||i.error||c.error); }
   state.LISTS={};
@@ -34,6 +35,10 @@ export async function loadData(){
   const seenMap={};
   if(!msn.error && msn.data) msn.data.forEach(r=>{ seenMap[r.entity_type+":"+r.entity_id]=r.last_seen_version; });
   const seenOf=(type,id)=> seenMap[type+":"+id] ?? 0;
+  // Függő képjavaslatok komponensenként (globálisan olvasható — mindenkinek
+  // látnia kell, hogy már fut-e javaslat, mielőtt sajátot próbálna beküldeni).
+  const pendingByComp={};
+  if(!ip.error && ip.data) ip.data.forEach(r=>{ pendingByComp[r.component_id]=r; });
   // A fülsáv csak a SAJÁT, bepipált sorozatokból épül (member_series.is_selected) — nem az összesből.
   const selectedIds = new Set((msel.data||[]).map(r=>r.series_id));
   const byS={}, byI={};
@@ -45,7 +50,8 @@ export async function loadData(){
   c.data.forEach(r=>{ const it=byI[r.issue_id]; if(!it) return;
     const my=myStatus[r.id]||{status:null,db:1,jegyzet:null};
     it.comps[r.tipus]={id:r.id,status:my.status,azonosito:r.azonosito,azonosito_tipus:r.azonosito_tipus,note:my.jegyzet,kep_url:r.kep_url,db:my.db,
-      version:r.version||1,changed:(r.version||1)>seenOf("component",r.id)};
+      version:r.version||1,changed:(r.version||1)>seenOf("component",r.id),
+      upload_enabled:!!r.upload_enabled, pending:pendingByComp[r.id]||null};
   });
   state.SERIES.forEach(x=>{ x.items.sort((a,b)=>a.n-b.n);
     x.items.forEach(it=>{ it.changed = it.ownChanged || Object.values(it.comps).some(c=>c.changed); });
