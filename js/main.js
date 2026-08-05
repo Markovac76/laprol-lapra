@@ -10,6 +10,7 @@ import { itemForm, listsForm } from "./admin-forms.js";
 import { usersForm } from "./admin-users.js";
 import { mySeriesForm } from "./my-series.js";
 import { karbantartasForm } from "./karbantartas.js";
+import { helpForm } from "./help.js";
 import { downloadTemplate, handleUpload } from "./excel.js";
 import { showIssueChangePopup } from "./changes.js";
 import { uploadLiveImage, proposeImage, approveProposal, rejectProposal, setUploadEnabled } from "./component-images.js";
@@ -101,6 +102,7 @@ document.getElementById("a-item").onclick=()=>{ if(!S()){ alert("Előbb válassz
 document.getElementById("a-lists").onclick=listsForm;
 document.getElementById("usersBtn").onclick=usersForm;
 document.getElementById("mySeriesBtn").onclick=mySeriesForm;
+document.getElementById("helpBtn").onclick=helpForm;
 document.getElementById("kbToggle").onclick=karbantartasForm;
 document.getElementById("a-template").onclick=downloadTemplate;
 document.getElementById("a-upload").onclick=()=>document.getElementById("upl").click();
