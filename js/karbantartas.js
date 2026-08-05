@@ -10,7 +10,7 @@ import { supabase } from "./supabase.js";
 import { state, esc, listName, opts, fmtDate, DISPLAY_MAX, PAL12, PAL_FAMILIES } from "./state.js";
 import { openModal, err, sheet } from "./modal.js";
 import { reload } from "./data.js";
-import { isStaff } from "./permissions.js";
+import { isStaff, isOwnerRole } from "./permissions.js";
 import { fetchDraftItems, renderDraftItemsList, draftItemForm } from "./draft-items.js";
 
 let currentTab = "aktiv";
@@ -65,12 +65,15 @@ function renderAktiv(series, drafts, memberSeries){
     const cnt = memberSeries.filter(m=>m.series_id===s.id && m.is_selected).length;
     const since = s.created_at ? fmtDate(s.created_at.slice(0,10)) : "—";
     const inProgress = editingSourceIds.has(s.id);
+    const deleteMarked = !!s.force_delete_requested_at;
     return `<div class="userrow"><div class="uinfo">
         <div class="uname">${esc(s.megjelenites||s.megnevezes)}${s.kiado?` <span class="sc-kiado">· ${esc(listName("kiado",s.kiado))}</span>`:""}</div>
         <div class="unote">${cnt} aktív felhasználó · aktív ${since} óta</div>
+        ${deleteMarked?`<div class="unote" style="color:#f3b6b6">🗑️ törlésre jelölve — szerkesztés letiltva</div>`:""}
       </div>
       <div class="uactions">
-        ${inProgress ? `<span class="unote">szerkesztés már folyamatban</span>`
+        ${deleteMarked ? `<span class="unote">nem szerkeszthető</span>`
+          : inProgress ? `<span class="unote">szerkesztés már folyamatban</span>`
           : `<button data-act="startedit" data-id="${s.id}">Szerkesztés indítása</button>`}
         <button class="danger" data-act="unpublish" data-id="${s.id}">Publikálatlanná tétel</button>
       </div></div>`;
@@ -106,14 +109,28 @@ function renderMunka(drafts, members){
   }).join("");
 }
 
-/* ---- Publikálatlan ---- */
+/* ---- Publikálatlan (+ force-törlés, owner-only) ---- */
 function renderPublikalatlan(series, memberSeries){
+  const owner = isOwnerRole();
   const list = series.filter(s=>s.lifecycle==="unpublished");
   const rows = list.map(s=>{
     const cnt = memberSeries.filter(m=>m.series_id===s.id && m.is_selected).length;
+    const pending = !!s.force_delete_requested_at;
+    const graceOver = pending && s.force_delete_grace_end && new Date(s.force_delete_grace_end) <= new Date();
+    let badge = "";
+    let actions = `<button data-act="republish" data-id="${s.id}">Újra publikálás</button>`;
+    if(pending){
+      const days = s.force_delete_grace_end ? Math.max(0, Math.ceil((new Date(s.force_delete_grace_end)-new Date())/86400000)) : null;
+      badge = `<div class="unote" style="color:#f3b6b6">🗑️ törlésre jelölve${graceOver ? " — türelmi idő lejárt" : (days!=null ? ` — ${days} nap van hátra` : "")}</div>`;
+      if(owner && graceOver) actions += `<button class="danger" data-act="finalizedelete" data-id="${s.id}">Végleges törlés</button>`;
+    } else if(owner){
+      actions += cnt>0
+        ? `<button class="danger" data-act="startdelete" data-id="${s.id}">Törlés indítása (${cnt} felhasználó érintett)</button>`
+        : `<button class="danger" data-act="finalizedelete" data-id="${s.id}">Törlés</button>`;
+    }
     return `<div class="userrow"><div class="uinfo"><div class="uname">${esc(s.megjelenites||s.megnevezes)}</div>
-        <div class="unote">${cnt} aktív felhasználó még rajta van</div></div>
-      <div class="uactions"><button data-act="republish" data-id="${s.id}">Újra publikálás</button></div></div>`;
+        <div class="unote">${cnt} aktív felhasználó még rajta van</div>${badge}</div>
+      <div class="uactions">${actions}</div></div>`;
   }).join("");
   return rows || `<p class="msub">Nincs publikálatlan sorozat.</p>`;
 }
@@ -123,6 +140,8 @@ async function handleAction(act, id, series, drafts){
   if(act==="startedit"){ const s=series.find(x=>x.id===id); if(s) await startEdit(s); return; }
   if(act==="unpublish"){ const s=series.find(x=>x.id===id); if(s) await unpublish(s); return; }
   if(act==="republish"){ const s=series.find(x=>x.id===id); if(s) await republish(s); return; }
+  if(act==="startdelete"){ const s=series.find(x=>x.id===id); if(s) await startDelete(s); return; }
+  if(act==="finalizedelete"){ const s=series.find(x=>x.id===id); if(s) await finalizeDelete(s); return; }
   const d=drafts.find(x=>x.id===id); if(!d) return;
   if(act==="claim")   return claim(d);
   if(act==="delete")  return deleteDraft(d);
@@ -186,6 +205,47 @@ async function republish(s){
     if(error) throw error;
     await reload();
   }catch(e){ err(e); }
+  await karbantartasForm();
+}
+
+// Force-törlés indítása (owner-only, csak ha van még aktív kiválasztás —
+// enélkül a finalizeDelete azonnal töröl). 14 napos türelmi idő; a DB-szintű
+// védőháló ezalatt blokkolja a szerkesztés-indítást és az újra-kiválasztást.
+async function startDelete(s){
+  if(!confirm(`Elindítod a(z) „${s.megnevezes}” törlési folyamatát? 14 napos türelmi idő indul, ami alatt az érintett felhasználók minden belépéskor jelzést kapnak, és a sorozat nem szerkeszthető / nem választható be újra. A türelmi idő letelte után véglegesen törölhető.`)) return;
+  try{
+    const { error } = await supabase.rpc("start_force_delete", { p_series_id: s.id });
+    if(error) throw error;
+  }catch(e){ err(e); }
+  await karbantartasForm();
+}
+
+// 0 aktív kiválasztásnál egyszerű megerősítés; türelmi idő letelte után a
+// sorozat nevének pontos begépelése kötelező (a szerver is újra ellenőrzi).
+async function finalizeDelete(s){
+  if(!s.force_delete_requested_at){
+    if(!confirm(`Biztosan véglegesen törlöd a(z) „${s.megnevezes}” sorozatot? Nincs rajta aktív kiválasztás — ez nem vonható vissza.`)) return;
+    await doFinalize(s.id, null);
+    return;
+  }
+  openModal(`<h2>Végleges törlés</h2>
+    <p class="msub">Ez VÉGLEGESEN törli a(z) „${esc(s.megnevezes)}” sorozatot és MINDEN hozzá kapcsolódó, még meglévő felhasználói adatot. Nem vonható vissza. A megerősítéshez írd be pontosan a sorozat nevét:</p>
+    <div class="field"><input id="fd-confirm" placeholder="${esc(s.megnevezes)}"></div>
+    <div class="modrow"><button class="btn ghost" id="fd-cancel">Mégse</button><button class="btn danger" id="fd-go">Végleges törlés</button></div>`);
+  document.getElementById("fd-cancel").onclick=()=>karbantartasForm();
+  document.getElementById("fd-go").onclick=async ()=>{
+    const v=document.getElementById("fd-confirm").value.trim();
+    if(v!==s.megnevezes){ alert("A begépelt név nem egyezik pontosan."); return; }
+    await doFinalize(s.id, v);
+  };
+}
+
+async function doFinalize(seriesId, confirmName){
+  try{
+    const { error } = await supabase.rpc("finalize_delete_series", { p_series_id: seriesId, p_confirm_name: confirmName });
+    if(error) throw error;
+    await reload();
+  }catch(e){ err(e); return; }
   await karbantartasForm();
 }
 

@@ -12,7 +12,7 @@ import { proposeSeriesForm } from "./series-proposal.js";
 export async function mySeriesForm(){
   openModal(`<h2>Sorozataim</h2><p class="msub">Betöltés…</p>`);
   const [{data:series,error:se},{data:mine,error:me}] = await Promise.all([
-    supabase.from("series").select("id,megnevezes,megjelenites,kiado,lifecycle").order("sort_order"),
+    supabase.from("series").select("id,megnevezes,megjelenites,kiado,lifecycle,force_delete_requested_at").order("sort_order"),
     supabase.from("member_series").select("*").eq("user_id",state.myId),
   ]);
   if(se||me){ err(se||me); return; }
@@ -29,9 +29,12 @@ function render(series, mine){
     const selected = !!(m && m.is_selected);
     const deleteBlocked = !!(m && !m.is_selected && m.delete_count>=5);
     const unpublishedBlocked = s.lifecycle==="unpublished" && !selected;
-    const blocked = deleteBlocked || unpublishedBlocked;
+    const deleteMarkedBlocked = !!s.force_delete_requested_at && !selected;
+    const blocked = deleteBlocked || unpublishedBlocked || deleteMarkedBlocked;
     const dcount = m ? m.delete_count : 0;
-    const note = unpublishedBlocked
+    const note = deleteMarkedBlocked
+      ? `<span class="unote" style="color:#f3b6b6">törlésre jelölve — nem választható</span>`
+      : unpublishedBlocked
       ? `<span class="unote" style="color:#f3b6b6">publikálatlan — nem választható újra</span>`
       : deleteBlocked
       ? `<span class="unote" style="color:#f3b6b6">5/5 törlés — nem választható újra</span>`
