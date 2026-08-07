@@ -40,7 +40,7 @@ export function itemForm(existing){
     </div>`;
   }).join("");
 
-  openModal(`<h2>${existing?"Tétel szerkesztése":"Új tétel"}</h2>
+  openModal(`<h2>${existing?"Szám szerkesztése":"Új szám"}</h2>
     <p class="msub">${esc(s.sorozat)}</p>
     <div class="grid2">
       <div class="field"><label>Lapszám</label><input id="f-n" type="number" value="${it.n}"></div>
@@ -61,7 +61,7 @@ export function itemForm(existing){
     </div>
     ${compBlocks}
     <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="f-save">Mentés</button></div>
-    ${existing?`<div class="modrow"><button class="btn danger" id="f-del">Tétel törlése</button></div>`:""}`);
+    ${existing?`<div class="modrow"><button class="btn danger" id="f-del">Szám törlése</button></div>`:""}`);
 
   // státusz-gombok (itt lehet reset-elni)
   sheet.querySelectorAll(".statrow").forEach(row=>{
@@ -107,7 +107,7 @@ export function itemForm(existing){
 
   const delBtn=document.getElementById("f-del");
   if(delBtn) delBtn.onclick=async ()=>{
-    if(!confirm(`Biztosan törlöd a #${existing.n} tételt?`)) return;
+    if(!confirm(`Biztosan törlöd a #${existing.n} számot?`)) return;
     try{ const {error}=await supabase.from("issues").delete().eq("id",existing.id); if(error) throw error;
       closeModal(); await reload(); }catch(e){ err(e); }
   };

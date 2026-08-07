@@ -119,15 +119,15 @@ export async function handleUpload(file){
     ? `<p class="msub" style="color:#f0cd8a">⚠ ${dateWarnings.length} sor dátuma nem volt felismerhető (#${dateWarnings.slice(0,8).join(", #")}${dateWarnings.length>8?"…":""}) — ezeknél a dátum üresen marad, a többi mező feltöltődik.</p>`
     : "";
   const draftNote = updated>0
-    ? `<p class="msub">A ${updated} meglévő tétel törzsadat-módosítása (cím/dátum/ár/azonosító) egy <b>szerkesztési draftba</b> kerül a Karbantartásban — csak publikálás után lesz élő, addig átnézhető. A saját jelöléseid és fizetett áraid MINDIG azonnal frissülnek, draft nélkül.</p>`
+    ? `<p class="msub">A ${updated} meglévő szám törzsadat-módosítása (cím/dátum/ár/azonosító) egy <b>szerkesztési draftba</b> kerül a Karbantartásban — csak publikálás után lesz élő, addig átnézhető. A saját jelöléseid és fizetett áraid MINDIG azonnal frissülnek, draft nélkül.</p>`
     : "";
   openModal(`<h2>Feltöltés megerősítése</h2>
     <p class="msub">Ez a fájl a <b>„${esc(s.sorozat)}”</b> sorozatba kerül.</p>
     ${warnBlock}
     <div class="example" style="font-size:13px">
 ${plan.length} sor feldolgozva a fájlból:
-  • ${added} új tétel jön létre (azonnal élő)
-  • ${updated} meglévő tétel — törzsadata draftba, személyes adata azonnal frissül
+  • ${added} új szám jön létre (azonnal élő)
+  • ${updated} meglévő szám — törzsadata draftba, személyes adata azonnal frissül
 ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új)":" (frissül)"}`).join("\n")}${plan.length>5?"\n  …":""}
 </div>
     ${draftNote}
@@ -175,8 +175,8 @@ ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új
       }
       await reload();
       const msg = draftUpd>0
-        ? `Feltöltve.\nÚj tétel (azonnal élő): ${ins}\nMeglévő tétel törzsadat-módosítása (${draftUpd} db) egy szerkesztési draftba került a Karbantartásban — nézd át és publikáld, ha jó.\nA saját jelöléseid/áraid azonnal frissültek.`
-        : `Feltöltve.\nÚj tétel: ${ins}\nA saját jelöléseid/áraid a meglévő tételeken azonnal frissültek.`;
+        ? `Feltöltve.\nÚj szám (azonnal élő): ${ins}\nMeglévő szám törzsadat-módosítása (${draftUpd} db) egy szerkesztési draftba került a Karbantartásban — nézd át és publikáld, ha jó.\nA saját jelöléseid/áraid azonnal frissültek.`
+        : `Feltöltve.\nÚj szám: ${ins}\nA saját jelöléseid/áraid a meglévő számokon azonnal frissültek.`;
       alert(msg);
     }catch(e){ err(e); }
   };

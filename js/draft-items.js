@@ -23,7 +23,7 @@ export async function fetchDraftItems(draftSeriesId){
 }
 
 export function renderDraftItemsList(items, components){
-  if(!items.length) return `<p class="msub">Még nincs tétel a draftban.</p>`;
+  if(!items.length) return `<p class="msub">Még nincs szám a draftban.</p>`;
   return items.map(it=>{
     const compsTxt = components.map(t=>{
       const c=it.comps.find(x=>x.tipus===t);
@@ -52,7 +52,7 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
     </div>`;
   }).join("");
 
-  openModal(`<h2>${existing?"Tétel szerkesztése (draft)":"Új tétel (draft)"}</h2>
+  openModal(`<h2>${existing?"Szám szerkesztése (draft)":"Új szám (draft)"}</h2>
     <p class="msub">Munkaanyag — publikálásig senki más nem látja.</p>
     <div class="grid2">
       <div class="field"><label>Lapszám</label><input id="di-n" type="number" value="${it.lapszam}"></div>
@@ -62,7 +62,7 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
     <div class="field"><label>Eredeti ár (Ft)</label><input id="di-eredeti" type="number" value="${it.eredeti_ar??""}"></div>
     ${compBlocks}
     <div class="modrow"><button class="btn ghost" id="di-back">Vissza</button><button class="btn" id="di-save">Mentés</button></div>
-    ${existing?`<div class="modrow"><button class="btn danger" id="di-del">Tétel törlése a draftból</button></div>`:""}`);
+    ${existing?`<div class="modrow"><button class="btn danger" id="di-del">Szám törlése a draftból</button></div>`:""}`);
 
   document.getElementById("di-back").onclick=()=>onDone();
   document.getElementById("di-save").onclick=async ()=>{
@@ -86,8 +86,8 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
 
   const delBtn=document.getElementById("di-del");
   if(delBtn) delBtn.onclick=async ()=>{
-    const liveNote = existing.source_issue_id ? " Az élő tételt ez NEM törli — csak azt jelenti, hogy publikáláskor nem frissül." : " Ez csak a munkaanyagot érinti, élő tétel még nem tartozik hozzá.";
-    if(!confirm(`Biztosan törlöd a #${existing.lapszam} tételt a draftból?${liveNote}`)) return;
+    const liveNote = existing.source_issue_id ? " Az élő számot ez NEM törli — csak azt jelenti, hogy publikáláskor nem frissül." : " Ez csak a munkaanyagot érinti, élő szám még nem tartozik hozzá.";
+    if(!confirm(`Biztosan törlöd a #${existing.lapszam} számot a draftból?${liveNote}`)) return;
     try{ const {error}=await supabase.from("draft_issues").delete().eq("id",existing.id); if(error) throw error; }catch(e){ err(e); return; }
     onDone();
   };

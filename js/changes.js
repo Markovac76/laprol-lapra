@@ -80,7 +80,7 @@ export async function showIssueChangePopup(it, s){
       const d = unseenDiffsFor(rows, "component", c.id, seen["component:"+c.id] ?? 0);
       if(d.length) blocks += `<div class="msub" style="margin-top:8px;font-weight:600">${COMP_TYPES[t]||t}</div>${diffHtml(d)}`;
     }
-    openModal(`<h2>#${it.n} változásai</h2><p class="msub">„${esc(s.sorozat)}” — ${it.name?esc(it.name):"ez a tétel"} módosult.</p>
+    openModal(`<h2>#${it.n} változásai</h2><p class="msub">„${esc(s.sorozat)}” — ${it.name?esc(it.name):"ez a szám"} módosult.</p>
       ${blocks || `<p class="msub">Nincs megjeleníthető változás.</p>`}
       <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="chg-ok">OK, nyugtázom</button></div>`);
     document.getElementById("chg-ok").onclick=async ()=>{

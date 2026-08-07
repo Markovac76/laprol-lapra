@@ -104,7 +104,7 @@ function renderMunka(drafts, members){
       }
       return `<div class="userrow"><div class="uinfo"><div class="uname">${typeLabel}</div><div class="unote">${who}</div></div>
         <div class="uactions">${actions}</div></div>`;
-    }).join("") || `<p class="msub">Nincs tétel.</p>`;
+    }).join("") || `<p class="msub">Nincs elem.</p>`;
     return `<h4 class="poolgrp">${label} (${items.length})</h4>${rows}`;
   }).join("");
 }
@@ -278,7 +278,7 @@ async function release(d){
 }
 
 async function deleteDraft(d){
-  if(!confirm(`Biztosan törlöd ezt a tételt: „${d.megnevezes}”?`)) return;
+  if(!confirm(`Biztosan törlöd ezt a munkaanyagot: „${d.megnevezes}”?`)) return;
   try{
     const { error } = await supabase.from("draft_series").delete().eq("id", d.id);
     if(error) throw error;
@@ -325,9 +325,9 @@ function renderEditDraft(d, color, comps, compList, items){
       <div id="d-sw">${PAL_FAMILIES.map(f=>`<div class="swfam"><span class="swfam-nev">${f.nev}</span>
         <div class="swatches">${f.szinek.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-pressed="${c===color}"></button>`).join("")}</div></div>`).join("")}</div></div>
     <div class="modrow"><button class="btn ghost" id="d-back">Vissza</button><button class="btn" id="d-save">Mezők mentése</button></div>
-    <div class="msub" style="margin:16px 0 2px;color:var(--accent);filter:brightness(1.2);font-weight:600">Tételek (${items.length})</div>
+    <div class="msub" style="margin:16px 0 2px;color:var(--accent);filter:brightness(1.2);font-weight:600">Számok (${items.length})</div>
     <div id="d-items">${renderDraftItemsList(items, comps)}</div>
-    <div class="modrow"><button class="btn ghost" id="d-additem">+ Új tétel</button></div>`);
+    <div class="modrow"><button class="btn ghost" id="d-additem">+ Új szám</button></div>`);
 
   const dEl=document.getElementById("d-display"), cEl=document.getElementById("d-count");
   dEl.addEventListener("input",()=>cEl.textContent=`${dEl.value.length}/${DISPLAY_MAX}`);

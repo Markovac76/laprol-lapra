@@ -30,7 +30,7 @@ export function renderHero(){
     return `<div class="prog"><div class="lab"><span>${COMP_TYPES[t]||t}</span><b>${p.owned}/${p.total} · ${pct}%</b></div><div class="bar"><i style="width:${pct}%"></i></div></div>`; }).join("");
   const bottom=st.next
     ? `<div class="stat wide"><div class="k">Következő megjelenés</div><div class="v" style="font-size:14px">${fmtDate(st.next.date)}</div><div class="sub">#${st.next.n} · ${esc(st.next.name||"még nincs cím")}</div></div>`
-    : `<div class="stat wide"><div class="k">Beszerzendő lapszám</div><div class="v">${st.beszerzendo} db</div><div class="sub">hiányzó vagy még jelöletlen</div></div>`;
+    : `<div class="stat wide"><div class="k">Beszerzendő szám</div><div class="v">${st.beszerzendo} db</div><div class="sub">hiányzó vagy még jelöletlen</div></div>`;
   const closed = !st.hasFuture ? `<span class="closedtag">lezárt sorozat</span>` : "";
   const fizetettBasis = state.costBasis==="fizetett";
   const total = fizetettBasis ? st.fizetettTotal : st.eredetiTotal;
@@ -120,7 +120,7 @@ function imageControlsHtml(c, componentId){
 export function renderListHead(){
   const s=S();
   document.getElementById("listhead").innerHTML =
-    `<span class="lh-left">lapszám</span>` +
+    `<span class="lh-left">szám</span>` +
     s.components.map(t=>`<span class="lh-c">${COMP_TYPES[t]||t}</span>`).join("") +
     `<span style="width:34px"></span>`;
 }
