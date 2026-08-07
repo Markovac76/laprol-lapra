@@ -121,8 +121,15 @@ function renderPublikalatlan(series, memberSeries){
     let actions = `<button data-act="republish" data-id="${s.id}">Újra publikálás</button>`;
     if(pending){
       const days = s.force_delete_grace_end ? Math.max(0, Math.ceil((new Date(s.force_delete_grace_end)-new Date())/86400000)) : null;
-      badge = `<div class="unote" style="color:#f3b6b6">🗑️ törlésre jelölve${graceOver ? " — türelmi idő lejárt" : (days!=null ? ` — ${days} nap van hátra` : "")}</div>`;
-      if(owner && graceOver) actions += `<button class="danger" data-act="finalizedelete" data-id="${s.id}">Végleges törlés</button>`;
+      // A türelmi idő kizárólag az aktív kiválasztók védelmére van — ha időközben
+      // mindenki leválasztotta magát, a végleges törlés a hátralévő napoktól
+      // függetlenül azonnal elérhető.
+      const canFinalize = graceOver || cnt===0;
+      const badgeText = graceOver ? "türelmi idő lejárt"
+        : cnt===0 ? "nincs már aktív felhasználó — most már véglegesíthető"
+        : (days!=null ? `${days} nap van hátra` : "");
+      badge = `<div class="unote" style="color:#f3b6b6">🗑️ törlésre jelölve${badgeText?" — "+badgeText:""}</div>`;
+      if(owner && canFinalize) actions += `<button class="danger" data-act="finalizedelete" data-id="${s.id}">Végleges törlés</button>`;
     } else if(owner){
       actions += cnt>0
         ? `<button class="danger" data-act="startdelete" data-id="${s.id}">Törlés indítása (${cnt} felhasználó érintett)</button>`
