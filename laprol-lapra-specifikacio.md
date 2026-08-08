@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.6 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.7 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -83,7 +83,7 @@ UUID · kód · **kiadó** · **megnevezés** (teljes név) · **megjelenítend�
 
 ### 5.2 Szám (= „tartó") **[DÖNTVE · v1.4-ben átrendezve]**
 **Közös törzsadat (a számon ül, mindenki ugyanazt látja, csak admin/owner szerkeszti):**
-UUID · kód · **lapszám** · **cím** · **megjelenés dátuma** (elhagyható) · **eredeti ár** (a megjelenéskori/újságos referencia-ár az egész számra, korábban „fedélár", elhagyható). A szám önmagában nem birtokol státuszt — a státusz a komponenseké.
+UUID · kód · **lapszám** · **cím** · **megjelenés dátuma** (elhagyható) · **eredeti ár** (a megjelenéskori/újságos referencia-ár az egész számra, korábban „fedélár", elhagyható) · **`is_deleted`** (v1.7 — lásd 13.8, soft-delete). A szám önmagában nem birtokol státuszt — a státusz a komponenseké.
 
 **Személyes, szám-szintű adat (felhasználónként, `member_issue_data` tábla — v1.4):**
 **fizetett ár** (amennyiért Ő ténylegesen megszerezte) · **beszerzési mennyiség** (db, alapértelmezetten 1 — hány db-ot vett egy vételből; ez szorozza a fizetett árat az összesítésnél) · **beszerzés dátuma** · **beszerzés forrása**. Ezek nem komponenshez, hanem a **számhoz** tartoznak, de **személyesek** (mindenki a sajátját rögzíti). **[DÖNTVE, v1.4]**
@@ -132,7 +132,7 @@ RBA — II. vh. repülők (60) · Centuria — Forma 1 (60) · Hachette — Disn
 
 **Fizetett ár — automatikus kitöltés/nullázás [DÖNTVE, v1.5]:** amikor egy tétel **először** kap ≥1 `megvan` komponenst és a felhasználónak még nincs `fizetett_ar` értéke → automatikus kitöltés: `fizetett_ar = eredeti_ar` (vagy „nem ismert", ha az is az). Ha már van értéke (auto vagy kézi), további `megvan` **nem** írja felül. Ha az **összes** `megvan`-t visszavonja, a fizetett ár visszaáll „nem ismert"-re — de **csak ha auto-kitöltésű volt**; a kézzel beírt árat megőrzi. Az auto/kézi megkülönböztetést a `member_issue_data.ar_auto` mező adja. A logika kliens-oldali (a gyors jelölés/léptetés kezelőjében).
 
-**Fizetett ár — kézi szerkesztése MINDENKINEK [DÖNTVE, v1.5]:** a lenyíló panelben egy **✎** ikonról bárki (nem csak staff) szerkesztheti a **saját** `fizetett_ar` (+ beszerzési mennyiség, dátum, forrás) mezőit — kizárólag a `member_issue_data` saját sorát, a törzsadatot soha. Az ár: nem-negatív egész (0 megengedett) **vagy** „nem ismert". Kézi mentés → `ar_auto=false`.
+**„Saját adatlap" — konszolidált személyes-adat panel [DÖNTVE, megvalósítva — v1.7, hibajavítási kör 1+5. pont]:** a lenyíló panelben egy **✎** ikonról bárki (nem csak staff) megnyithatja — ez leváltotta a korábbi, csak-ár-szerkesztő `price-edit.js`-t. Egy helyen kezeli: komponensenként a **Státusz** (megvan/hiány/nem kell/jelöletlen — a jelöletlenre való visszaállítás is innen megy, MINDENKINEK, nem csak staffnak), a **Darabszám**, a **Jegyzet**, az (olvasható) Azonosító, valamint szám-szinten a **Fizetett ár** (+ „nem ismert" jelölő), beszerzési mennyiség, dátum, forrás. Kizárólag a `member_status`/`member_issue_data` saját sorait írja, a törzsadatot soha. Az ár: nem-negatív egész (0 megengedett) **vagy** „nem ismert". Kézi mentés → `ar_auto=false`.
 
 ### 5.6 Közös listatár (kötött, bővíthető listák) **[DÖNTVE]**
 A szabad szöveges mezők elgépelhetők, és ez később a címkerendszert is összezavarná. Ezért egy **közös listatár** (egy tábla, több listatípussal) szolgálja ki a választható értékeket:
@@ -163,7 +163,7 @@ megvan · hiány · nem kell · jelöletlen. A színek: **megvan = zöld**, **hi
 ### 6.2 Jelölés (körbeforgó) **[DÖNTVE]**
 - Az első koppintás jelöletlenről → **megvan**.
 - Utána körbeforog: megvan → hiány → nem kell → megvan…
-- **Jelöletlenre nem tér vissza.** A státusz **reset-elése kizárólag a szerkesztő ablakban** lehetséges.
+- **Jelöletlenre nem tér vissza koppintással.** A státusz **reset-elése a „Saját adatlap" ablakban** lehetséges — ez mindenkinek elérhető, nem staff-funkció (v1.7).
 - **Jövőbeli dátumú** szám komponensei nem állíthatók (a gombok letiltva).
 
 ### 6.3 Komponens-hierarchia **[DÖNTVE]**
@@ -219,15 +219,11 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 - **Lista (kompakt):** egy sor / lapszám — szám, cím, **ár két külön sorban** (eredeti ár / fizetve — 5.5), jobbra **komponensenként egy-egy ikonos jelölő** (a gomb alatt rövid felirat: megvan / hiány / nem kell). Ha egy komponensből 1-nél több van, a **darabszám a gombon** jelenik meg (csak kijelzés; a léptetés a panelben — 6.5). **[DÖNTVE · v1.5]**
 - **Tapadó fejléc:** a lista fölött rögzített sáv nevezi meg az oszlopokat (Magazin / Modell / Könyv) — mint Excelben a fagyasztott sor. **[DÖNTVE]**
 - **Lenyíló panel:** a sor végén nyíl; lenyitva komponensenként **egy-egy azonos méretű kép** (alatta a komponens neve/kódja; ha nincs kép: „nincs adat"), **komponensenkénti +/− darabszám-léptető** (6.5), és egy **személyes ár-blokk** (eredeti ár + saját fizetett ár, **✎** ikonnal szerkeszthető — 5.5). **Alapból csukott, egyszerre csak egy nyitható**, sorozat-/szűrő-/keresésváltáskor visszazár. **[DÖNTVE · v1.5]**
-- **Karbantartó mód:** tétel/komponens szerkesztése-törlése, új tétel, új sorozat, sorozat szerkesztése; **státusz-reset**; a **listatár bővítése**. *(Építés alatt — 5b.)*
-- **Excel-alapú betöltés (csak asztali/laptop, telefonon rejtve):** sablon letöltése (**a sorozat komponens-készletéből származtatva**) + kitöltött fájl feltöltése; sorszám szerinti, nem-romboló frissítés. **[DÖNTVE]**
+- **🔧 Gyors szerkesztés eszköztár [DÖNTVE, megvalósítva — v1.7]:** vadonatúj Szám azonnali felvitele („+ Új tétel" — nincs mit védeni rajta), a listatár bővítése („☰ Listák"), és Excel-alapú tömeges import a kiválasztott, élő sorozathoz („⬇ Sablon"/„⬆ Excel" — minden nézeten elérhető, telefonon is). Egy MÁR LÉTEZŐ Szám törzsadatát (cím, dátum, ár, azonosító, komponens-típus) ez az eszköztár nem módosítja/törli közvetlenül — ahhoz mindig a Karbantartás draft/publikálás útja kell (13.5–13.8), hogy a felhasználók megkapják a felkiáltójel-jelzést. A saját (személyes) adatokat bárki bármikor, közvetlenül a **„Saját adatlap"** ✎ ikonjával szerkesztheti, draft nélkül (5.5).
 - **Kép csatolása:** komponens-szinten (Supabase Storage). *(Építés alatt.)*
 - **Bejelentkezés megőrzése:** tartós munkamenet, hogy telefonon ne kelljen újra belépni; élesben „kezdőképernyőhöz adás" (PWA) is szóba jön. **[DÖNTVE]**
 
-**Nézetek és eszközök [DÖNTVE]:** egy közös, reszponzív felület — **nincs külön „gyors nézet", és nincs vizuális eltérés** az eszközök közt; csak a funkciók elérhetősége tér el.
-- **Telefon / tablet:** beszerzés + karbantartás (státuszok jelölése, keresés, szűrés, böngészés, kép fotóval, egyszerű szerkesztés). A nehéz, fájl-alapú műveletek (Excel-sablon + drag & drop feltöltés) itt **nem elérhetők**.
-- **Asztali / laptop:** mindez + **adminisztráció** (sablon letöltése/feltöltése, tömeges műveletek).
-- A tablet a telefonnal egy csoportban (karbantartás-szerep); az admin-funkciók elrejtése az **eszköz jellegére** (érintős/méret) figyel, nem csak a szélességre. (Megvalósítás: építési részlet.)
+**Nézetek és eszközök [DÖNTVE, v1.7-ben pontosítva]:** egy közös, reszponzív felület — **nincs külön „gyors nézet", és nincs vizuális eltérés** az eszközök közt. A funkciók elérhetősége szerep szerint tér el (user/staff), NEM eszköz szerint — a korábbi „Excel-sablon csak asztalin" korlátozás megszűnt (hibajavítási kör 12. pont, v1.7): staff a ⬇ Sablon/⬆ Excel gombokat telefonon is eléri, ott is meg tudja nyitni a fájl-választót (bár a fájl kitöltése/rendezése gyakorlatilag asztali munka marad).
 
 ---
 
@@ -237,7 +233,7 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 - **Supabase (a modul saját projektje):** adatbázis + Storage (képek) + Auth (privát bejelentkezés). **[DÖNTVE]**
 - A felület **közvetlenül** a Supabase-hez fordul — nincs külön proxy. **[DÖNTVE]**
 - **Privát**, **szinkron** telefon és gép közt (közös háttér). **[DÖNTVE]**
-- **Felület felépítése [DÖNTVE, v1.4, bővítve v1.6]:** natív **ES modulok**, **build-eszköz nélkül**. `index.html` (markup) + `styles.css` + `js/` mappa: `state`, `supabase`, `modal`, `permissions`, `data`, `render`, `personal`, `price-edit`, `admin-forms`, `admin-users`, `excel`, `auth`, `main` (alap), · `my-series`, `series-proposal` (sorozat-választás/javaslás), `karbantartas`, `draft-items` (életciklus, draft-szerkesztés), `changes` (verziókövetés/felkiáltójel), `component-images`, `image-resize` (képkezelés — v1.6). A `supabase-js` és az `xlsx` CDN-ről, ESM-ként. (A mutálható app-állapot egy közös `state` objektumban.)
+- **Felület felépítése [DÖNTVE, v1.4, bővítve v1.6/v1.7]:** natív **ES modulok**, **build-eszköz nélkül**. `index.html` (markup) + `styles.css` + `js/` mappa: `state`, `supabase`, `modal`, `permissions`, `data`, `render`, `personal`, `admin-forms`, `admin-users`, `excel`, `auth`, `main` (alap) · `my-series`, `series-proposal` (sorozat-választás/javaslás), `karbantartas`, `draft-items` (életciklus, draft-szerkesztés), `changes` (verziókövetés/felkiáltójel), `component-images`, `image-resize` (képkezelés — v1.6) · `my-data` (konszolidált „Saját adatlap", v1.7 — leváltotta a régi `price-edit`-et), `draft-excel` (sablon-alapú tömeges tétel-feltöltés draftokhoz, v1.7), `help`, `help-content` (beépített súgó, v1.7). A `supabase-js` és az `xlsx` CDN-ről, ESM-ként. (A mutálható app-állapot egy közös `state` objektumban.)
 - **Jogosultság:** háromszintű szerep a `members` táblában, RLS-sel és belépéskori ellenőrzéssel — lásd 13.
 
 ---
@@ -283,11 +279,13 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 9. **Kép nagyítása:** a lenyíló képsávban a képre koppintva teljes képernyős nézet — hasznos lehet, még nem épült meg.
 10. **Kettőnél több nem-magazin komponens** esetén a hierarchia pontosítása (jelenleg nem aktuális).
 11. **További „nagy kép" szempontok**, ha felmerülnek.
-12. **Excel-import összehangolása a draft/pool-folyamattal — DÖNTVE, DE MÉG NEM ÉPÍTVE [NYITOTT, megvalósítás]** A sorozatkezelés-újratervezés (13.5–13.7) idején megszületett a döntés: publikált sorozatra irányuló import, MEGLÉVŐ tételek módosítása → automatikusan nyisson/töltsön egy szerkesztési draftot, a szokásos publikálás-folyamat (diff+verzióemelés+felkiáltójel) fusson le rá; ÚJ tétel/komponens hozzáadása → közvetlen írás, nincs mit védeni; nem publikált (munkaanyag) sorozatra irányuló import → változatlanul közvetlen írás. **Ez a döntés még nincs átvezetve a kódba** — a `js/excel.js` ma is minden esetben közvetlenül ír az élő `issues`/`components` táblákba, a draft/verzió/felkiáltójel-mechanizmus teljes megkerülésével. Lásd `allapot-osszefoglalo.md` 5. és 8. pontja.
+12. **Excel-import összehangolása a draft/pool-folyamattal — [LEZÁRVA, megvalósítva]** A döntés (publikált sorozatra irányuló import, MEGLÉVŐ tételek módosítása → szerkesztési draftba, szokásos publikálás-folyamattal; ÚJ tétel/komponens → közvetlen írás, nincs mit védeni) átvezetve a kódba (`js/excel.js`). Mellékesen javítva egy dormant hiba: a komponens-státusz korábban a holt `components.status` oszlopba íródott a személyes `member_status` helyett.
 
 ---
 
-## 11. Állapot most (építés)
+## 11. Állapot most (építés) **[TÖRTÉNETI — a korai (5a/5b) építési fázis pillanatképe, azóta minden pontja lezárult]**
+
+*Ez a fejezet a projekt legkorábbi, „még csak épül" állapotát rögzíti — ma már minden itt felsorolt pont kész (Karbantartás, képkezelés, publikálás GitHub+Vercelre), sőt jóval továbbfejlődött (13. fejezet, hibajavítási körök). Változatlanul hagyva, mint történeti jegyzet.*
 
 **Kész és él:**
 - **Supabase-projekt** (Frankfurt, Free), táblák: `series`, `issues`, `components`, `lists` — mind **RLS**-sel védve (csak a saját adat).
@@ -414,9 +412,24 @@ Végleges törlés csak **publikálatlan** sorozatra, kizárólag **owner** jogo
 
 SQL: `laprol-lapra-sorozatkezeles-5-force-torles.sql`.
 
+### 13.8 Hibajavítási kör kiegészítései a draft-rendszerhez **[DÖNTVE, megvalósítva — v1.7]**
+A 15-pontos hibajavítási kör (élő tesztelésből) három érdemi bővítést hozott a 13.5–13.7-ben leírt draft/publikálás-architektúrára:
+
+**Szám-törlés (soft-delete) [1+5. pont].** A staff-only „Tétel szerkesztése" gyors-panel megszűnt (lásd 5.5, 7. fejezet) — egy MÁR ÉLŐ Szám törzsadatát innentől kizárólag a Karbantartás draft-szerkesztője módosíthatja/törölheti. A törlés NEM fizikai `DELETE`: az élő `issues.is_deleted` mezőt a draft `deleted` jelzője a szokásos diff/verzió/`change_log` gépezeten át `false→true`-ra állítja publikáláskor — ez azért kritikus, hogy a felkiáltójel/gyűjtött-elfogadás felület a törlés UTÁN is tudjon róla értesíteni (azok a nézetek csak a MÉG LÉTEZŐ sorokon iterálnak). A felhasználó a törölt Számot áthúzva, „Ez a szám törölve lett a sorozatból." üzenettel látja, amíg nem nyugtázza; nyugtázáskor a saját (`member_status`/`member_issue_data`) adatai arról a Számról törlődnek. A `stats()`/`renderChips()` a törölt Számokat kihagyja a haladás-számításból.
+
+**Komponens-típus utólagos átsorolása [14. pont].** Ha egy komponens korábban pl. „Egyéb"-ként lett felvéve, mert a pontos típus még nem létezett a listatárban, a draft-szerkesztőben (egy már létező komponensnél) egy típus-választó legördülő engedi átsorolni a listatár aktuális típusaira — egyedi, komponensenkénti korrekció, a szokásos publikálás/felkiáltójel-mechanizmuson át. Ütközésvédelem: két komponens egy Számon nem sorolható ugyanarra a típusra. Ha az új típus még nincs a sorozat komponens-készletén, automatikusan felkerül oda (különben az élő felület sehol nem jelenítené meg — minden nézet a sorozat deklarált komponens-listáján iterál).
+
+**Sablon-alapú tömeges tétel-feltöltés draftokhoz [11. pont].** Eddig csak egyesével lehetett Számot felvinni egy draftba. Új, közös modul (`draft-excel.js`) ad sablon letöltést/feltöltést két helyen: (a) az „Új sorozat javaslása" beküldés utáni köztes lépésében, (b) a Karbantartás draft-szerkesztőjében (mindkét draft-típusnál). Technikai részlet: a `draft_issues`/`draft_components` RLS-e staff-only, ezért a javaslat-beküldő saját, MÉG FEL NEM VETT javaslatához egy külön, szűk jogosultság-ellenőrzésű SQL-függvény (`propose_bulk_issues`) enged tömeges beszúrást — csak a beküldőnek, csak staff-i átvétel előtt. Ütköző (már létező) lapszámokat a feltöltés kihagyja, nem ír felül.
+
+SQL-ek: `laprol-lapra-hibajavitas-1-5-szam-torles-sajat-adatlap.sql`, `-14-komponens-atsorolas.sql`, `-11-sablon-tomeges-feltoltes.sql`.
+
+### 13.9 Beépített súgó **[DÖNTVE, megvalósítva — v1.7]**
+❓ fejléc-gomb, mindenkinek elérhető, permission-gated tartalommal: „Felhasználói" fül (mindenki) + „Adminisztrátori" fül (csak staffnak látszik). 17 kategória, kérdés-válasz formában (`js/help-content.js`), a TÉNYLEGES felület/kód alapján írva (nem a specifikáció tervezési nyelvén) — gombfeliratok, ikonok, folyamat-lépések az élő appból. Terminológia egységesítve: a gyűjthető egység mindig „Szám" (hibajavítási kör 3. pont).
+
 ---
 
 *Napló:*
+- v1.7 — **Hibajavítási kör** (élő tesztelésből, 15 pont, `claude-code-4-lepes-hibajavitasok.md`), teljesen lezárva: mobil UI/CSS finomítások (chips-görgetősáv, felkiáltójel-badge pozíció, fejléc-gomb sorrend/hangsúly, kép-placeholder méret); terminológia-egységesítés („Szám" mindenütt); egységes, kézzel írt inline SVG-ikonrendszer (a natív emoji platformfüggő megjelenése helyett); force-törlés korai lezárása (ha a türelmi idő alatt 0-ra csökken az aktív kiválasztás); **a staff-only „Tétel szerkesztése" gyors-panel megszűnt**, helyette mindenkinek elérhető **„Saját adatlap"** (5.5) + a Karbantartás draft-útja minden törzsadat-módosításra, Szám-törlés **soft-delete-tel** (13.8); komponens-típus utólagos átsorolása (13.8); **sablon-alapú tömeges tétel-feltöltés** draftokhoz, két helyen (13.8); a meglévő, élő sorozatokhoz tartozó Excel-sablon gombok mostantól minden nézeten (mobilon is) elérhetők, a „+ Új tétel"/„☰ Listák" gombokkal egy sorban; a 🗂️ Karbantartás és 📚 Sorozataim fejléc-gomb helyet cserélt; **beépített súgó** (13.9). Mellékesen javítva egy önálló, a kör közben talált RLS-hiba: a javaslat-beküldés (`draft_series` insert) egy `.select()`-es visszaolvasás miatt minden nem-staff felhasználónál elbukott (a SELECT-szabály staff-only, Postgres az `INSERT...RETURNING` kimenetét is átengedi rajta) — javítva kliens-oldali id-generálással, RLS-módosítás nélkül. Az Excel-import/draft-pool összehangolása (10. fejezet 12. pontja, korábban „döntve, de nem építve") ezzel a körrel egy időben szintén lezárva.
 - v1.6 — **Sorozatkezelés teljes újratervezése és megvalósítása** (5 lépésben): **(1)** kiválasztás rétege — `member_series`, „📚 Sorozataim" választó, a fülsáv innentől csak a saját bepipált sorozatokból épül (13.3, az 5×-ös törlési limit később elvetve). **(2)** sorozat-életciklus állapotgép (Beérkezett/Munkaanyag/Publikálásra váró/Aktív/Publikálatlan) + „🗂️ Karbantartás" staff-only menüpont, `draft_series` pool — a régi közvetlen „+ Új sorozat"/„✎ Sorozat" gombok megszűntek, minden sorozat-törzsadat-módosítás a pool-on megy át (13.5). **(3)** `draft_issues`/`draft_components` — a szerkesztés-indítás a teljes élő adatot átmásolja a draftba; `publish_draft_series()` SQL-függvény egy tranzakcióban diffel/verzióz/frissít; felkiáltójel-mechanizmus (`change_log`, `member_seen`) négy helyen (13.6). Mellékesen javítva: a sorozat-kód számláló globálissá vált. **(4)** teljes képkezelés-csővezeték a semmiből: közös, publikus Storage bucket, kliens-oldali átméretezés, staff közvetlen feltöltés, user-javaslat workflow helyi (nem külön queue) elbírálással (5.3). **(5)** force-törlés — owner-only, 0 aktív kiválasztásnál azonnali, egyébként 14 napos türelmi idővel, kétszintű védőhálóval (13.7); mellékesen lezárva egy talált RLS-rés (a `series` tábla eddig staffnak közvetlen törlést is engedett volna). SQL-ek: `laprol-lapra-sorozatkezeles-1` … `-6` (az utolsó a törlési limit utólagos elvetése).
 - v1.5 — **UX-csomag:** a „Felhasználók" önálló 👥 fejléc-gomb lett (a 🔧 eszköztárból kivéve, staff-only); kilépéskor a sorozat-accent visszaáll semlegesre; nagyobb fejléc-ikonok és „összeg" gomb; a lista „eredeti ár / fizetve" **két külön sorban**; a **+/− léptetők a listából a lenyíló panelbe** kerültek (nagyobb gombok). **Ár-logika:** **„nem ismert"** felirat a NULL árakra; **automatikus fizetett-ár** kitöltés (első `megvan`-ná váláskor `fizetett_ar = eredeti_ar`) és nullázás (minden `megvan` visszavonásakor — a kézi árat `ar_auto` jelző őrzi); **személyes ár-szerkesztő MINDENKINEK** a panel ✎ ikonjáról (csak `member_issue_data`); az **„Eredeti ár alapján"** szorzó a **domináns** komponens (a színezéssel egyezően), nem magazin/könyv; **„+nem ismert" badge** a NULL-áras bevont tételekre. SQL: `laprol-lapra-ar-auto.sql` (ar_auto oszlop). Fix: a panel-léptető szelektora (`.pstepbtn`).
 - v1.4 — **háromszintű jogosultság** (user/admin/owner; `members` tábla `role`/`status`/`display_name`; **letiltás** [nem törlés], letiltott fiók belépéskor kirúgva; felhasználó-kezelő UI „👥 Felhasználók"; `SECURITY DEFINER` segédfüggvények + oszlop-védő trigger; staff-alapú törzsadat-RLS; a tulajdonos sora védett). **Ár-modell szétválasztás:** „fedélár" → **Eredeti ár** (közös törzsadat), a személyes ár-adat (fizetett ár, beszerzési mennyiség, dátum, forrás) a **`member_issue_data`** táblába; **kétnézetes hero** („Eredeti ár" / „Fizetett ár alapján") + megjelenítési szabály: a „fizetve"/összeg **csak megvett tételre** (≥1 komponens `megvan`) számít. **Fájlszétbontás:** `index.html` → natív **ES modulok** (`js/`) + `styles.css`, build-eszköz nélkül. **Adatjavítás:** régi ezres-tagolási korrupció (II VH Repülők #5–60: 5→5990) egyszeri, forrás-alapú SQL-lel visszatöltve, `<100` szűrővel; a személyes fizetett ár teljessé téve. SQL-ek: `jogosultsag-1/2/3`, `arjavitas`, `fizetett-teljesseg`.
