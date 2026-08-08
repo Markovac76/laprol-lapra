@@ -302,5 +302,9 @@ footer{color:var(--faint);font-size:11.5px;text-align:center;padding:8px 0 26px}
 .helpa ol,.helpa ul{margin:0 0 6px;padding-left:20px}
 .ownertag{font-size:10.5px;font-weight:700;color:var(--amber);background:var(--amber-d);
   border:1px solid var(--amber);border-radius:999px;padding:1px 8px;vertical-align:middle}
+
+/* --- Törölt Szám (elfogadásra vár) --- */
+.issue-deleted{border-style:dashed;opacity:.8}
+.issue-deleted .imeta{font-size:12.5px;font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (max-width:380px){.stats{grid-template-columns:1fr}}

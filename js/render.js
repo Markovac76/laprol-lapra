@@ -66,8 +66,8 @@ const FILTERS=[["mind","Mind"],["megvan","Megvan"],["hianyzik","Hiányzik"],["ne
 function issueHasStatus(it,s,stt){ return s.components.some(t=>it.comps[t]&&it.comps[t].status===stt); }
 
 export function renderChips(){
-  const s=S();
-  const c=id=> id==="mind"?s.items.length : id==="varhato"?s.items.filter(it=>it.date&&it.date>=todayISO).length : s.items.filter(it=>issueHasStatus(it,s,id)).length;
+  const s=S(); const activeItems=s.items.filter(it=>!it.deleted);
+  const c=id=> id==="mind"?activeItems.length : id==="varhato"?activeItems.filter(it=>it.date&&it.date>=todayISO).length : activeItems.filter(it=>issueHasStatus(it,s,id)).length;
   const fl=FILTERS.filter(([id])=>id!=="varhato"||c("varhato")>0);
   if(state.filter==="varhato"&&c("varhato")===0) state.filter="mind";
   const chgBtn = s.anyChanged ? `<button class="chip chgchip" id="collectedChgBtn" title="Összes változás ebben a sorozatban">!</button>` : "";
@@ -126,10 +126,24 @@ export function renderListHead(){
 }
 
 export function renderList(){
-  const s=S(), items=s.items.filter(matches), list=document.getElementById("list");
+  const s=S(), list=document.getElementById("list");
+  // Törölt tétel a szűrőtől/kereséstől függetlenül mindig látszik, amíg el nem
+  // fogadja a user a törlés-jelzést (a felkiáltójel innen nyitható) — utána
+  // véglegesen eltűnik a nézetből.
+  const items=s.items.filter(it=> it.deleted ? it.changed : matches(it));
   if(!items.length){ list.innerHTML=`<div class="empty-state">Nincs a szűrőnek megfelelő szám.</div>`; return; }
   const scode=pad(S().kodSzam||(state.activeIdx+1),3);
   list.innerHTML=items.map(it=>{
+    if(it.deleted){
+      return `<div class="issue issue-deleted"><div class="ihead">
+        <div class="num">#${it.n}</div>
+        <div class="rmain">
+          <div class="ititle" style="text-decoration:line-through;color:var(--faint)">${esc(it.name||"nincs cím")}</div>
+          <div class="imeta" style="color:#f3b6b6">Ez a szám törölve lett a sorozatból.</div>
+        </div>
+        <div class="marks"><button class="chgbtn" data-changeissue="${it.n}" title="Részletek / elfogadás">!</button></div>
+      </div></div>`;
+    }
     const future=it.date&&it.date>todayISO;
     const istate=issueState(it,s);
     const hasPendingImg = isStaff() && s.components.some(t=>it.comps[t] && it.comps[t].pending);
@@ -162,7 +176,7 @@ export function renderList(){
       }).join("") + `</div>
       <div class="panelmoney">
         <div class="pmrow"><span class="pmk">eredeti ár</span><span class="pmv">${it.eredeti_ar!=null?fmtFt(it.eredeti_ar):"nem ismert"}</span></div>
-        <div class="pmrow"><span class="pmk">fizetve</span><span class="pmv">${it.fizetett_ar!=null?fmtFt(it.fizetett_ar):"nem ismert"}</span><button class="pmedit" data-editprice="${it.n}" title="Saját beszerzési adat szerkesztése">✎</button></div>
+        <div class="pmrow"><span class="pmk">fizetve</span><span class="pmv">${it.fizetett_ar!=null?fmtFt(it.fizetett_ar):"nem ismert"}</span><button class="pmedit" data-mydata="${it.n}" title="Saját adatlap (státusz, darabszám, jegyzet, ár)">✎</button></div>
       </div>` : "";
     return `<div class="issue${istate?" i-"+istate:""}"><div class="ihead">
       <div class="num">#${it.n}${it.changed?`<button class="chgbtn onnum" data-changeissue="${it.n}" title="Mi változott?">!</button>`:""}</div>
@@ -172,7 +186,6 @@ export function renderList(){
         ${moneyBlock}
       </div>
       <div class="marks">${marks}
-        ${state.adminMode?`<button class="rowedit" data-edit="${it.n}" title="Szerkesztés">✎</button>`:""}
         <button class="expander" data-exp="${it.n}" aria-expanded="${open}" aria-label="Képek">${CHEV}${hasPendingImg?'<span class="chgdot img" title="Függő képjavaslat">📷</span>':""}</button>
       </div>
     </div>${panel}</div>`;

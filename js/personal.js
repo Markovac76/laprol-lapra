@@ -20,6 +20,16 @@ export async function upsertMyIssueData(issueId, fields){
   return error;
 }
 
+// Egy törölt Szám elfogadásakor (a felkiáltójel OK gombja) a SAJÁT adatok
+// törlése erről a Számról — komponensenkénti státusz/darabszám/jegyzet és a
+// szám-szintű beszerzési adat. Mást (más userek adatát, a törzsadatot) nem érint.
+export async function purgeMyDataForIssue(issueId, componentIds){
+  if(componentIds && componentIds.length){
+    await supabase.from("member_status").delete().eq("user_id",state.myId).in("component_id",componentIds);
+  }
+  await supabase.from("member_issue_data").delete().eq("user_id",state.myId).eq("issue_id",issueId);
+}
+
 // Automatikus fizetett-ár kitöltés / nullázás egy tétel megvan-állapotának változásakor.
 // prevOwned = volt-e ≥1 'megvan' komponens a változás ELŐTT. A hívó a jelölés/léptetés
 // mentése UTÁN hívja (a komponens állapota ekkor már a friss). Mutálja az it-et is.

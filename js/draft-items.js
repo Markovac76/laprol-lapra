@@ -33,6 +33,7 @@ export function renderDraftItemsList(items, components){
         <div class="uname">#${it.lapszam}${it.cim?" – "+esc(it.cim):""}</div>
         <div class="unote">${it.megjelenes?fmtDate(it.megjelenes):"nincs dátum"}${it.eredeti_ar!=null?" · "+it.eredeti_ar+" Ft":""}</div>
         <div class="unote">${compsTxt}</div>
+        ${it.deleted?'<div class="unote" style="color:#f3b6b6">🗑️ törlésre jelölve publikáláskor</div>':""}
       </div>
       <div class="uactions"><button data-diedit="${it.id}">Szerkesztés</button></div>
     </div>`;
@@ -61,6 +62,7 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
     <div class="field"><label>Cím</label><input id="di-name" value="${esc(it.cim||"")}"></div>
     <div class="field"><label>Eredeti ár (Ft)</label><input id="di-eredeti" type="number" value="${it.eredeti_ar??""}"></div>
     ${compBlocks}
+    ${existing&&existing.source_issue_id?`<label class="ckrow" style="margin-top:10px"><input type="checkbox" id="di-deleted" ${it.deleted?"checked":""}> Ezt a Számot törlöm a sorozatból (publikáláskor)</label>`:""}
     <div class="modrow"><button class="btn ghost" id="di-back">Vissza</button><button class="btn" id="di-save">Mentés</button></div>
     ${existing?`<div class="modrow"><button class="btn danger" id="di-del">Szám törlése a draftból</button></div>`:""}`);
 
@@ -68,8 +70,9 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
   document.getElementById("di-save").onclick=async ()=>{
     const v=id=>{const e=document.getElementById(id);return e?e.value.trim():"";};
     const n=parseInt(v("di-n")); if(isNaN(n)){alert("A lapszám kötelező.");return;}
+    const delCk=document.getElementById("di-deleted");
     const master={ draft_series_id:draftSeriesId, lapszam:n, cim:v("di-name")||null, megjelenes:v("di-date")||null,
-      eredeti_ar:v("di-eredeti")?parseInt(v("di-eredeti")):null };
+      eredeti_ar:v("di-eredeti")?parseInt(v("di-eredeti")):null, deleted: delCk ? delCk.checked : false };
     try{
       let draftIssueId = existing?existing.id:null;
       if(existing){ const {error}=await supabase.from("draft_issues").update(master).eq("id",existing.id); if(error) throw error; }

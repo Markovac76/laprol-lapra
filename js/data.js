@@ -45,7 +45,7 @@ export async function loadData(){
   state.SERIES = s.data.filter(r=>selectedIds.has(r.id)).map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,version:r.version||1,changed:(r.version||1)>seenOf("series",r.id),
       fdRequestedAt:r.force_delete_requested_at||null, fdGraceEnd:r.force_delete_grace_end||null, items:[]}; byS[r.id]=o; return o; });
   i.data.forEach(r=>{ const mi=myIssue[r.id]||{}; const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,
-      eredeti_ar:r.eredeti_ar, version:r.version||1, ownChanged:(r.version||1)>seenOf("issue",r.id),
+      eredeti_ar:r.eredeti_ar, version:r.version||1, ownChanged:(r.version||1)>seenOf("issue",r.id), deleted:!!r.is_deleted,
       fizetett_ar:(mi.fizetett_ar==null?null:mi.fizetett_ar),besz_menny:(mi.besz_menny==null?1:mi.besz_menny),besz_datum:mi.besz_datum||null,forras:mi.forras||null,ar_auto:(mi.ar_auto==null?true:mi.ar_auto),
       comps:{}}; byI[r.id]=o; const ser=byS[r.series_id]; if(ser) ser.items.push(o); });
   c.data.forEach(r=>{ const it=byI[r.issue_id]; if(!it) return;
@@ -62,10 +62,11 @@ export async function loadData(){
 }
 
 export function stats(si){
-  const s=state.SERIES[si]; const perType={}; s.components.forEach(t=>perType[t]={owned:0,total:s.items.length});
+  const s=state.SERIES[si]; const activeItems=s.items.filter(it=>!it.deleted);
+  const perType={}; s.components.forEach(t=>perType[t]={owned:0,total:activeItems.length});
   const dt=dominantType(s);   // a lapszám-színezéssel megegyező domináns komponens
   let eredetiTotal=0, fizetettTotal=0, eredetiUnknown=false, fizetettUnknown=false, beszerzendo=0, next=null, hasFuture=false;
-  for(const it of s.items){
+  for(const it of activeItems){
     const future=it.date&&it.date>todayISO;
     if(future) hasFuture=true;
     // Eredeti ár alapján: a DOMINÁNS komponens 'megvan' (= zöld lapszám) → beszámít; szorzó a domináns darabszáma.

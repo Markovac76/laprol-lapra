@@ -6,11 +6,12 @@ import { supabase } from "./supabase.js";
 import { state, esc, COMP_TYPES } from "./state.js";
 import { openModal, err } from "./modal.js";
 import { reload } from "./data.js";
+import { purgeMyDataForIssue } from "./personal.js";
 
 const FIELD_LABELS = {
   kiado:"Kiadó", megnevezes:"Megnevezés", megjelenites:"Megjelenítendő név", szin:"Szín", components:"Komponens-készlet",
   lapszam:"Lapszám", cim:"Cím", megjelenes:"Megjelenés dátuma", eredeti_ar:"Eredeti ár",
-  azonosito_tipus:"Azonosító típusa", azonosito:"Azonosító",
+  azonosito_tipus:"Azonosító típusa", azonosito:"Azonosító", is_deleted:"Törölve",
 };
 const fieldLabel = f => FIELD_LABELS[f] || f;
 
@@ -53,6 +54,8 @@ async function markSeen(entityType, entityId, version){
 }
 
 function componentEntries(it){ return Object.entries(it.comps).filter(([,c])=>c.id); }
+const isDeletionDiff = diffs => diffs.some(d=>d.field==="is_deleted" && d.new==="true");
+const DELETED_MSG = `<div class="example" style="color:#f3b6b6">Ez a szám törölve lett a sorozatból.</div>`;
 
 export async function showSeriesChangePopup(s){
   try{
@@ -75,10 +78,17 @@ export async function showIssueChangePopup(it, s){
     const ids = [it.id, ...comps.map(([,c])=>c.id)];
     const seen = await fetchSeenMap(ids);
     const rows = await fetchChangeLog(ids);
-    let blocks = diffHtml(unseenDiffsFor(rows, "issue", it.id, seen["issue:"+it.id] ?? 0));
-    for(const [t,c] of comps){
-      const d = unseenDiffsFor(rows, "component", c.id, seen["component:"+c.id] ?? 0);
-      if(d.length) blocks += `<div class="msub" style="margin-top:8px;font-weight:600">${COMP_TYPES[t]||t}</div>${diffHtml(d)}`;
+    const issueDiffs = unseenDiffsFor(rows, "issue", it.id, seen["issue:"+it.id] ?? 0);
+    const deletion = isDeletionDiff(issueDiffs);
+    let blocks;
+    if(deletion){
+      blocks = DELETED_MSG;
+    } else {
+      blocks = diffHtml(issueDiffs);
+      for(const [t,c] of comps){
+        const d = unseenDiffsFor(rows, "component", c.id, seen["component:"+c.id] ?? 0);
+        if(d.length) blocks += `<div class="msub" style="margin-top:8px;font-weight:600">${COMP_TYPES[t]||t}</div>${diffHtml(d)}`;
+      }
     }
     openModal(`<h2>#${it.n} változásai</h2><p class="msub">„${esc(s.sorozat)}” — ${it.name?esc(it.name):"ez a szám"} módosult.</p>
       ${blocks || `<p class="msub">Nincs megjeleníthető változás.</p>`}
@@ -87,6 +97,7 @@ export async function showIssueChangePopup(it, s){
       try{
         await markSeen("issue", it.id, it.version);
         for(const [,c] of comps) await markSeen("component", c.id, c.version);
+        if(deletion) await purgeMyDataForIssue(it.id, comps.map(([,c])=>c.id));
       }catch(e){ err(e); return; }
       closeModal(); await reload();
     };
@@ -107,11 +118,19 @@ export async function showCollectedChanges(s){
       const d = unseenDiffsFor(rows, "series", s.id, seen["series:"+s.id] ?? 0);
       if(d.length) html += `<div class="msub" style="font-weight:600">Sorozat</div>${diffHtml(d)}`;
     }
+    const deletedItems = [];
     for(const it of changedItems){
-      let block = diffHtml(unseenDiffsFor(rows, "issue", it.id, seen["issue:"+it.id] ?? 0));
-      for(const [t,c] of componentEntries(it)){
-        const d = unseenDiffsFor(rows, "component", c.id, seen["component:"+c.id] ?? 0);
-        if(d.length) block += `<div class="msub" style="margin-top:4px">${COMP_TYPES[t]||t}</div>${diffHtml(d)}`;
+      const issueDiffs = unseenDiffsFor(rows, "issue", it.id, seen["issue:"+it.id] ?? 0);
+      let block;
+      if(isDeletionDiff(issueDiffs)){
+        deletedItems.push(it);
+        block = DELETED_MSG;
+      } else {
+        block = diffHtml(issueDiffs);
+        for(const [t,c] of componentEntries(it)){
+          const d = unseenDiffsFor(rows, "component", c.id, seen["component:"+c.id] ?? 0);
+          if(d.length) block += `<div class="msub" style="margin-top:4px">${COMP_TYPES[t]||t}</div>${diffHtml(d)}`;
+        }
       }
       if(block) html += `<div class="msub" style="font-weight:600;margin-top:10px">#${it.n}${it.name?" – "+esc(it.name):""}</div>${block}`;
     }
@@ -122,7 +141,12 @@ export async function showCollectedChanges(s){
       ${s.anyChanged?`<button class="btn" id="chg-all">Mind elfogadom</button>`:""}</div>`);
     const allBtn=document.getElementById("chg-all");
     if(allBtn) allBtn.onclick=async ()=>{
-      try{ const { error } = await supabase.rpc("seed_member_seen", { p_series_id: s.id }); if(error) throw error; }
+      try{
+        const { error } = await supabase.rpc("seed_member_seen", { p_series_id: s.id }); if(error) throw error;
+        for(const it of deletedItems){
+          await purgeMyDataForIssue(it.id, componentEntries(it).map(([,c])=>c.id));
+        }
+      }
       catch(e){ err(e); return; }
       closeModal(); await reload();
     };

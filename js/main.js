@@ -5,7 +5,7 @@ import { state, S, nextStatus, hasOwnedComponent } from "./state.js";
 import { SUPABASE_ANON_KEY } from "./supabase.js";
 import { renderAll, renderList, renderChips, renderTabs, applyPickerMode, syncHeadHeight } from "./render.js";
 import { upsertMyStatus, applyAutoPrice } from "./personal.js";
-import { priceForm } from "./price-edit.js";
+import { myDataForm } from "./my-data.js";
 import { itemForm, listsForm } from "./admin-forms.js";
 import { usersForm } from "./admin-users.js";
 import { mySeriesForm } from "./my-series.js";
@@ -35,9 +35,9 @@ document.getElementById("list").addEventListener("click",async e=>{
   const exp=e.target.closest(".expander");
   if(exp){ const n=+exp.dataset.exp; state.openIssue=(state.openIssue===n)?null:n; renderList(); return; }
 
-  // Saját beszerzési adat szerkesztése (mindenkinek) — a panel ✎ ikonja
-  const pe=e.target.closest("[data-editprice]");
-  if(pe){ const it=S().items.find(x=>x.n===+pe.dataset.editprice); if(it) priceForm(it); return; }
+  // Saját adatlap (mindenkinek) — a panel ✎ ikonja
+  const pe=e.target.closest("[data-mydata]");
+  if(pe){ const it=S().items.find(x=>x.n===+pe.dataset.mydata); if(it) myDataForm(it); return; }
 
   // +/− darabszám-léptető (a lenyíló panelben)
   const st=e.target.closest(".pstepbtn");
@@ -78,8 +78,6 @@ document.getElementById("list").addEventListener("click",async e=>{
   const it2=e.target.closest("[data-imgtoggle]");
   if(it2){ try{ await setUploadEnabled(it2.dataset.imgtoggle, it2.dataset.current!=="1"); await reload(); }catch(e2){ err(e2); } return; }
 
-  const ed=e.target.closest("[data-edit]");
-  if(ed){ const it=S().items.find(x=>x.n===+ed.dataset.edit); if(it) itemForm(it); return; }
   const mk=e.target.closest(".mark"); if(!mk||mk.disabled) return;
   const it=S().items.find(x=>x.n===+mk.dataset.n); const t=mk.dataset.t;
   const comp=it.comps[t]; if(!comp||!comp.id) return;
@@ -98,7 +96,7 @@ document.getElementById("list").addEventListener("click",async e=>{
 document.getElementById("admToggle").onclick=function(){ state.adminMode=!state.adminMode;
   this.setAttribute("aria-pressed",state.adminMode); this.classList.toggle("on",state.adminMode);
   renderList(); applyPickerMode(); };
-document.getElementById("a-item").onclick=()=>{ if(!S()){ alert("Előbb válassz ki egy sorozatot a 📚 Sorozataim alatt (vagy javasolj újat)."); return; } itemForm(null); };
+document.getElementById("a-item").onclick=()=>{ if(!S()){ alert("Előbb válassz ki egy sorozatot a 📚 Sorozataim alatt (vagy javasolj újat)."); return; } itemForm(); };
 document.getElementById("a-lists").onclick=listsForm;
 document.getElementById("usersBtn").onclick=usersForm;
 document.getElementById("mySeriesBtn").onclick=mySeriesForm;
