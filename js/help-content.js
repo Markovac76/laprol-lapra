@@ -38,7 +38,7 @@ export const HELP_CONTENT = {
 
     { id:"jeloles", title:"Jelölés és státuszok", open:false, items:[
       { q:"Hogyan jelölöm meg, hogy megvan egy szám?",
-        a:"<p>Koppints a szám sorában a komponens ikonjára (pl. a magazin ikonjára). Az első koppintás <b>megvan</b>-ra állítja. További koppintásokra körbeforog: megvan → hiány → nem kell → megvan… Jelöletlenre nem tér vissza magától — ahhoz szerkesztő ablak kell (staff-funkció).</p>" },
+        a:"<p>Koppints a szám sorában a komponens ikonjára (pl. a magazin ikonjára). Az első koppintás <b>megvan</b>-ra állítja. További koppintásokra körbeforog: megvan → hiány → nem kell → megvan… Jelöletlenre nem tér vissza magától koppintással — ehhez nyisd le a sort, és a fizetve-sor melletti <b>✎ Saját adatlap</b> gombon a „jelöletlen” választógombbal állíthatod vissza (ez mindenkinek elérhető, nem staff-funkció).</p>" },
       { q:"Mit jelentenek a szám színei?",
         a:"<ul><li><b>Zöld</b> — kész, megvan a lényeg</li><li><b>Piros</b> — hiányzik, kell</li><li><b>Sárga</b> — részleges (pl. megvan a magazin, de a hozzá tartozó modell/melléklet még hiányzik)</li><li><b>Szürke</b> — tudatosan „nem kell”-re jelölve</li><li><b>Semleges</b> — még jelöletlen, vagy a szám még nem is jelent meg</li></ul>" },
       { q:"Hogyan állítom be, ha egy komponensből több példányom van?",
@@ -53,7 +53,9 @@ export const HELP_CONTENT = {
       { q:"Miért töltődik ki automatikusan a fizetett ár?",
         a:"<p>Amikor egy számnál először jelölsz meg legalább egy komponenst „megvan”-ra, és még nincs saját fizetett árad rajta, a rendszer automatikusan az eredeti árat írja be. Ha ezt utána kézzel átírod, a kézi érték megmarad. Ha az összes jelölésedet visszavonod arról a számról, és az ár még mindig az automatikus volt, visszaáll „nem ismert”-re — a kézzel beírt árat viszont sosem törli.</p>" },
       { q:"Hogyan írom át kézzel a saját fizetett áramat?",
-        a:"<p>Nyisd le a sor képsávját, majd a fizetett ár melletti <b>✎</b> ikonra koppintva megnyílik a „Saját beszerzési adatok” ablak — itt állíthatod a fizetett árat (vagy jelölheted „nem ismert”-nek), a beszerzési mennyiséget, a dátumot és a forrást.</p>" },
+        a:"<p>Nyisd le a sor képsávját, majd a fizetett ár melletti <b>✎</b> ikonra koppintva megnyílik a <b>„Saját adatlap”</b> — itt állíthatod a fizetett árat (vagy jelölheted „nem ismert”-nek), a beszerzési mennyiséget, a dátumot és a forrást. Ugyanez az ablak komponensenként a státuszt, darabszámot és jegyzetet is kezeli — lásd „Mi az a Saját adatlap?” alább.</p>" },
+      { q:"Mi az a Saját adatlap?",
+        a:"<p>Egy mindenki (nem csak staff) számára elérhető, egységes ablak egy Számhoz — a ✎ ikonnal nyitható meg a lenyitott sorban. Itt van egy helyen: komponensenként a <b>Státusz</b> (megvan/hiány/nem kell/jelöletlen), a <b>Darabszám</b>, a <b>Jegyzet</b>, az (olvasható) Azonosító, valamint szám-szinten a <b>Fizetett ár</b>, a beszerzési mennyiség, dátum és forrás. Ez mindig csak a SAJÁT adataidat írja — a törzsadatot (cím, dátum, eredeti ár, azonosító) soha.</p>" },
       { q:"Mit jelent a „nem ismert” felirat egy árnál?",
         a:"<p>Azt, hogy nincs rögzített érték — nem hiba vagy üres mező, egyszerűen még nem tudod (vagy nem adtad meg) az árat. Ez a hero-doboz összegzésénél <b>„+ nem ismert”</b> jelzésként is megjelenhet, ha van ilyen számod.</p>" },
     ]},
@@ -83,6 +85,8 @@ export const HELP_CONTENT = {
         a:"<p>A felkiáltójelre koppintva megnyílik egy ablak, ami mezőnként mutatja: „régi érték → új érték”. <b>OK, nyugtázom</b> — tudomásul veszed, a jelzés eltűnik. <b>Mégse</b> — bezárja az ablakot, de a felkiáltójel megmarad, később is megnézheted.</p>" },
       { q:"Mi az a gyűjtött elfogadás gomb?",
         a:"<p>A szűrő-gombok sorának jobb szélén, egy önálló „!” gomb jelenik meg, ha a sorozaton belül bárhol van el nem fogadott változás. Erre koppintva egy listában látod az ÖSSZES változást egyszerre, és egy „Mind elfogadom” gombbal egyszerre nyugtázhatod mindet — nem kell számonként külön.</p>" },
+      { q:"Miért van egy szám áthúzva, „Ez a szám törölve lett a sorozatból” felirattal?",
+        a:"<p>A staff törölte ezt a Számot a sorozatból. Amíg nem nyugtázod a felkiáltójellel, a sor még látszik (áthúzva, szaggatott kerettel), hogy biztosan tudomást szerezz róla — utána eltűnik a listából. Nyugtázáskor a saját (státusz/darabszám/jegyzet/beszerzés) adataid arról a Számról törlődnek, a döntést nem lehet visszavonni.</p>" },
     ]},
 
     { id:"uj-javaslat", title:"Új sorozat javaslása", open:false, items:[
@@ -90,6 +94,8 @@ export const HELP_CONTENT = {
         a:"<p>A <b>📚 Sorozataim</b> ablak alján van egy <b>„+ Új sorozat javaslása”</b> gomb. Itt megadhatod a kiadót, a sorozat nevét, a fülön megjelenő rövid nevet, a színét és hogy miből áll egy szám (pl. magazin + modell). A <b>„Javaslat beküldése”</b> gombbal küldheted el.</p>" },
       { q:"Mi történik a javaslatommal a beküldés után?",
         a:"<p>Bekerül a staff „feldolgozásra váró” listájába (a Karbantartás menüpontba) — a staff nézi át, egészíti ki a számokkal, és publikálja, ha kész. Amíg ez nem történik meg, a sorozat nem jelenik meg senki fülsávjában, a Sorozataim választóban sem.</p>" },
+      { q:"Fel tudom vinni én magam a Számokat a javaslatomhoz, vagy azt is a staffnak kell?",
+        a:"<p>Beküldés után egy köztes képernyő jelenik meg: itt (nem kötelezően) letöltheted a sorozatod komponens-készletéhez igazodó Excel-sablont, kitöltheted a Számokkal, és visszatöltheted — ez egyenesen a javaslatod munkaanyagába kerül, nem kell egyesével a staffnak pótolnia. Ha kihagyod, a staff pótolja majd feldolgozáskor.</p>" },
     ]},
 
     { id:"osszesitok", title:"Belekerülési költség és összesítők", open:false, items:[
@@ -107,7 +113,7 @@ export const HELP_CONTENT = {
       { q:"Mire való a 🗂️ Karbantartás gomb?",
         a:"<p>Ez staff-only (admin/tulajdonos) menüpont, innen kezelhető a sorozatok teljes életútja. Három fület tartalmaz: <b>Aktív sorozatok</b> (a már publikáltak), <b>Munka sorozatok</b> (a beérkezett javaslatok és folyamatban lévő szerkesztések) és <b>Publikálatlan</b> (a levett sorozatok).</p>" },
       { q:"Miben más ez, mint a 🔧 Gyors szerkesztés gomb?",
-        a:"<p>A 🔧 gomb a lista soraiban egy ✎ ikont jelenít meg, amivel egy számot (és a komponenseit) rögtön, közvetlenül szerkeszthetsz vagy törölhetsz — ez a leggyorsabb út egy elgépelés vagy hiányzó adat pótlására. A Karbantartás ezzel szemben a <b>teljes, végigkövetett</b> utat kínálja: draftot nyit, amit publikálni kell, és csak publikáláskor kapják meg a felhasználók a felkiáltójel-jelzést a változásról. A 🔧-vel végzett gyors szerkesztés <b>azonnal élesbe kerül, verziókövetés és felkiáltójel-jelzés nélkül</b> — erről bővebben lásd „Sorozat szerkesztése” alább.</p>" },
+        a:"<p>A 🔧 gomb egy kis eszköztárat nyit meg a kiválasztott sorozat felett: <b>„+ Új tétel”</b> (vadonatúj Szám azonnali, közvetlen felvétele), <b>„☰ Listák”</b> (a választható listák — kiadó, komponens-típus stb. — bővítése), és <b>„⬇ Sablon”</b>/<b>„⬆ Excel”</b> (tömeges Excel-import a kiválasztott, már élő sorozathoz). Egy MÁR LÉTEZŐ Szám törzsadatát (cím, dátum, ár, azonosító, komponens-típus) ez az eszköztár nem tudja közvetlenül módosítani vagy törölni — ahhoz mindig a Karbantartás draft/publikálás útja kell, hogy a többi felhasználó a szokásos felkiáltójel-jelzést kapja a változásról. A saját (személyes) adataid — státusz, darabszám, jegyzet, fizetett ár — bármikor, közvetlenül a „Saját adatlap” ✎ ikonjával szerkesztheted, draft nélkül, mert ezek sosem törzsadat.</p>" },
     ]},
 
     { id:"eletciklus", title:"Sorozat-életciklus", open:false, items:[
@@ -132,13 +138,21 @@ export const HELP_CONTENT = {
         a:"<p>A draft-szerkesztő nézet alján a <b>„+ Új szám”</b> gombbal vehetsz fel újat, vagy egy meglévő számnál a <b>„Szerkesztés”</b> gombbal módosíthatod (lapszám, cím, dátum, eredeti ár, komponensenkénti azonosító). Ez a draftot módosítja, NEM az élő adatot.</p>" },
       { q:"Mi történik publikáláskor?",
         a:"<p>Ha a draft kész, a Munkaanyag fülön a <b>„Kész”</b> gombbal átteszed Publikálásra váróba, ott pedig a <b>„Publikálás”</b> gombbal élesíted. Ekkor a rendszer mezőnként összeveti a draftot az élő adattal, minden változott mezőről feljegyzést készít, és mindenkinek, akit érint, felkiáltójel-jelzést ad — ez a végigkövetett, „mindenki tudomást szerez róla” útja a szerkesztésnek.</p>" },
-      { q:"Van ennél gyorsabb út egy apró javításra?",
-        a:"<p>Igen — a 🔧 Gyors szerkesztés gomb bekapcsolásával minden sorban megjelenik egy ✎ ikon, amire koppintva rögtön szerkesztheted vagy törölheted a számot, draft és publikálás nélkül. <b>Fontos:</b> ez a mód KÖZVETLENÜL, azonnal élesbe teszi a módosítást — a verziókövetés és a felkiáltójel-jelzés ezen NEM megy át, tehát a többi felhasználó nem kap értesítést a változásról. Kisebb elgépelések gyors javítására való; ha azt szeretnéd, hogy mindenki lássa a felkiáltójelet, a fenti, draft-alapú utat használd.</p>" },
+      { q:"Van ennél gyorsabb út egy apró javításra egy már élő Számon?",
+        a:"<p>Nem — egy már publikált Szám törzsadatának (cím, dátum, ár, azonosító, komponens-típus) MINDEN módosítása a fenti, draft-alapú, publikálást igénylő úton megy át, hogy a felhasználók megkapják a felkiáltójel-jelzést. Gyorsabb, közvetlen út csak vadonatúj Szám felvitelére van (🔧 Gyors szerkesztés → „+ Új tétel”), mert azon még senkinek nincs saját adata, nincs mit védeni. Ha a SAJÁT (személyes) adataidat — státuszt, darabszámot, jegyzetet, fizetett árat — akarod gyorsan javítani, azt bármikor közvetlenül a „Saját adatlap” ✎ ikonjával teheted, draft nélkül.</p>" },
+      { q:"Hogyan viszek fel tömegesen sok Számot egyszerre a draftba?",
+        a:"<p>A draft-szerkesztő nézet alján a <b>„+ Új szám”</b> mellett ott a <b>„⬇ Sablon”</b> és <b>„⬆ Sablon feltöltése”</b> gomb — ugyanaz a sablon-mechanizmus, mint az Excel-importnál, csak ez a draftba (nem az élő adatba) tölt be tömegesen új Számokat. Már meglévő (azonos lapszámú) draft-tételt a feltöltés kihagy, nem ír felül.</p>" },
+      { q:"Hogyan törlök egy már publikált Számot?",
+        a:"<p>A draft-szerkesztőben nyisd meg a Szám <b>„Szerkesztés”</b> gombját, és pipáld be az <b>„Ezt a Számot törlöm a sorozatból (publikáláskor)”</b> jelölőnégyzetet — ez csak MÁR ÉLŐ (nem vadonatúj draft-) tételen jelenik meg. Publikáláskor ez nem törli fizikailag a sort: a felhasználók a szokásos felkiáltójel-jelzésen keresztül kapnak róla értesítést („Ez a szám törölve lett a sorozatból.”), és csak az ő OK-nyugtázásukkor törlődnek a saját (státusz/darabszám/jegyzet/beszerzés) adataik arról a Számról.</p>" },
+      { q:"Hogyan sorolok át egy komponenst másik típusra?",
+        a:"<p>Ha egy komponens korábban pl. „Egyéb”-ként lett felvéve, mert a pontos típus még nem létezett a listában — miután a „☰ Listák”-ban felvetted a pontos típust (pl. „Irattartó”), a draft-szerkesztőben az adott Szám komponensénél megjelenik egy <b>„Típus (utólagos átsorolás)”</b> legördülő, ahol átválthatod. Ez egyedi, komponensenkénti korrekció, publikáláskor a szokásos felkiáltójel-jelzésen megy át. Két komponens a Számon nem sorolható ugyanarra a típusra.</p>" },
     ]},
 
     { id:"excel-import", title:"Excel-import", open:false, items:[
       { q:"Hogyan töltök le sablont?",
-        a:"<p>Válaszd ki a sorozatot a fülsávban, majd a 🔧 Gyors szerkesztés eszköztárban koppints az <b>„⬇ Sablon”</b> gombra (csak asztali/laptop nézetben érhető el, telefonon nem). A letöltött Excel fájl oszlopai a kiválasztott sorozat komponens-készletéhez igazodnak.</p>" },
+        a:"<p>Válaszd ki a sorozatot a fülsávban, majd a 🔧 Gyors szerkesztés eszköztárban koppints az <b>„⬇ Sablon”</b> gombra. A letöltött Excel fájl oszlopai a kiválasztott sorozat komponens-készletéhez igazodnak.</p>" },
+      { q:"Ez ugyanaz a sablon, mint a Karbantartás draft-szerkesztőjében vagy az Új sorozat javaslásánál?",
+        a:"<p>Nem, két különböző mechanizmus, hasonló elven: ez itt (🔧 Gyors szerkesztés → ⬇ Sablon/⬆ Excel) egy MÁR ÉLŐ, publikált sorozathoz szól — a sablon a saját (személyes) jelöléseidet/áraidat és a törzsadat-módosításokat egyszerre kezeli (utóbbi draftba kerül, lásd lent). A Karbantartás draft-szerkesztőjében és az „Új sorozat javaslása” köztes lépésében található sablon ezzel szemben kizárólag DRAFT-ba (még nem élő munkaanyagba) visz fel vadonatúj Számokat tömegesen — abban nincs személyes/ár oszlop, mert a draftnak még nincs is felhasználója.</p>" },
       { q:"Mit jelentenek a sablon oszlopai?",
         a:"<p>Lapszám, cím, dátum, eredeti ár, majd személyes fizetett ár, aztán komponensenként két oszlop: „státusz” (megvan/hianyzik/nemkell) és „azonosító”.</p>" },
       { q:"Mi történik feltöltéskor, ha a sor egy MEGLÉVŐ számra vonatkozik?",
