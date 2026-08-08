@@ -65,13 +65,19 @@ export function proposeSeriesForm(){
     if(!comps.length){ alert("Legalább egy komponens kell."); return; }
     const disp=(dEl.value.trim()||nm).slice(0,DISPLAY_MAX);
     try{
-      const { data, error } = await supabase.from("draft_series").insert({
-        pool_type:"new", pool_status:"incoming", submitted_by: state.myId,
+      // Az id-t a kliens generálja és küldi be — a draft_series SELECT-
+      // szabálya staff-only (a Karbantartás felület csak nekik való), egy
+      // sima .select()-es visszaolvasás egy nem-staff beküldőnél RLS-hibát
+      // dobna (Postgres az INSERT...RETURNING kimenetét is a SELECT-
+      // szabályon engedi át, és elutasítás esetén hibát ad, nem üres sort).
+      const newId = crypto.randomUUID();
+      const { error } = await supabase.from("draft_series").insert({
+        id: newId, pool_type:"new", pool_status:"incoming", submitted_by: state.myId,
         kiado: document.getElementById("p-kiado").value||null,
         megnevezes: nm, megjelenites: disp, szin: color, components: comps,
-      }).select().single();
+      });
       if(error) throw error;
-      renderProposalIntermediate(data.id, comps, nm);
+      renderProposalIntermediate(newId, comps, nm);
     }catch(e){ err(e); }
   };
 }
