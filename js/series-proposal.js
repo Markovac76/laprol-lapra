@@ -8,6 +8,28 @@
 import { supabase } from "./supabase.js";
 import { state, DISPLAY_MAX, PAL12, PAL_FAMILIES, esc, opts } from "./state.js";
 import { openModal, closeModal, err, sheet } from "./modal.js";
+import { downloadDraftTemplate, pickDraftExcelFile, confirmDraftUpload, bulkInsertDraftItemsAsProposer } from "./draft-excel.js";
+
+// Köztes lépés a javaslat beküldése és a "Köszönjük" képernyő között —
+// itt (nem kötelezően) tömegesen felvihetők a Számok egy sablon-Excellel,
+// hogy ne kelljen a staff-nak egyesével pótolnia, vagy a beküldőnek
+// egyáltalán ne is legyen módja rá (11. pont).
+function renderProposalIntermediate(draftId, comps, nm){
+  openModal(`<h2>Javaslat rögzítve</h2>
+    <p class="msub">„${esc(nm)}” bekerült a feldolgozásra váró listába. Ha van kész listád a Számokról, itt (nem kötelező) tömegesen is felviheted egy sablon-Excellel — így a staffnak nem kell egyesével pótolnia.</p>
+    <div class="modrow"><button class="btn ghost" id="pi-tmpl">⬇ Sablon letöltése</button>
+      <button class="btn ghost" id="pi-tmplup">⬆ Kitöltött sablon feltöltése</button></div>
+    <div class="modrow"><button class="btn" id="pi-done">Kész</button></div>`);
+  document.getElementById("pi-tmpl").onclick=()=>downloadDraftTemplate(comps, nm);
+  document.getElementById("pi-tmplup").onclick=()=>{
+    pickDraftExcelFile(file=>confirmDraftUpload(openModal, err, file, draftId, comps,
+      ()=>renderProposalIntermediate(draftId, comps, nm), bulkInsertDraftItemsAsProposer));
+  };
+  document.getElementById("pi-done").onclick=()=>{
+    openModal(`<h2>Köszönjük!</h2><p class="msub">A javaslatod bekerült a feldolgozásra váró listába.</p>
+      <div class="modrow"><button class="btn" onclick="closeModal()">Rendben</button></div>`);
+  };
+}
 
 export function proposeSeriesForm(){
   let color = PAL12[0];
@@ -43,14 +65,13 @@ export function proposeSeriesForm(){
     if(!comps.length){ alert("Legalább egy komponens kell."); return; }
     const disp=(dEl.value.trim()||nm).slice(0,DISPLAY_MAX);
     try{
-      const { error } = await supabase.from("draft_series").insert({
+      const { data, error } = await supabase.from("draft_series").insert({
         pool_type:"new", pool_status:"incoming", submitted_by: state.myId,
         kiado: document.getElementById("p-kiado").value||null,
         megnevezes: nm, megjelenites: disp, szin: color, components: comps,
-      });
+      }).select().single();
       if(error) throw error;
-      openModal(`<h2>Köszönjük!</h2><p class="msub">A javaslatod bekerült a feldolgozásra váró listába.</p>
-        <div class="modrow"><button class="btn" onclick="closeModal()">Rendben</button></div>`);
+      renderProposalIntermediate(data.id, comps, nm);
     }catch(e){ err(e); }
   };
 }

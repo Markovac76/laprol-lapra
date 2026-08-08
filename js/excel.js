@@ -21,6 +21,10 @@ import { upsertMyIssueData, upsertMyStatus } from "./personal.js";
 
 let _xlsx=null;
 async function xlsx(){ if(!_xlsx) _xlsx=await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm"); return _xlsx; }
+// A draft-excel.js (11. pont — sablon-alapú tömeges tétel-feltöltés a
+// javaslat-/draft-szerkesztő flow-ban) ugyanezt a betöltőt és a dátum-/
+// szám-felismerést hasznosítja újra, hogy ne legyen két külön implementáció.
+export const loadXlsx = xlsx;
 
 const HU_MONTHS={jan:1,január:1,febr:2,február:2,márc:3,március:3,ápr:4,április:4,
   máj:5,május:5,jún:6,június:6,júl:7,július:7,aug:8,augusztus:8,
@@ -30,7 +34,7 @@ function isoDate(y,mo,d){ y=parseInt(y); mo=parseInt(mo); d=parseInt(d);
   if(!y||mo<1||mo>12||d<1||d>31) return null;
   return `${y}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
 
-function coerceDate(v){
+export function coerceDate(v){
   if(v==null||v==="") return null;
   if(v instanceof Date && !isNaN(v)) return new Date(v.getTime()-v.getTimezoneOffset()*60000).toISOString().slice(0,10);
   let s=String(v).trim(); if(!s) return null;
@@ -43,7 +47,7 @@ function coerceDate(v){
   return null;  // felismerhetetlen formátum → nem dob hibát, csak üresen marad
 }
 
-function parseHuNumber(v){
+export function parseHuNumber(v){
   if(v==null || v==="") return null;
   if(typeof v==="number") return Math.round(v);
   let s=String(v).trim(); if(!s) return null;

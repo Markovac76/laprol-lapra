@@ -12,6 +12,7 @@ import { openModal, err, sheet } from "./modal.js";
 import { reload } from "./data.js";
 import { isStaff, isOwnerRole } from "./permissions.js";
 import { fetchDraftItems, renderDraftItemsList, draftItemForm } from "./draft-items.js";
+import { downloadDraftTemplate, pickDraftExcelFile, confirmDraftUpload } from "./draft-excel.js";
 
 let currentTab = "aktiv";
 
@@ -334,7 +335,9 @@ function renderEditDraft(d, color, comps, compList, items){
     <div class="modrow"><button class="btn ghost" id="d-back">Vissza</button><button class="btn" id="d-save">Mezők mentése</button></div>
     <div class="msub" style="margin:16px 0 2px;color:var(--accent);filter:brightness(1.2);font-weight:600">Számok (${items.length})</div>
     <div id="d-items">${renderDraftItemsList(items, comps)}</div>
-    <div class="modrow"><button class="btn ghost" id="d-additem">+ Új szám</button></div>`);
+    <div class="modrow"><button class="btn ghost" id="d-additem">+ Új szám</button>
+      <button class="btn ghost" id="d-tmpl">⬇ Sablon</button>
+      <button class="btn ghost" id="d-tmplup">⬆ Sablon feltöltése</button></div>`);
 
   const dEl=document.getElementById("d-display"), cEl=document.getElementById("d-count");
   dEl.addEventListener("input",()=>cEl.textContent=`${dEl.value.length}/${DISPLAY_MAX}`);
@@ -370,4 +373,12 @@ function renderEditDraft(d, color, comps, compList, items){
   sheet.querySelectorAll("#d-items [data-diedit]").forEach(b=>{
     b.onclick=()=>{ const it=items.find(x=>x.id===b.dataset.diedit); if(it) draftItemForm(d.id, it, comps, reopen); };
   });
+  document.getElementById("d-tmpl").onclick=()=>{
+    if(!comps.length){ alert("Előbb válassz ki legalább egy komponenst fent."); return; }
+    downloadDraftTemplate(comps, d.megnevezes);
+  };
+  document.getElementById("d-tmplup").onclick=()=>{
+    if(!comps.length){ alert("Előbb válassz ki legalább egy komponenst fent."); return; }
+    pickDraftExcelFile(file=>confirmDraftUpload(openModal, err, file, d.id, comps, reopen));
+  };
 }
