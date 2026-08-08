@@ -3,7 +3,7 @@
    mezőváltozásainak megjelenítése és nyugtázása (member_seen).
    ============================================================ */
 import { supabase } from "./supabase.js";
-import { state, esc, COMP_TYPES } from "./state.js";
+import { state, esc, COMP_TYPES, listName } from "./state.js";
 import { openModal, err } from "./modal.js";
 import { reload } from "./data.js";
 import { purgeMyDataForIssue } from "./personal.js";
@@ -11,9 +11,10 @@ import { purgeMyDataForIssue } from "./personal.js";
 const FIELD_LABELS = {
   kiado:"Kiadó", megnevezes:"Megnevezés", megjelenites:"Megjelenítendő név", szin:"Szín", components:"Komponens-készlet",
   lapszam:"Lapszám", cim:"Cím", megjelenes:"Megjelenés dátuma", eredeti_ar:"Eredeti ár",
-  azonosito_tipus:"Azonosító típusa", azonosito:"Azonosító", is_deleted:"Törölve",
+  azonosito_tipus:"Azonosító típusa", azonosito:"Azonosító", is_deleted:"Törölve", tipus:"Típus",
 };
 const fieldLabel = f => FIELD_LABELS[f] || f;
+const fieldValue = (f,v) => f==="tipus" ? esc(listName("komponens",v) || v || "—") : esc(v??"—");
 
 async function fetchSeenMap(ids){
   if(!ids.length) return {};
@@ -44,7 +45,7 @@ function unseenDiffsFor(rows, entityType, entityId, seenVersion){
 
 function diffHtml(diffs){
   if(!diffs.length) return "";
-  return `<div class="example">` + diffs.map(d=>`${fieldLabel(d.field)}: ${esc(d.old??"—")} → ${esc(d.new??"—")}`).join("\n") + `</div>`;
+  return `<div class="example">` + diffs.map(d=>`${fieldLabel(d.field)}: ${fieldValue(d.field,d.old)} → ${fieldValue(d.field,d.new)}`).join("\n") + `</div>`;
 }
 
 async function markSeen(entityType, entityId, version){

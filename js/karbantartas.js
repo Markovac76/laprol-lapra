@@ -359,8 +359,15 @@ function renderEditDraft(d, color, comps, compList, items){
     d = {...d, kiado:document.getElementById("d-kiado").value||null, megnevezes:nm, megjelenites:disp, szin:color, components:comps};
     await editDraftForm(d);
   };
-  document.getElementById("d-additem").onclick=()=>draftItemForm(d.id, null, comps, ()=>editDraftForm(d));
+  // Egy komponens-átsorolás új típust adhat a sorozat komponens-listájához
+  // (draft-items.js) — a szerkesztőbe visszatérve ezért friss draft_series
+  // sort töltünk be, nem a bezáráskori (esetleg elavult) `d`-t.
+  const reopen = async ()=>{
+    const { data:fresh } = await supabase.from("draft_series").select("*").eq("id",d.id).single();
+    await editDraftForm(fresh||d);
+  };
+  document.getElementById("d-additem").onclick=()=>draftItemForm(d.id, null, comps, reopen);
   sheet.querySelectorAll("#d-items [data-diedit]").forEach(b=>{
-    b.onclick=()=>{ const it=items.find(x=>x.id===b.dataset.diedit); if(it) draftItemForm(d.id, it, comps, ()=>editDraftForm(d)); };
+    b.onclick=()=>{ const it=items.find(x=>x.id===b.dataset.diedit); if(it) draftItemForm(d.id, it, comps, reopen); };
   });
 }
