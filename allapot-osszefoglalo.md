@@ -1,6 +1,6 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v3)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v4)
 
-**Frissítve:** 2026. augusztus 8. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
+**Frissítve:** 2026. augusztus 26. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
 > Told fel ezt a fájlt a Claude projektbe (cseréld le a régi verziót). Új beszélgetés elején hivatkozz rá: "olvasd el az állapot-összefoglalót, onnan tudod, hol tartunk."
 
@@ -19,15 +19,24 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.7** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.8** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **README.md** (ÚJ, v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
 ```
 laprol-lapra/
 ├── index.html          ← csak markup + script betöltés
 ├── styles.css
+├── README.md             ← ÚJ (v1.8): projekt-belépő dokumentum
 ├── config.js            ← NINCS git-ben, Vercel generálja env változóból
 ├── config.example.js
+├── db.local.js            ← ÚJ (v1.8): Postgres connection string a migrációkhoz — NINCS git-ben
+├── db.local.example.js     ← ÚJ (v1.8): minta db.local.js-hez
+├── db-backups/               ← ÚJ (v1.8): migráció előtti JSON-pillanatképek — NINCS git-ben
+├── scripts/                   ← ÚJ (v1.8): migrációs eszközök, saját package.json + node_modules (utóbbi NINCS git-ben)
+│   ├── package.json, package-lock.json
+│   ├── backup-db.js
+│   └── run-migration.js
 ├── vercel.json
 ├── manifest.json + icons/
 └── js/
@@ -39,11 +48,11 @@ laprol-lapra/
     ├── karbantartas.js, draft-items.js         ← életciklus, draft-szerkesztés
     ├── changes.js                              ← verziókövetés/felkiáltójel
     ├── component-images.js, image-resize.js    ← képfeltöltés/-javaslat
-    ├── my-data.js                               ← ÚJ (v1.7): „Saját adatlap", leváltotta a price-edit.js-t
-    ├── draft-excel.js                           ← ÚJ (v1.7): sablon-alapú tömeges tétel-feltöltés draftokhoz
-    └── help.js, help-content.js                 ← ÚJ (v1.7): beépített súgó
+    ├── my-data.js                               ← „Saját adatlap", leváltotta a price-edit.js-t
+    ├── draft-excel.js                           ← sablon-alapú tömeges tétel-feltöltés draftokhoz
+    └── help.js, help-content.js                 ← beépített súgó
 ```
-`price-edit.js` **megszűnt** — a `my-data.js` teljesen leváltotta. Ha bármit módosítasz, ebben a modul-szerkezetben kell — nem egyetlen nagy fájlban.
+`price-edit.js` **megszűnt** — a `my-data.js` teljesen leváltotta. Ha bármit módosítasz az appon (`index.html`/`js/`/`styles.css`), ebben a modul-szerkezetben kell — nem egyetlen nagy fájlban. A `scripts/` mappa ettől külön áll: helyi fejlesztői eszköz, sosem megy a Vercel build-be.
 
 ### Munkafolyamat
 1. Home-felületen (itt) átbeszéljük/kidolgozzuk a döntéseket, vagy egyben egy instrukció-fájlt (`claude-code-N-lepes-....md`) állítunk össze.
@@ -54,13 +63,14 @@ laprol-lapra/
 **SQL-migrációk módja MEGVÁLTOZOTT (lásd lent):** eddig a Code csak írta a `.sql` fájlt, TE futtattad a Supabase SQL Editorban. Mostantól a Code közvetlen Postgres-kapcsolattal MAGA futtatja le — a jóváhagyási igény (a teljes SQL megmutatása + explicit "mehet" várása) VÁLTOZATLANUL kötelező, csak a végrehajtás módja más. Részletek: `README.md` "Migrációk" szakasza.
 
 ### Közvetlen Postgres-kapcsolat a migrációkhoz **[DÖNTVE, megvalósítva]**
-Az anyanotesz projektben már bevált minta átvéve: a Code egy `scripts/run-migration.js` Node-scripttel (a `pg` npm-csomaggal, `scripts/`-en belüli, gitignore-olt saját `node_modules`-szal — ez NEM az app build-jének/deploy-jának a része) fut le közvetlenül a Postgres ellen, `db.local.js`-ben (gitignore-olt, `db.local.example.js` a minta) tárolt connection stringgel, "Direct connection" móddal (nem pooler). Minden futtatás előtt automatikusan friss `db-backups/` JSON-pillanatképet készít az összes táblából (gitignore-olt), és a migrációt `BEGIN`/`COMMIT`/`ROLLBACK` tranzakcióba csomagolja. A jóváhagyási kapu (teljes SQL megmutatása, explicit "mehet" várása, mielőtt a script lefut) VÁLTOZATLANUL kötelező — ez nem szoftveres kényszer, hanem a beszélgetés szintjén betartott szabály. Technikai eltérés az anyanotesz-mintától: az eredetileg tervezett ephemeral `npx -p pg` injektálás ezen a gépen nem működött megbízhatóan (modul-feloldási hiba), ezért egy dedikált `scripts/package.json` + helyi `node_modules` lett a megoldás — funkcionálisan egyenértékű, semmi nem kerül belőle git-be.
+Az anyanotesz projektben már bevált minta átvéve: a Code egy `scripts/run-migration.js` Node-scripttel (a `pg` npm-csomaggal, `scripts/`-en belüli, gitignore-olt saját `node_modules`-szal — ez NEM az app build-jének/deploy-jának a része) fut le közvetlenül a Postgres ellen, `db.local.js`-ben (gitignore-olt, `db.local.example.js` a minta) tárolt connection stringgel, "Direct connection" móddal (nem pooler). Minden futtatás előtt automatikusan friss `db-backups/` JSON-pillanatképet készít az összes táblából (gitignore-olt), és a migrációt `BEGIN`/`COMMIT`/`ROLLBACK` tranzakcióba csomagolja. A jóváhagyási kapu (teljes SQL megmutatása, explicit "mehet" várása, mielőtt a script lefut) VÁLTOZATLANUL kötelező — ez nem szoftveres kényszer, hanem a beszélgetés szintjén betartott szabály. Technikai eltérés az anyanotesz-mintától: az eredetileg tervezett ephemeral `npx -p pg` injektálás ezen a gépen nem működött megbízhatóan (modul-feloldási hiba), ezért egy dedikált `scripts/package.json` + helyi `node_modules` lett a megoldás — funkcionálisan egyenértékű, semmi nem kerül belőle git-be. **Élesben végpontig tesztelve** (2026-08-26): valódi kapcsolódás, mind a 17 tábla helyes JSON-backupja, és egy idempotens migráció sikeres, tranzakciós újrafuttatása.
 
 ### Supabase inaktivitás elleni védelem — heti "heartbeat" **[DÖNTVE, megvalósítva]**
 A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után szüneteltet egy projektet — pusztán a Dashboard/app megnyitása nem elég, ez majdnem megtörtént élesben egyszer (figyelmeztető email érkezett róla). Megoldás: egy tisztán adatbázis-szintű, `pg_cron`-nal ütemezett heti job (**nincs benne Edge Function, `pg_net` vagy külső titok** — szándékosan a legegyszerűbb, elégséges megoldás, mivel egyedüli cél az inaktivitás elkerülése, semmi más — nem tévesztendő össze a hordozhatóság/export nyitott kérdésével, ami külön, később aktuális téma).
 - **`system_heartbeat` tábla** — egysoros, tisztán technikai; RLS bekapcsolva, DE szándékosan nincs rajta policy, így a kliens (böngésző/app) semmilyen hozzáférést nem kap hozzá, kizárólag a `pg_cron` éri el.
 - **`weekly-heartbeat` cron job** — minden vasárnap 03:17 UTC-kor egy egyszerű UPSERT-et futtat rajta (`cron.job`/`cron.job_run_details` táblákból ellenőrizhető, hogy lefutott-e).
 - SQL: `laprol-lapra-heartbeat.sql`. Előfeltétel: a `pg_cron` extension engedélyezve legyen (a script megpróbálja magától bekapcsolni; ha nem sikerül, Dashboard → Database → Extensions → pg_cron).
+- **Megerősítve élesben** (2026-08-26): a `weekly-heartbeat` job aktív, a `17 3 * * 0` ütemezéssel, a tulajdonos ellenőrizte a `cron.job` táblában.
 
 ---
 
@@ -143,7 +153,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.7).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.8).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.
