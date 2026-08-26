@@ -1,0 +1,9 @@
+{
+  "name": "laprol-lapra-scripts",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Helyi fejlesztői eszközök: közvetlen Postgres-migráció futtatása biztonsági mentéssel. Nem része a kiszolgált appnak (index.html/js), nem megy a Vercel build-be.",
+  "dependencies": {
+    "pg": "^8.13.0"
+  }
+}
