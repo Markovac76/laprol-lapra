@@ -53,6 +53,12 @@ laprol-lapra/
 
 **SQL-migrációk módja is így megy:** a Code ír egy `.sql` fájlt a mappába, TE futtatod a Supabase SQL Editorban, majd jelented az eredményt (a Code sosem fut SQL-t közvetlenül a te Supabase-projekted ellen).
 
+### Supabase inaktivitás elleni védelem — heti "heartbeat" **[DÖNTVE, megvalósítva]**
+A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után szüneteltet egy projektet — pusztán a Dashboard/app megnyitása nem elég, ez majdnem megtörtént élesben egyszer (figyelmeztető email érkezett róla). Megoldás: egy tisztán adatbázis-szintű, `pg_cron`-nal ütemezett heti job (**nincs benne Edge Function, `pg_net` vagy külső titok** — szándékosan a legegyszerűbb, elégséges megoldás, mivel egyedüli cél az inaktivitás elkerülése, semmi más — nem tévesztendő össze a hordozhatóság/export nyitott kérdésével, ami külön, később aktuális téma).
+- **`system_heartbeat` tábla** — egysoros, tisztán technikai; RLS bekapcsolva, DE szándékosan nincs rajta policy, így a kliens (böngésző/app) semmilyen hozzáférést nem kap hozzá, kizárólag a `pg_cron` éri el.
+- **`weekly-heartbeat` cron job** — minden vasárnap 03:17 UTC-kor egy egyszerű UPSERT-et futtat rajta (`cron.job`/`cron.job_run_details` táblákból ellenőrizhető, hogy lefutott-e).
+- SQL: `laprol-lapra-heartbeat.sql`. Előfeltétel: a `pg_cron` extension engedélyezve legyen (a script megpróbálja magától bekapcsolni; ha nem sikerül, Dashboard → Database → Extensions → pg_cron).
+
 ---
 
 ## 3. Adatmodell
