@@ -65,8 +65,12 @@ function normStatus(v){ if(!v) return undefined; const t=String(v).trim().toLowe
   if(t==="megvan")return"megvan"; if(t==="hianyzik"||t==="hiányzik"||t==="hiany"||t==="hiány")return"hianyzik";
   if(t==="nemkell")return"nemkell"; return undefined; }
 
+// 3 oszlop / típus: státusz, azonosító, megnevezés. A Megnevezés — ha egy
+// típusból már több példány is van a Számon — kizárólag az ELSŐ (elsődleges)
+// példányra vonatkozik; a 2., 3. stb. példány felvitele/elnevezése Excel-lel
+// nem támogatott, csak kézzel a szerkesztőben.
 function tmplHead(s){ const h=["lapszám","cím","dátum (Excel dátum, pl. 2026.03.15)","eredeti ár (csak szám)","fizetett ár – személyes (csak szám)"];
-  s.components.forEach(t=>{ h.push((COMP_TYPES[t]||t)+" státusz (megvan/hianyzik/nemkell)"); h.push((COMP_TYPES[t]||t)+" azonosító"); }); return h; }
+  s.components.forEach(t=>{ h.push((COMP_TYPES[t]||t)+" státusz (megvan/hianyzik/nemkell)"); h.push((COMP_TYPES[t]||t)+" azonosító"); h.push((COMP_TYPES[t]||t)+" megnevezés"); }); return h; }
 
 export async function downloadTemplate(){
   const s=S();
@@ -75,9 +79,9 @@ export async function downloadTemplate(){
     const X=await xlsx(), head=tmplHead(s);
     // valódi Excel dátum- és szám-típusú példacellák, hogy Excel a helyes formátumot ajánlja fel
     const ex1=[1,"Példa – írd át vagy töröld", new Date(2026,2,15), 2490, ""];
-    s.components.forEach(()=>{ ex1.push("megvan"); ex1.push(""); });
+    s.components.forEach(()=>{ ex1.push("megvan"); ex1.push(""); ex1.push(""); });
     const ex2=[2,"Másik példa", new Date(2026,3,15), 1490, 1490];
-    s.components.forEach(()=>{ ex2.push(""); ex2.push(""); });
+    s.components.forEach(()=>{ ex2.push(""); ex2.push(""); ex2.push(""); });
     const ws=X.utils.aoa_to_sheet([head,ex1,ex2], {cellDates:true});
     ws["!cols"]=head.map(h=>({wch:Math.max(14,h.length+2)}));
     // pénz-oszlopok (D, E) explicit szám-formátum
@@ -108,9 +112,9 @@ export async function handleUpload(file){
       const comps=[];
       for(let ci=0; ci<s.components.length; ci++){
         const t=s.components[ci];
-        const st=normStatus(row[5+ci*2]); const az=String(row[6+ci*2]??"").trim();
-        // status: SZEMÉLYES (member_status) — mindig közvetlen. azonosito: TÖRZSADAT (components).
-        comps.push({t, status:st, azonosito: az||null});
+        const st=normStatus(row[5+ci*3]); const az=String(row[6+ci*3]??"").trim(); const mn=String(row[7+ci*3]??"").trim();
+        // status: SZEMÉLYES (member_status) — mindig közvetlen. azonosito/megnevezés: TÖRZSADAT (components).
+        comps.push({t, status:st, azonosito: az||null, megnevezes: mn||null});
       }
       const existing=s.items.find(x=>x.n===n);
       plan.push({n, p, pi, comps, isNew:!existing});
@@ -153,7 +157,7 @@ ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új
           if(error) throw error; const issueId=data.id;
           if(Object.keys(item.pi).length){ const pierr=await upsertMyIssueData(issueId, {...item.pi, ar_auto:false}); if(pierr) throw pierr; }
           for(const c of item.comps){
-            const cpayload={}; if(c.azonosito) cpayload.azonosito=c.azonosito;
+            const cpayload={}; if(c.azonosito) cpayload.azonosito=c.azonosito; if(c.megnevezes) cpayload.megnevezes=c.megnevezes;
             const {data:cd,error:cerr}=await supabase.from("components").insert({...cpayload, issue_id:issueId, tipus:c.t}).select().single();
             if(cerr) throw cerr;
             if(c.status!==undefined){ const serr=await upsertMyStatus(cd.id, {status:c.status}); if(serr) throw serr; }
@@ -165,11 +169,11 @@ ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új
           if(Object.keys(item.pi).length){ const pierr=await upsertMyIssueData(liveIssue.id, {...item.pi, ar_auto:false}); if(pierr) throw pierr; }
           for(const c of item.comps){
             if(c.status===undefined) continue;
-            const liveComp=liveIssue.comps[c.t]; if(!liveComp||!liveComp.id) continue;
+            const liveComp=(liveIssue.comps[c.t]||[])[0]; if(!liveComp||!liveComp.id) continue;
             const serr=await upsertMyStatus(liveComp.id, {status:c.status}); if(serr) throw serr;
           }
           // Törzsadat: a szerkesztési draftba (csak most, ha tényleg kell — létrehozás/claim lazy).
-          const hasMasterChange = Object.keys(item.p).length>0 || item.comps.some(c=>c.azonosito);
+          const hasMasterChange = Object.keys(item.p).length>0 || item.comps.some(c=>c.azonosito||c.megnevezes);
           if(hasMasterChange){
             if(!draftId) draftId = await findOrCreateEditDraft(s);
             await upsertDraftIssue(draftId, liveIssue, item.p, item.comps);
@@ -239,12 +243,17 @@ async function upsertDraftIssue(draftId, liveIssue, masterFields, comps){
   }
 
   for(const c of comps){
-    if(!c.azonosito) continue;
-    const liveComp=liveIssue.comps[c.t]; if(!liveComp||!liveComp.id) continue;
+    if(!c.azonosito && !c.megnevezes) continue;
+    // Excel-lel csak az ELSŐDLEGES (első) példány azonosítója/megnevezése
+    // állítható — egy 2., 3. példány felvitele/átnevezése csak kézzel, a
+    // Karbantartás draft-szerkesztőjében megy (lásd tmplHead megjegyzése).
+    const liveComp=(liveIssue.comps[c.t]||[])[0]; if(!liveComp||!liveComp.id) continue;
     const { data: existingDC, error: dcerr } = await supabase.from("draft_components")
       .select("*").eq("draft_issue_id", draftIssueId).eq("source_component_id", liveComp.id).maybeSingle();
     if(dcerr) throw dcerr;
-    const cpayload = { azonosito_tipus: liveComp.azonosito_tipus||null, azonosito: c.azonosito, tipus: c.t };
+    const cpayload = { azonosito_tipus: liveComp.azonosito_tipus||null,
+      azonosito: c.azonosito || liveComp.azonosito || null,
+      megnevezes: c.megnevezes || liveComp.megnevezes || null, tipus: c.t };
     if(existingDC){ const {error:ucerr}=await supabase.from("draft_components").update(cpayload).eq("id",existingDC.id); if(ucerr) throw ucerr; }
     else { const {error:icerr}=await supabase.from("draft_components").insert({draft_issue_id:draftIssueId, source_component_id:liveComp.id, ...cpayload}); if(icerr) throw icerr; }
   }

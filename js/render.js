@@ -1,7 +1,7 @@
 /* ============================================================
    Megjelenítés: fülek, hero, szűrők, lista, tapadó fejléc.
    ============================================================ */
-import { state, S, COMP_TYPES, todayISO, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent } from "./state.js";
+import { state, S, COMP_TYPES, todayISO, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus } from "./state.js";
 import { stats } from "./data.js";
 import { showSeriesChangePopup, showIssueChangePopup, showCollectedChanges } from "./changes.js";
 import { isStaff } from "./permissions.js";
@@ -63,7 +63,7 @@ export function renderHero(){
 }
 
 const FILTERS=[["mind","Mind"],["megvan","Megvan"],["hianyzik","Hiányzik"],["nemkell","Nem kell"],["varhato","Várható"]];
-function issueHasStatus(it,s,stt){ return s.components.some(t=>it.comps[t]&&it.comps[t].status===stt); }
+function issueHasStatus(it,s,stt){ return s.components.some(t=>compsOfType(it,t).some(c=>c.status===stt)); }
 
 export function renderChips(){
   const s=S(); const activeItems=s.items.filter(it=>!it.deleted);
@@ -146,31 +146,49 @@ export function renderList(){
     }
     const future=it.date&&it.date>todayISO;
     const istate=issueState(it,s);
-    const hasPendingImg = isStaff() && s.components.some(t=>it.comps[t] && it.comps[t].pending);
+    const hasPendingImg = isStaff() && s.components.some(t=>compsOfType(it,t).some(c=>c.pending));
     const dateHtml=it.date?`<span class="${future?"future":""}">${fmtDate(it.date)}</span>`:`<span style="color:var(--faint)">nincs dátum</span>`;
     const dbTag=(it.besz_menny&&it.besz_menny>1)?`<span class="dbtag">${it.besz_menny} db</span>`:"";
     const eredetiLine = `<span class="money">eredeti ár ${it.eredeti_ar!=null?fmtFt(it.eredeti_ar):"nem ismert"}</span>`;
     const fizetveLine = hasOwnedComponent(it,s) ? `<span class="money">fizetve ${it.fizetett_ar!=null?fmtFt(it.fizetett_ar):"nem ismert"}</span>` : "";
     const moneyBlock = `<div class="imoney">${eredetiLine}${fizetveLine}</div>`;
     // A +/− léptetők a lenyíló panelbe kerültek; a listában csak a darabszám-kijelzés marad az ikonon.
-    const marks=s.components.map(t=>{ const c=it.comps[t]||{status:null}; const stt=c.status; const cdb=(c.db==null?1:c.db);
-      const showCnt = stt==="megvan" && cdb>1;
-      return `<button class="mark${stt?" m-"+stt:""}${showCnt?" has-cnt":""}" data-n="${it.n}" data-t="${t}" ${future?"disabled":""}
-        title="${COMP_TYPES[t]||t}${stt?": "+stt:": jelöletlen"}${showCnt?" · "+cdb+" db":""}" aria-label="${COMP_TYPES[t]||t}">
-        <span class="mrow">${ICONS[t]||ICONS.egyeb}${showCnt?`<span class="cnt">${cdb}</span>`:""}</span><span class="mlab">${MLAB[stt]||""}</span></button>`;
+    // Ha egy típusból egy Számon TÖBB, egyedi Megnevezésű példány van, a kompakt
+    // gomb koppintással már nem cserélgethető (melyiket?) — helyette összesített,
+    // "legrosszabb eset" jelvényt mutat, és a panelt nyitja meg a részletekhez.
+    const marks=s.components.map(t=>{
+      const inst=compsOfType(it,t); const multi=inst.length>1;
+      const c=inst[0]||{status:null}; const cdb=(c.db==null?1:c.db);
+      const stt = multi ? worstStatus(inst) : c.status;
+      const showCnt = !multi && stt==="megvan" && cdb>1;
+      const countTag = multi ? `<span class="cnt">×${inst.length}</span>` : (showCnt?`<span class="cnt">${cdb}</span>`:"");
+      const title = multi
+        ? `${COMP_TYPES[t]||t}: ${inst.length} példány — legrosszabb eset: ${stt?MLAB[stt]:"jelöletlen"}`
+        : `${COMP_TYPES[t]||t}${stt?": "+stt:": jelöletlen"}${showCnt?" · "+cdb+" db":""}`;
+      const idAttr = multi ? `data-multi="1"` : `data-cid="${c.id||""}"`;
+      return `<button class="mark${stt?" m-"+stt:""}${(showCnt||multi)?" has-cnt":""}" data-n="${it.n}" data-t="${t}" ${idAttr} ${future?"disabled":""}
+        title="${title}" aria-label="${COMP_TYPES[t]||t}">
+        <span class="mrow">${ICONS[t]||ICONS.egyeb}${countTag}</span><span class="mlab">${multi?"részletek":(MLAB[stt]||"")}</span></button>`;
     }).join("");
     const open = state.openIssue===it.n;
-    const panel = open ? `<div class="imgpanel">` + s.components.map((t,ci)=>{
-        const c=it.comps[t]||{};
+    // A panel a Számon TÉNYLEGESEN meglévő komponens-PÉLDÁNYOKAT listázza (nem a
+    // deklarált típusokat) — egy típusból több példány is saját kártyát kap, a
+    // Megnevezésével (vagy "Típus #N" eséssel, ha nincs kitöltve és 1-nél több van).
+    const flat = s.components.flatMap(t=>compsOfType(it,t).map(c=>({t,c})));
+    const typeCounts={}; flat.forEach(({t})=>{ typeCounts[t]=(typeCounts[t]||0)+1; });
+    const typeSeen={};
+    const panel = open ? `<div class="imgpanel">` + flat.map(({t,c},ci)=>{
         const cdb=(c.db==null?1:c.db);
+        typeSeen[t]=(typeSeen[t]||0)+1;
+        const label = c.megnevezes ? esc(c.megnevezes) : (typeCounts[t]>1 ? `${COMP_TYPES[t]||t} #${typeSeen[t]}` : (COMP_TYPES[t]||t));
         const img=c.kep_url?`<img src="${esc(c.kep_url)}" alt="${COMP_TYPES[t]||t}">`:`nincs adat`;
         // A tényleges darabszám-állítás itt, a panelben — nagyobb, kényelmesen érinthető gombokkal.
         const pstep = !future ? `<div class="pstepper">
-          <button class="pstepbtn" data-step="-" data-n="${it.n}" data-t="${t}" aria-label="Kevesebb">−</button>
+          <button class="pstepbtn" data-step="-" data-n="${it.n}" data-cid="${c.id}" aria-label="Kevesebb">−</button>
           <span class="pcount">${cdb} db</span>
-          <button class="pstepbtn" data-step="+" data-n="${it.n}" data-t="${t}" aria-label="Több">+</button></div>` : "";
+          <button class="pstepbtn" data-step="+" data-n="${it.n}" data-cid="${c.id}" aria-label="Több">+</button></div>` : "";
         return `<div class="imgcard"><div class="imgbox">${img}</div>
-          <div class="imgcap"><div class="cn">${COMP_TYPES[t]||t}</div>
+          <div class="imgcap"><div class="cn">${label}</div>
           <div class="cc">${scode}-${pad(it.n,4)}-${pad(ci+1,2)}</div></div>${pstep}
           ${c.id?imageControlsHtml(c,c.id):""}</div>`;
       }).join("") + `</div>

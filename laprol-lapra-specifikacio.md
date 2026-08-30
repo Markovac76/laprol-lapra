@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.8 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.9 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -93,6 +93,7 @@ A komponens-**típusokat a modul** definiálja (magazin / modell / egyéb; a mod
 
 Egy szám egy vagy több komponensből áll (pl. **magazin** + **modell**, vagy több melléklet). Minden komponens:
 - UUID · kód · **típus** (magazin / modell / egyéb)
+- **megnevezés** (opcionális, szabad szöveges) — lásd lent
 - **saját státusz** (megvan / hiányzik / nem kell / jelöletlen)
 - **darabszám (db)** — élő készlet-számláló, alapértelmezetten 1; komponensenként külön (a magazinból maradhat 1, a modellből 2). Lásd 6.7.
 - **saját kép** (**egy kép komponensenként**: a magaziné a borító, a modellé a modellfotó, a könyvé egy kép a könyvről — Supabase Storage)
@@ -102,6 +103,13 @@ Egy szám egy vagy több komponensből áll (pl. **magazin** + **modell**, vagy 
 - **címkék (tag-ek)** — külön lekérdezhetők; ez a platform „fogalomtárához" kapcsolódó réteg
 
 > Ez leváltja a korábbi „két fix képmező" ötletet: a kép mostantól **komponens-szintű**, így akárhány melléklet is viheti a sajátját.
+
+**Komponens-szintű "Megnevezés" + több azonos típusú komponens egy Számon [DÖNTVE, megvalósítva — v1.9]:** feloldja a 10.10-es nyitott kérdést. Egy Számon **egy típusból TÖBB, egyedi példány is** felvehető (pl. két különböző Lego-minifigura-csomag ugyanazon a Számon) — a `components`/`draft_components` táblákon sosem volt `UNIQUE(issue_id, tipus)` megszorítás, ez korábban tisztán a kliens-oldali (típusonként egy komponens) modell korlátja volt. Minden példány kaphat egy opcionális, szabad szöveges **`megnevezes`** mezőt (pl. "Star Wars minifigura-csomag"), ami eltérhet a Szám (könyv/magazin) címétől; ha üres, a felület "Típus #N" sorszámozásra esik vissza (csak akkor számoz, ha ténylegesen 1-nél több példány van egy típusból — egyetlen példánynál a puszta típusnév marad, nincs vizuális változás a megszokotthoz képest).
+- **UI:** a kompakt lista-sorban egyetlen példánynál minden marad a régiben (koppintásra körbeforog); 2+ példánynál a gomb egy "legrosszabb eset" jelvénnyé válik (×N jelzéssel), koppintásra a lenyíló panelt nyitja meg — ott minden példány saját kártyát kap (kép, darabszám-léptető, Megnevezés/fallback felirat), mert egyenkénti állítás csak ott értelmezhető (melyiket cserélgetné a kompakt gomb?).
+- **Felvitel:** a Karbantartás draft-szerkesztőjében ÉS a "+ Új tétel" gyors-felvitelnél is van "+ Még egy [Típus] hozzáadása" — mindkét helyen tetszőleges számú példány adható egy típusból, mentés előtt szabadon törölhető/bővíthető.
+- **Excel-sablon:** a "Megnevezés" mostantól saját oszlop típusonként (mind az élő sorozat sablonjában, mind a draft/javaslat sablonban) — de kizárólag az adott típus **elsődleges (első) példányára** vonatkozik; egy 2., 3. példány felvitele/elnevezése Excellel nem támogatott, csak kézzel a szerkesztőben (a sablon egy Szám = egy sor modellje ezt nem bírná el jól változó példányszám mellett).
+- **Draft-folyamat:** egy meglévő, publikált Számon új példány hozzáadása vagy egy meglévő megnevezésének módosítása a szokásos draft → diff → verzió → felkiáltójel-folyamaton megy át (`publish_draft_series()` a `megnevezes` mezőt is diffeli/logolja/frissíti); nem publikált (munkaanyag) sorozatnál szabadon szerkeszthető.
+- SQL: `laprol-lapra-komponens-megnevezes.sql` (oszlop), `laprol-lapra-komponens-megnevezes-rpc.sql` (`propose_bulk_issues`), `laprol-lapra-komponens-megnevezes-publish.sql` (`publish_draft_series`).
 
 **Képkezelés [DÖNTVE, megvalósítva — v1.6]:**
 - Tárolás: **Supabase Storage, KÖZÖS, publikus bucket** (`component-images`) — a megosztott katalógus elvéhez igazítva. *(Eltérés a korábbi tervtől: az eredetileg elgondolt felhasználónkénti privát mappa + aláírt URL a megosztott katalógus fényében feleslegesen bonyolult lett volna — a kép mostantól közös adat, mint a sorozat/tétel törzsadata.)* A `kep_url` állandó publikus URL, minden cserénél cache-busting query-paraméterrel frissítve.
@@ -166,21 +174,22 @@ megvan · hiány · nem kell · jelöletlen. A színek: **megvan = zöld**, **hi
 - **Jelöletlenre nem tér vissza koppintással.** A státusz **reset-elése a „Saját adatlap" ablakban** lehetséges — ez mindenkinek elérhető, nem staff-funkció (v1.7).
 - **Jövőbeli dátumú** szám komponensei nem állíthatók (a gombok letiltva).
 
-### 6.3 Komponens-hierarchia **[DÖNTVE]**
-Egy szám színét a **domináns komponens** dönti el:
-- ha van magazin + más komponens → a **nem-magazin** komponens a domináns;
-- ha csak egy komponens van → az a domináns.
-*(Kettőnél több nem-magazin komponens esetét később tisztázzuk — jelenleg nincs ilyen.)*
+### 6.3 Komponens-hierarchia **[DÖNTVE · v1.9-ben kiterjesztve]**
+Egy szám színét a **domináns típus(ok)** összesített állapota dönti el:
+- ha van magazin + más típus → a **nem-magazin** típus(ok) dominálnak;
+- ha csak egy típus van → az a domináns.
+
+**Kettőnél több nem-magazin komponens (10.10) — LEZÁRVA, v1.9:** ha egy Számon a domináns típus(ok) összesen TÖBB példányból állnak (akár mert több nem-magazin TÍPUS van deklarálva, akár mert egy típusból több, egyedi Megnevezésű PÉLDÁNY létezik — pl. két különböző Lego-csomag), a "legrosszabb eset nyer" elv dönt: a Szám csak akkor **zöld**, ha a domináns típus(ok) MINDEN példánya `megvan`. A rangsor (legrosszabbtól a legjobbig): **hiányzik > jelöletlen > nem kell > megvan** — ez pontosan visszaadja a 6.4-es táblázatot egyetlen példány esetén, nincs viselkedésváltozás a ma megszokotthoz képest.
 
 ### 6.4 A lapszám színe **[DÖNTVE]**
 
-| Domináns komponens | Magazin | Lapszám színe |
+| Domináns típus(ok) összesített állapota | Magazin | Lapszám színe |
 |---|---|---|
-| megvan | bármi | **zöld** |
-| nem kell | bármi | **szürke** |
-| hiány | megvan | **sárga** (részleges) |
-| hiány | hiány / nem kell / jelöletlen | **piros** |
-| jelöletlen | bármi | **semleges** |
+| megvan (MINDEN példány) | bármi | **zöld** |
+| nem kell (a legrosszabb eset ez, hiány/jelöletlen nélkül) | bármi | **szürke** |
+| hiány (van legalább egy hiányzó példány) | megvan | **sárga** (részleges) |
+| hiány (van legalább egy hiányzó példány) | hiány / nem kell / jelöletlen | **piros** |
+| jelöletlen (a legrosszabb eset ez, hiány nélkül) | bármi | **semleges** |
 | *(még nem jelent meg)* | — | **semleges** |
 
 **Olvasata:** zöld = kész · sárga = van belőle valami, de a lényeg hiányzik · piros = kell · szürke = tudatosan kihúzva · semleges = még nem téma.
@@ -280,7 +289,7 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 7. **Címkerendszer:** a listatárban a hely megvan, de a logika (hierarchia? szinonimák? kanonikus alak?) **külön átbeszélendő**, mielőtt szabványosítjuk. *(Lásd bővebben a platform-fejezet „Modulok közti kapcsolat" pontját is.)*
 8. **Import-sablon konkrét elrendezése:** az elv eldőlt (a sorozat komponens-készletéből származik); a pontos oszlop-felépítés az építéskor.
 9. **Kép nagyítása:** a lenyíló képsávban a képre koppintva teljes képernyős nézet — hasznos lehet, még nem épült meg.
-10. **Kettőnél több nem-magazin komponens** esetén a hierarchia pontosítása (jelenleg nem aktuális).
+10. **Kettőnél több nem-magazin komponens** esetén a hierarchia pontosítása — **[LEZÁRVA, megvalósítva — v1.9]**, lásd 5.3/6.3.
 11. **További „nagy kép" szempontok**, ha felmerülnek.
 12. **Excel-import összehangolása a draft/pool-folyamattal — [LEZÁRVA, megvalósítva]** A döntés (publikált sorozatra irányuló import, MEGLÉVŐ tételek módosítása → szerkesztési draftba, szokásos publikálás-folyamattal; ÚJ tétel/komponens → közvetlen írás, nincs mit védeni) átvezetve a kódba (`js/excel.js`). Mellékesen javítva egy dormant hiba: a komponens-státusz korábban a holt `components.status` oszlopba íródott a személyes `member_status` helyett.
 
@@ -432,6 +441,7 @@ SQL-ek: `laprol-lapra-hibajavitas-1-5-szam-torles-sajat-adatlap.sql`, `-14-kompo
 ---
 
 *Napló:*
+- v1.9 — **Komponens-szintű "Megnevezés" + több azonos típusú komponens egy Számon** (5.3, 6.3/6.4, 10.10 lezárva): opcionális, szabad szöveges `megnevezes` mező minden komponensen ("Típus #N" fallback, ha üres); egy típusból mostantól tetszőleges számú, egyedi példány felvehető egy Számon (pl. két Lego-csomag) — a `+ Még egy X hozzáadása` a Karbantartás draft-szerkesztőjében és a "+ Új tétel" gyors-felvitelnél is elérhető. Színezés kiterjesztve: "legrosszabb eset nyer" a domináns típus(ok) ÖSSZES példányára (nem csak egyre), 1 példánynál nincs viselkedésváltozás. Excel-sablon (mindkét helyen) új "megnevezés" oszlopot kapott típusonként, kizárólag az elsődleges példányra. Draft-folyamat: `publish_draft_series()` és `propose_bulk_issues()` is frissítve, a `megnevezes` a szokásos diff/verzió/change_log-gépezeten megy át. SQL: `laprol-lapra-komponens-megnevezes.sql`, `-rpc.sql`, `-publish.sql`. *(Mellékesen javítva: a Karbantartásban egy "Új javaslat" sehol nem mutatta a sorozat nevét — a `karbantartas.js` három helyen kézzel írt felirata `pool_type==="new"`-nál kihagyta a nevet; nem RLS/JOIN-hiba volt, tisztán megjelenítési hiba, javítva.)*
 - v1.8 — **Üzemeltetési kiegészítések** (8. fejezet): (1) **Supabase inaktivitás elleni védelem** — heti `pg_cron` „heartbeat" (`system_heartbeat` tábla, RLS-sel, policy nélkül; `weekly-heartbeat` job), hogy a Free plan sose szüneteltesse a projektet 7 nap inaktivitás miatt. (2) **Migrációk munkamódszere megváltozott**: a Code mostantól közvetlen Postgres-kapcsolattal (`scripts/run-migration.js`, `pg` npm-csomag, gitignore-olt `db.local.js` connection stringgel) maga futtatja a migrációkat, automatikus `db-backups/` pillanatképpel és tranzakciós (`BEGIN`/`COMMIT`/`ROLLBACK`) végrehajtással — a korábbi „a tulajdonos futtatja a Supabase SQL Editorban" helyett. A jóváhagyási igény (teljes SQL megmutatása + explicit jóváhagyás előbb) változatlan. Élesben tesztelve mindkettő (kapcsolódás, 17-táblás backup, idempotens migráció újrafuttatása, cron job aktív állapota). Új projekt-belépő dokumentum: **`README.md`** (tech stack, mappaszerkezet, munkamódszer — a migrációs munkamódszer részletei elsődlegesen ott, nem itt). SQL: `laprol-lapra-heartbeat.sql`.
 - v1.7 — **Hibajavítási kör** (élő tesztelésből, 15 pont, `claude-code-4-lepes-hibajavitasok.md`), teljesen lezárva: mobil UI/CSS finomítások (chips-görgetősáv, felkiáltójel-badge pozíció, fejléc-gomb sorrend/hangsúly, kép-placeholder méret); terminológia-egységesítés („Szám" mindenütt); egységes, kézzel írt inline SVG-ikonrendszer (a natív emoji platformfüggő megjelenése helyett); force-törlés korai lezárása (ha a türelmi idő alatt 0-ra csökken az aktív kiválasztás); **a staff-only „Tétel szerkesztése" gyors-panel megszűnt**, helyette mindenkinek elérhető **„Saját adatlap"** (5.5) + a Karbantartás draft-útja minden törzsadat-módosításra, Szám-törlés **soft-delete-tel** (13.8); komponens-típus utólagos átsorolása (13.8); **sablon-alapú tömeges tétel-feltöltés** draftokhoz, két helyen (13.8); a meglévő, élő sorozatokhoz tartozó Excel-sablon gombok mostantól minden nézeten (mobilon is) elérhetők, a „+ Új tétel"/„☰ Listák" gombokkal egy sorban; a 🗂️ Karbantartás és 📚 Sorozataim fejléc-gomb helyet cserélt; **beépített súgó** (13.9). Mellékesen javítva egy önálló, a kör közben talált RLS-hiba: a javaslat-beküldés (`draft_series` insert) egy `.select()`-es visszaolvasás miatt minden nem-staff felhasználónál elbukott (a SELECT-szabály staff-only, Postgres az `INSERT...RETURNING` kimenetét is átengedi rajta) — javítva kliens-oldali id-generálással, RLS-módosítás nélkül. Az Excel-import/draft-pool összehangolása (10. fejezet 12. pontja, korábban „döntve, de nem építve") ezzel a körrel egy időben szintén lezárva.
 - v1.6 — **Sorozatkezelés teljes újratervezése és megvalósítása** (5 lépésben): **(1)** kiválasztás rétege — `member_series`, „📚 Sorozataim" választó, a fülsáv innentől csak a saját bepipált sorozatokból épül (13.3, az 5×-ös törlési limit később elvetve). **(2)** sorozat-életciklus állapotgép (Beérkezett/Munkaanyag/Publikálásra váró/Aktív/Publikálatlan) + „🗂️ Karbantartás" staff-only menüpont, `draft_series` pool — a régi közvetlen „+ Új sorozat"/„✎ Sorozat" gombok megszűntek, minden sorozat-törzsadat-módosítás a pool-on megy át (13.5). **(3)** `draft_issues`/`draft_components` — a szerkesztés-indítás a teljes élő adatot átmásolja a draftba; `publish_draft_series()` SQL-függvény egy tranzakcióban diffel/verzióz/frissít; felkiáltójel-mechanizmus (`change_log`, `member_seen`) négy helyen (13.6). Mellékesen javítva: a sorozat-kód számláló globálissá vált. **(4)** teljes képkezelés-csővezeték a semmiből: közös, publikus Storage bucket, kliens-oldali átméretezés, staff közvetlen feltöltés, user-javaslat workflow helyi (nem külön queue) elbírálással (5.3). **(5)** force-törlés — owner-only, 0 aktív kiválasztásnál azonnali, egyébként 14 napos türelmi idővel, kétszintű védőhálóval (13.7); mellékesen lezárva egy talált RLS-rés (a `series` tábla eddig staffnak közvetlen törlést is engedett volna). SQL-ek: `laprol-lapra-sorozatkezeles-1` … `-6` (az utolsó a törlési limit utólagos elvetése).

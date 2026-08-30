@@ -3,24 +3,16 @@
    belül — a Karbantartás "Szerkesztés" nézetének beágyazott listája.
    Csak törzsadat-mezők — nincs személyes réteg, a draft publikálás
    előtti állapot, még senkinek nincs rajta saját adata.
+
+   Egy típusból TÖBB, egyedi Megnevezésű példány is felvehető (pl. két
+   különböző Lego-csomag) — ezért a `comps` mindig FLAT tömb (nem
+   típusonkénti map), soha nem dedupelünk típus szerint.
    ============================================================ */
 import { supabase } from "./supabase.js";
 import { state, COMP_TYPES, esc, fmtDate, opts, listName } from "./state.js";
 import { openModal, err } from "./modal.js";
 
 const typeLabel = t => listName("komponens", t) || COMP_TYPES[t] || t;
-// A deklarált (sorozat-szintű) típusok ÉS a tételen ténylegesen meglévő,
-// esetleg átsorolt komponensek típusainak uniója — hogy egy már átsorolt
-// komponens ne "tűnjön el" a szerkesztőből.
-const compSlots = (it, components) => Array.from(new Set([...components, ...((it&&it.comps)||[]).map(c=>c.tipus)]));
-// Átsorolásnál csak olyan célt kínálunk fel, amit a tétel MÁS komponense
-// még nem foglal — két azonos típusú komponens ugyanazon a tételen
-// összeütközne (a második "eltűnne", mert az élő adat típusonként egy
-// komponenst vár tételenként).
-const retypeOptions = (it, ownType) => {
-  const usedElsewhere = new Set((it.comps||[]).filter(c=>c.tipus!==ownType).map(c=>c.tipus));
-  return (state.LISTS.komponens||[]).filter(o=>o.ertek===ownType || !usedElsewhere.has(o.ertek));
-};
 
 export async function fetchDraftItems(draftSeriesId){
   const { data: issues, error: ie } = await supabase.from("draft_issues")
@@ -36,13 +28,12 @@ export async function fetchDraftItems(draftSeriesId){
   return (issues||[]).map(it=>({...it, comps: comps.filter(c=>c.draft_issue_id===it.id)}));
 }
 
-export function renderDraftItemsList(items, components){
+export function renderDraftItemsList(items){
   if(!items.length) return `<p class="msub">Még nincs szám a draftban.</p>`;
   return items.map(it=>{
-    const compsTxt = compSlots(it, components).map(t=>{
-      const c=it.comps.find(x=>x.tipus===t);
-      return `${typeLabel(t)}${c&&c.azonosito?": "+esc(c.azonosito):""}`;
-    }).join(" · ");
+    const compsTxt = (it.comps||[]).map(c=>
+      `${typeLabel(c.tipus)}${c.megnevezes?" — "+esc(c.megnevezes):""}${c.azonosito?": "+esc(c.azonosito):""}`
+    ).join(" · ");
     return `<div class="userrow"><div class="uinfo">
         <div class="uname">#${it.lapszam}${it.cim?" – "+esc(it.cim):""}</div>
         <div class="unote">${it.megjelenes?fmtDate(it.megjelenes):"nincs dátum"}${it.eredeti_ar!=null?" · "+it.eredeti_ar+" Ft":""}</div>
@@ -54,77 +45,126 @@ export function renderDraftItemsList(items, components){
   }).join("");
 }
 
+let tmpSeq=0;
+const keyOf = c => c.id || c._tmpKey;
+
 export function draftItemForm(draftSeriesId, existing, components, onDone){
-  const it = existing || {lapszam:"", cim:"", megjelenes:"", eredeti_ar:"", comps:[]};
-  const slots = existing ? compSlots(it, components) : components;
-  const compBlocks = slots.map(t=>{
-    const c=(it.comps||[]).find(x=>x.tipus===t)||{};
-    const canRetype = !!(existing && c.id);
-    const typeOpts = canRetype ? retypeOptions(it,t).map(o=>`<option value="${esc(o.ertek)}"${o.ertek===t?" selected":""}>${esc(o.nev)}</option>`).join("") : "";
-    return `<div class="compedit">
-      <h4>${esc(typeLabel(t))}</h4>
-      ${canRetype?`<div class="field"><label>Típus (utólagos átsorolás)</label><select id="di-type-${t}">${typeOpts}</select></div>`:""}
-      <div class="grid2">
-        <div class="field"><label>Azonosító típusa</label><select id="di-ct-${t}"><option value="">—</option>${opts("azonosito",c.azonosito_tipus)}</select></div>
-        <div class="field"><label>Azonosító</label><input id="di-cid-${t}" value="${esc(c.azonosito||"")}"></div>
-      </div>
-    </div>`;
-  }).join("");
+  // Munka-másolat: a `comps` itt egy FLAT tömb (session-only, még nem mentett
+  // "+ Még egy X" példányokkal bővíthető) — csak Mentéskor kerül a DB-be.
+  let comps = existing ? (existing.comps||[]).map(c=>({...c}))
+    : components.map(t=>({tipus:t, azonosito_tipus:null, azonosito:"", megnevezes:"", _tmpKey:"tmp"+(tmpSeq++)}));
+  let master = { lapszam: existing?existing.lapszam:"", cim: existing?(existing.cim||""):"", megjelenes: existing?(existing.megjelenes||""):"",
+    eredeti_ar: existing&&existing.eredeti_ar!=null?existing.eredeti_ar:"", deleted: existing?!!existing.deleted:false };
 
-  openModal(`<h2>${existing?"Szám szerkesztése (draft)":"Új szám (draft)"}</h2>
-    <p class="msub">Munkaanyag — publikálásig senki más nem látja.</p>
-    <div class="grid2">
-      <div class="field"><label>Lapszám</label><input id="di-n" type="number" value="${it.lapszam}"></div>
-      <div class="field"><label>Megjelenés dátuma</label><input id="di-date" type="date" value="${it.megjelenes||""}"></div>
-    </div>
-    <div class="field"><label>Cím</label><input id="di-name" value="${esc(it.cim||"")}"></div>
-    <div class="field"><label>Eredeti ár (Ft)</label><input id="di-eredeti" type="number" value="${it.eredeti_ar??""}"></div>
-    ${compBlocks}
-    ${existing&&existing.source_issue_id?`<label class="ckrow" style="margin-top:10px"><input type="checkbox" id="di-deleted" ${it.deleted?"checked":""}> Ezt a Számot törlöm a sorozatból (publikáláskor)</label>`:""}
-    <div class="modrow"><button class="btn ghost" id="di-back">Vissza</button><button class="btn" id="di-save">Mentés</button></div>
-    ${existing?`<div class="modrow"><button class="btn danger" id="di-del">Szám törlése a draftból</button></div>`:""}`);
-
-  document.getElementById("di-back").onclick=()=>onDone();
-  document.getElementById("di-save").onclick=async ()=>{
-    const v=id=>{const e=document.getElementById(id);return e?e.value.trim():"";};
-    const n=parseInt(v("di-n")); if(isNaN(n)){alert("A lapszám kötelező.");return;}
-    const delCk=document.getElementById("di-deleted");
-    const master={ draft_series_id:draftSeriesId, lapszam:n, cim:v("di-name")||null, megjelenes:v("di-date")||null,
-      eredeti_ar:v("di-eredeti")?parseInt(v("di-eredeti")):null, deleted: delCk ? delCk.checked : false };
-    const chosenTipusok = slots.map(t=>{ const sel=document.getElementById("di-type-"+t); return sel?sel.value:t; });
-    if(new Set(chosenTipusok).size !== chosenTipusok.length){
-      alert("Két komponens nem sorolható ugyanarra a típusra ezen a Számon."); return;
+  function syncFromDom(){
+    const v=id=>{const e=document.getElementById(id); return e?e.value:null;};
+    if(document.getElementById("di-n")!=null){
+      master.lapszam=v("di-n"); master.cim=v("di-name"); master.megjelenes=v("di-date"); master.eredeti_ar=v("di-eredeti");
+      const delCk=document.getElementById("di-deleted"); if(delCk) master.deleted=delCk.checked;
     }
-    try{
-      let draftIssueId = existing?existing.id:null;
-      if(existing){ const {error}=await supabase.from("draft_issues").update(master).eq("id",existing.id); if(error) throw error; }
-      else { const {data,error}=await supabase.from("draft_issues").insert(master).select().single(); if(error) throw error; draftIssueId=data.id; }
-      const newComponents = components.slice();
-      for(let i=0;i<slots.length;i++){
-        const t=slots[i], newTipus=chosenTipusok[i];
-        if(!newComponents.includes(newTipus)) newComponents.push(newTipus);
-        const cmaster={ tipus:newTipus, azonosito_tipus: document.getElementById("di-ct-"+t).value||null, azonosito: document.getElementById("di-cid-"+t).value.trim()||null };
-        const cur=(it.comps||[]).find(x=>x.tipus===t);
-        if(cur){ const {error}=await supabase.from("draft_components").update(cmaster).eq("id",cur.id); if(error) throw error; }
-        else { const {error}=await supabase.from("draft_components").insert({...cmaster, draft_issue_id:draftIssueId, source_component_id:null}); if(error) throw error; }
-      }
-      // Ha egy átsorolás olyan típusra váltott, ami még nincs a sorozat
-      // komponens-listáján, azt fel kell venni oda is — enélkül a
-      // publikálás után az élő felület sehol nem jelenítené meg (minden
-      // megjelenítés a sorozat deklarált komponens-listáján iterál).
-      if(newComponents.length!==components.length){
-        const {error}=await supabase.from("draft_series").update({components:newComponents}).eq("id",draftSeriesId);
-        if(error) throw error;
-      }
-    }catch(e){ err(e); return; }
-    onDone();
-  };
+    comps.forEach(c=>{
+      const k=keyOf(c);
+      const nameEl=document.getElementById("di-name-"+k); if(nameEl) c.megnevezes=nameEl.value;
+      const idtEl=document.getElementById("di-ct-"+k); if(idtEl) c.azonosito_tipus=idtEl.value;
+      const idEl=document.getElementById("di-cid-"+k); if(idEl) c.azonosito=idEl.value;
+      const typeEl=document.getElementById("di-type-"+k); if(typeEl) c.tipus=typeEl.value;
+    });
+  }
 
-  const delBtn=document.getElementById("di-del");
-  if(delBtn) delBtn.onclick=async ()=>{
-    const liveNote = existing.source_issue_id ? " Az élő számot ez NEM törli — csak azt jelenti, hogy publikáláskor nem frissül." : " Ez csak a munkaanyagot érinti, élő szám még nem tartozik hozzá.";
-    if(!confirm(`Biztosan törlöd a #${existing.lapszam} számot a draftból?${liveNote}`)) return;
-    try{ const {error}=await supabase.from("draft_issues").delete().eq("id",existing.id); if(error) throw error; }catch(e){ err(e); return; }
-    onDone();
-  };
+  function draw(){
+    const byType={}; comps.forEach(c=>{ (byType[c.tipus]=byType[c.tipus]||[]).push(c); });
+    // Megjelenő típus-sorrend: a deklarált komponens-lista, majd bármi extra
+    // (pl. átsorolással bekerült) típus a végén.
+    const slotTypes = Array.from(new Set([...components, ...comps.map(c=>c.tipus)]));
+    const compBlocks = slotTypes.map(t=>{
+      const list=byType[t]||[];
+      const blocks=list.map((c,idx)=>{
+        const k=keyOf(c);
+        const canRetype = !!c.id;   // csak már mentett (élő párral vagy anélkül perzisztált) példány sorolható át
+        const typeOpts = canRetype ? (state.LISTS.komponens||[]).map(o=>`<option value="${esc(o.ertek)}"${o.ertek===c.tipus?" selected":""}>${esc(o.nev)}</option>`).join("") : "";
+        return `<div class="compedit">
+          <h4>${esc(typeLabel(t))}${list.length>1?` #${idx+1}`:""}</h4>
+          ${canRetype?`<div class="field"><label>Típus (utólagos átsorolás)</label><select id="di-type-${k}">${typeOpts}</select></div>`:""}
+          <div class="field"><label>Megnevezés (opcionális) <span style="color:var(--faint);font-weight:400">— ha üres, "${esc(typeLabel(t))}${list.length>1?" #N":""}" jelenik meg</span></label>
+            <input id="di-name-${k}" value="${esc(c.megnevezes||"")}" placeholder="pl. Star Wars minifigura-csomag"></div>
+          <div class="grid2">
+            <div class="field"><label>Azonosító típusa</label><select id="di-ct-${k}"><option value="">—</option>${opts("azonosito",c.azonosito_tipus)}</select></div>
+            <div class="field"><label>Azonosító</label><input id="di-cid-${k}" value="${esc(c.azonosito||"")}"></div>
+          </div>
+          ${list.length>1?`<button type="button" class="btn ghost" data-removecomp="${k}">Ez a példány törlése</button>`:""}
+        </div>`;
+      }).join("");
+      return blocks + `<button type="button" class="btn ghost" data-addcomp="${esc(t)}">+ Még egy ${esc(typeLabel(t))} hozzáadása</button>`;
+    }).join("");
+
+    openModal(`<h2>${existing?"Szám szerkesztése (draft)":"Új szám (draft)"}</h2>
+      <p class="msub">Munkaanyag — publikálásig senki más nem látja.</p>
+      <div class="grid2">
+        <div class="field"><label>Lapszám</label><input id="di-n" type="number" value="${master.lapszam}"></div>
+        <div class="field"><label>Megjelenés dátuma</label><input id="di-date" type="date" value="${master.megjelenes||""}"></div>
+      </div>
+      <div class="field"><label>Cím</label><input id="di-name" value="${esc(master.cim||"")}"></div>
+      <div class="field"><label>Eredeti ár (Ft)</label><input id="di-eredeti" type="number" value="${master.eredeti_ar??""}"></div>
+      ${compBlocks}
+      ${existing&&existing.source_issue_id?`<label class="ckrow" style="margin-top:10px"><input type="checkbox" id="di-deleted" ${master.deleted?"checked":""}> Ezt a Számot törlöm a sorozatból (publikáláskor)</label>`:""}
+      <div class="modrow"><button class="btn ghost" id="di-back">Vissza</button><button class="btn" id="di-save">Mentés</button></div>
+      ${existing?`<div class="modrow"><button class="btn danger" id="di-del">Szám törlése a draftból</button></div>`:""}`);
+
+    document.getElementById("di-back").onclick=()=>onDone();
+
+    document.querySelectorAll("[data-addcomp]").forEach(b=>{
+      b.onclick=()=>{ syncFromDom(); comps.push({tipus:b.dataset.addcomp, azonosito_tipus:null, azonosito:"", megnevezes:"", _tmpKey:"tmp"+(tmpSeq++)}); draw(); };
+    });
+    document.querySelectorAll("[data-removecomp]").forEach(b=>{
+      b.onclick=async ()=>{
+        syncFromDom();
+        const k=b.dataset.removecomp, c=comps.find(x=>keyOf(x)===k);
+        if(!c) return;
+        if(c.id){
+          if(!confirm("Törlöd ezt a példányt a draftból?")) return;
+          try{ const {error}=await supabase.from("draft_components").delete().eq("id",c.id); if(error) throw error; }
+          catch(e){ err(e); return; }
+        }
+        comps = comps.filter(x=>x!==c); draw();
+      };
+    });
+
+    document.getElementById("di-save").onclick=async ()=>{
+      syncFromDom();
+      const n=parseInt(master.lapszam); if(isNaN(n)){alert("A lapszám kötelező.");return;}
+      const masterPayload={ draft_series_id:draftSeriesId, lapszam:n, cim:(master.cim||"").trim()||null, megjelenes:master.megjelenes||null,
+        eredeti_ar:master.eredeti_ar?parseInt(master.eredeti_ar):null, deleted: !!master.deleted };
+      try{
+        let draftIssueId = existing?existing.id:null;
+        if(existing){ const {error}=await supabase.from("draft_issues").update(masterPayload).eq("id",existing.id); if(error) throw error; }
+        else { const {data,error}=await supabase.from("draft_issues").insert(masterPayload).select().single(); if(error) throw error; draftIssueId=data.id; }
+
+        const newComponents = components.slice();
+        for(const c of comps){
+          if(!newComponents.includes(c.tipus)) newComponents.push(c.tipus);
+          const cpayload={ tipus:c.tipus, azonosito_tipus:(c.azonosito_tipus||"").trim()||null, azonosito:(c.azonosito||"").trim()||null, megnevezes:(c.megnevezes||"").trim()||null };
+          if(c.id){ const {error}=await supabase.from("draft_components").update(cpayload).eq("id",c.id); if(error) throw error; }
+          else { const {error}=await supabase.from("draft_components").insert({...cpayload, draft_issue_id:draftIssueId, source_component_id:null}); if(error) throw error; }
+        }
+        // Ha egy átsorolás/új példány olyan típust hozott be, ami még nincs a
+        // sorozat komponens-listáján, azt fel kell venni oda is — enélkül a
+        // publikálás után az élő felület sehol nem jelenítené meg.
+        if(newComponents.length!==components.length){
+          const {error}=await supabase.from("draft_series").update({components:newComponents}).eq("id",draftSeriesId);
+          if(error) throw error;
+        }
+      }catch(e){ err(e); return; }
+      onDone();
+    };
+
+    const delBtn=document.getElementById("di-del");
+    if(delBtn) delBtn.onclick=async ()=>{
+      const liveNote = existing.source_issue_id ? " Az élő számot ez NEM törli — csak azt jelenti, hogy publikáláskor nem frissül." : " Ez csak a munkaanyagot érinti, élő szám még nem tartozik hozzá.";
+      if(!confirm(`Biztosan törlöd a #${existing.lapszam} számot a draftból?${liveNote}`)) return;
+      try{ const {error}=await supabase.from("draft_issues").delete().eq("id",existing.id); if(error) throw error; }catch(e){ err(e); return; }
+      onDone();
+    };
+  }
+
+  draw();
 }

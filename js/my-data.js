@@ -8,7 +8,7 @@
    itemForm meglévő-tétel-szerkesztési útját — kizárólag a member_status/
    member_issue_data saját sorait írja, a törzsadatot SOHA.
    ============================================================ */
-import { state, S, COMP_TYPES, esc, opts } from "./state.js";
+import { state, S, COMP_TYPES, esc, opts, compsOfType } from "./state.js";
 import { openModal, closeModal, err, sheet } from "./modal.js";
 import { reload } from "./data.js";
 import { upsertMyStatus, upsertMyIssueData } from "./personal.js";
@@ -16,22 +16,28 @@ import { upsertMyStatus, upsertMyIssueData } from "./personal.js";
 export function myDataForm(it){
   const s = S();
   const unknown = it.fizetett_ar==null;
-  const compBlocks = s.components.map(t=>{
-    const c = it.comps[t]||{};
+  // Egy típusból több, egyedi Megnevezésű példány is lehet — mindegyik saját
+  // blokkot kap, komponens-id-vel kulcsolva (nem típussal, mert az nem egyedi).
+  const flat = s.components.flatMap(t=>compsOfType(it,t).map(c=>({t,c})));
+  const typeCounts={}; flat.forEach(({t})=>{ typeCounts[t]=(typeCounts[t]||0)+1; });
+  const typeSeen={};
+  const compBlocks = flat.map(({t,c})=>{
     const st = c.status||null;
+    typeSeen[t]=(typeSeen[t]||0)+1;
+    const label = c.megnevezes ? esc(c.megnevezes) : (typeCounts[t]>1 ? `${COMP_TYPES[t]||t} #${typeSeen[t]}` : (COMP_TYPES[t]||t));
     return `<div class="compedit">
-      <h4>${COMP_TYPES[t]||t}</h4>
-      <div class="statrow" data-stat="${t}">
+      <h4>${label}</h4>
+      <div class="statrow" data-stat="${c.id}">
         <button type="button" data-v="megvan" aria-pressed="${st==="megvan"}">megvan</button>
         <button type="button" data-v="hianyzik" aria-pressed="${st==="hianyzik"}">hiány</button>
         <button type="button" data-v="nemkell" aria-pressed="${st==="nemkell"}">nem kell</button>
         <button type="button" data-v="" aria-pressed="${!st}">jelöletlen</button>
       </div>
       <div class="grid2" style="margin-top:8px">
-        <div class="field"><label>Darabszám (db)</label><input id="md-db-${t}" type="number" min="0" value="${c.db==null?1:c.db}"></div>
+        <div class="field"><label>Darabszám (db)</label><input id="md-db-${c.id}" type="number" min="0" value="${c.db==null?1:c.db}"></div>
         <div class="field"><label>Azonosító</label><input value="${esc(c.azonosito||"nincs")}" disabled></div>
       </div>
-      <div class="field"><label>Jegyzet</label><input id="md-note-${t}" value="${esc(c.note||"")}"></div>
+      <div class="field"><label>Jegyzet</label><input id="md-note-${c.id}" value="${esc(c.note||"")}"></div>
     </div>`;
   }).join("");
 
@@ -60,13 +66,13 @@ export function myDataForm(it){
 
   document.getElementById("md-save").onclick=async ()=>{
     try{
-      for(const t of s.components){
-        const comp=it.comps[t]; if(!comp||!comp.id) continue;
-        const row=sheet.querySelector(`.statrow[data-stat="${t}"]`);
+      for(const {c:comp} of flat){
+        if(!comp.id) continue;
+        const row=sheet.querySelector(`.statrow[data-stat="${comp.id}"]`);
         const pressed=row?row.querySelector('button[aria-pressed="true"]'):null;
         const stat=pressed?(pressed.dataset.v||null):null;
-        const dbv=Math.max(0, parseInt(document.getElementById("md-db-"+t).value)||0);
-        const note=document.getElementById("md-note-"+t).value.trim()||null;
+        const dbv=Math.max(0, parseInt(document.getElementById("md-db-"+comp.id).value)||0);
+        const note=document.getElementById("md-note-"+comp.id).value.trim()||null;
         const merr=await upsertMyStatus(comp.id, {status:stat, db:dbv, jegyzet:note});
         if(merr) throw merr;
       }

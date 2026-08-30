@@ -1,7 +1,7 @@
 /* ============================================================
    Belépési pont: minden esemény-bekötés + indítás egy helyen.
    ============================================================ */
-import { state, S, nextStatus, hasOwnedComponent } from "./state.js";
+import { state, S, nextStatus, hasOwnedComponent, findCompById, allComps } from "./state.js";
 import { SUPABASE_ANON_KEY } from "./supabase.js";
 import { renderAll, renderList, renderChips, renderTabs, applyPickerMode, syncHeadHeight } from "./render.js";
 import { upsertMyStatus, applyAutoPrice } from "./personal.js";
@@ -42,8 +42,8 @@ document.getElementById("list").addEventListener("click",async e=>{
   // +/− darabszám-léptető (a lenyíló panelben)
   const st=e.target.closest(".pstepbtn");
   if(st){
-    const it=S().items.find(x=>x.n===+st.dataset.n); const t=st.dataset.t;
-    const comp=it&&it.comps[t]; if(!comp||!comp.id) return;
+    const it=S().items.find(x=>x.n===+st.dataset.n);
+    const comp=it&&findCompById(it,st.dataset.cid); if(!comp||!comp.id) return;
     const prevOwned=hasOwnedComponent(it,S());
     const prevDb=(comp.db==null?1:comp.db), prevStatus=comp.status;
     let nextDb = prevDb + (st.dataset.step==="+" ? 1 : -1);
@@ -68,8 +68,8 @@ document.getElementById("list").addEventListener("click",async e=>{
   const ia=e.target.closest("[data-imgapprove]"), ir=e.target.closest("[data-imgreject]");
   if(ia||ir){
     const id = ia ? ia.dataset.imgapprove : ir.dataset.imgreject;
-    const it=S().items.find(x=>Object.values(x.comps).some(c=>c.pending&&c.pending.id===id));
-    const comp=it&&Object.values(it.comps).find(c=>c.pending&&c.pending.id===id);
+    const it=S().items.find(x=>allComps(x).some(c=>c.pending&&c.pending.id===id));
+    const comp=it&&allComps(it).find(c=>c.pending&&c.pending.id===id);
     if(!comp) return;
     try{ ia ? await approveProposal(comp.pending) : await rejectProposal(comp.pending); await reload(); }
     catch(e2){ err(e2); }
@@ -79,8 +79,11 @@ document.getElementById("list").addEventListener("click",async e=>{
   if(it2){ try{ await setUploadEnabled(it2.dataset.imgtoggle, it2.dataset.current!=="1"); await reload(); }catch(e2){ err(e2); } return; }
 
   const mk=e.target.closest(".mark"); if(!mk||mk.disabled) return;
-  const it=S().items.find(x=>x.n===+mk.dataset.n); const t=mk.dataset.t;
-  const comp=it.comps[t]; if(!comp||!comp.id) return;
+  const it=S().items.find(x=>x.n===+mk.dataset.n);
+  // Több, egyedi Megnevezésű példány esetén a kompakt gomb nem cserélgethető
+  // (melyiket?) — koppintásra inkább a panelt nyitja meg (mint az expander).
+  if(mk.dataset.multi==="1"){ state.openIssue=(state.openIssue===it.n)?null:it.n; renderAll(); return; }
+  const comp=findCompById(it,mk.dataset.cid); if(!comp||!comp.id) return;
   const prevOwned=hasOwnedComponent(it,S());
   const prev=comp.status, prevDb=(comp.db==null?1:comp.db);
   const next=nextStatus(prev);                                   // jelöletlenre nem tér vissza

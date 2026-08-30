@@ -13,9 +13,12 @@ import { loadXlsx, coerceDate, parseHuNumber } from "./excel.js";
 
 const typeLabel = t => listName("komponens", t) || COMP_TYPES[t] || t;
 
+// 2 oszlop / típus: azonosító, megnevezés — mindkettő az adott típus
+// ELSŐDLEGES (első) példányára vonatkozik; 2., 3. példány felvitele Excel-lel
+// nem támogatott, csak kézzel a szerkesztőben.
 function tmplHead(components){
   const h=["lapszám","cím","dátum (Excel dátum, pl. 2026.03.15)","eredeti ár (csak szám)"];
-  components.forEach(t=>h.push(typeLabel(t)+" azonosító"));
+  components.forEach(t=>{ h.push(typeLabel(t)+" azonosító"); h.push(typeLabel(t)+" megnevezés"); });
   return h;
 }
 
@@ -30,8 +33,8 @@ export function pickDraftExcelFile(onFile){
 
 export async function downloadDraftTemplate(components, seriesName){
   const X=await loadXlsx(), head=tmplHead(components);
-  const ex1=[1,"Példa – írd át vagy töröld", new Date(2026,2,15), 2490]; components.forEach(()=>ex1.push(""));
-  const ex2=[2,"Másik példa", new Date(2026,3,15), 1490]; components.forEach(()=>ex2.push(""));
+  const ex1=[1,"Példa – írd át vagy töröld", new Date(2026,2,15), 2490]; components.forEach(()=>{ ex1.push(""); ex1.push(""); });
+  const ex2=[2,"Másik példa", new Date(2026,3,15), 1490]; components.forEach(()=>{ ex2.push(""); ex2.push(""); });
   const ws=X.utils.aoa_to_sheet([head,ex1,ex2], {cellDates:true});
   ws["!cols"]=head.map(h=>({wch:Math.max(14,h.length+2)}));
   if(ws["D2"]) ws["D2"].z='#,##0" Ft"'; if(ws["D3"]) ws["D3"].z='#,##0" Ft"';
@@ -54,7 +57,7 @@ export async function parseDraftExcel(file, components){
     const megjelenes=coerceDate(row[2]);
     if(row[2] && String(row[2]).trim() && !megjelenes) dateWarnings.push(n);
     const eredeti_ar=parseHuNumber(row[3]);
-    const comps=components.map((t,ci)=>({tipus:t, azonosito:String(row[4+ci]??"").trim()||null}));
+    const comps=components.map((t,ci)=>({tipus:t, azonosito:String(row[4+ci*2]??"").trim()||null, megnevezes:String(row[5+ci*2]??"").trim()||null}));
     rows.push({lapszam:n, cim, megjelenes, eredeti_ar, comps});
   }
   return {rows, dateWarnings};
@@ -77,7 +80,7 @@ export async function bulkInsertDraftItems(draftSeriesId, rows){
     }).select().single();
     if(error) throw error;
     if(row.comps.length){
-      const payload = row.comps.map(c=>({ draft_issue_id:data.id, tipus:c.tipus, azonosito:c.azonosito, source_component_id:null }));
+      const payload = row.comps.map(c=>({ draft_issue_id:data.id, tipus:c.tipus, azonosito:c.azonosito, megnevezes:c.megnevezes, source_component_id:null }));
       const { error: cerr } = await supabase.from("draft_components").insert(payload);
       if(cerr) throw cerr;
     }

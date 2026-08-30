@@ -88,7 +88,7 @@ function renderMunka(drafts, members){
   return groups.map(([st,label])=>{
     const items=drafts.filter(d=>d.pool_status===st);
     const rows=items.map(d=>{
-      const typeLabel = d.pool_type==="new" ? "Új javaslat" : `Szerkesztés: ${esc(d.megnevezes)}`;
+      const typeLabel = d.pool_type==="new" ? `Új javaslat: ${esc(d.megnevezes)}` : `Szerkesztés: ${esc(d.megnevezes)}`;
       const who = `beküldte: ${esc(nameOf(members,d.submitted_by))} · ${fmtDate((d.created_at||"").slice(0,10))||""}`;
       let actions="";
       if(st==="incoming"){
@@ -189,7 +189,7 @@ async function startEdit(s){
       const map={}; newDraftIssues.forEach(di=>{ map[di.source_issue_id]=di.id; });
       const compPayload = (liveComps||[]).map(lc=>({
         draft_issue_id: map[lc.issue_id], source_component_id: lc.id, tipus: lc.tipus,
-        azonosito_tipus: lc.azonosito_tipus, azonosito: lc.azonosito,
+        azonosito_tipus: lc.azonosito_tipus, azonosito: lc.azonosito, megnevezes: lc.megnevezes,
       }));
       if(compPayload.length){ const {error:dcerr}=await supabase.from("draft_components").insert(compPayload); if(dcerr) throw dcerr; }
     }
@@ -314,14 +314,14 @@ async function editDraftForm(d){
   let comps = (d.components||[]).slice();
   const compList = (state.LISTS.komponens||[{ertek:"magazin",nev:"Magazin"},{ertek:"modell",nev:"Modell"},{ertek:"konyv",nev:"Könyv"},{ertek:"egyeb",nev:"Egyéb"}]);
 
-  openModal(`<h2>${d.pool_type==="new"?"Új javaslat szerkesztése":"Szerkesztés: "+esc(d.megnevezes)}</h2><p class="msub">Betöltés…</p>`);
+  openModal(`<h2>${d.pool_type==="new"?"Új javaslat szerkesztése: "+esc(d.megnevezes):"Szerkesztés: "+esc(d.megnevezes)}</h2><p class="msub">Betöltés…</p>`);
   let items;
   try{ items = await fetchDraftItems(d.id); }catch(e){ err(e); return; }
   renderEditDraft(d, color, comps, compList, items);
 }
 
 function renderEditDraft(d, color, comps, compList, items){
-  openModal(`<h2>${d.pool_type==="new"?"Új javaslat szerkesztése":"Szerkesztés: "+esc(d.megnevezes)}</h2>
+  openModal(`<h2>${d.pool_type==="new"?"Új javaslat szerkesztése: "+esc(d.megnevezes):"Szerkesztés: "+esc(d.megnevezes)}</h2>
     <p class="msub">Munkaanyag — csak neked látszik, amíg nem publikálod.</p>
     <div class="field"><label>Kiadó</label><select id="d-kiado"><option value="">—</option>${opts("kiado",d.kiado)}</select></div>
     <div class="field"><label>Megnevezés (teljes név)</label><input id="d-name" value="${esc(d.megnevezes||"")}"></div>
@@ -334,7 +334,7 @@ function renderEditDraft(d, color, comps, compList, items){
         <div class="swatches">${f.szinek.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-pressed="${c===color}"></button>`).join("")}</div></div>`).join("")}</div></div>
     <div class="modrow"><button class="btn ghost" id="d-back">Vissza</button><button class="btn" id="d-save">Mezők mentése</button></div>
     <div class="msub" style="margin:16px 0 2px;color:var(--accent);filter:brightness(1.2);font-weight:600">Számok (${items.length})</div>
-    <div id="d-items">${renderDraftItemsList(items, comps)}</div>
+    <div id="d-items">${renderDraftItemsList(items)}</div>
     <div class="modrow"><button class="btn ghost" id="d-additem">+ Új szám</button>
       <button class="btn ghost" id="d-tmpl">⬇ Sablon</button>
       <button class="btn ghost" id="d-tmplup">⬆ Sablon feltöltése</button></div>`);

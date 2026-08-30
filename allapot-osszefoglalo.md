@@ -1,6 +1,6 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v4)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v5)
 
-**Frissítve:** 2026. augusztus 26. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
+**Frissítve:** 2026. augusztus 31. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
 > Told fel ezt a fájlt a Claude projektbe (cseréld le a régi verziót). Új beszélgetés elején hivatkozz rá: "olvasd el az állapot-összefoglalót, onnan tudod, hol tartunk."
 
@@ -8,7 +8,7 @@
 
 ## 1. A nagy kép
 
-**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított, jelenleg egy 15-pontos hibajavítási kör frissen lezárva. **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
+**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított, legutóbb a komponens-szintű "Megnevezés" + több azonos típusú komponens funkció zárva (v1.9). **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
 
 ---
 
@@ -19,8 +19,8 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.8** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
-- **README.md** (ÚJ, v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
+- **Specifikáció:** jelenleg **v1.9** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
 ```
@@ -122,6 +122,16 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 - Fejléc: 🗂️ Karbantartás és 📚 Sorozataim gomb helyet cserélt.
 - **Beépített súgó** (`help.js`/`help-content.js`): ❓ fejléc-gomb, 17 kategória, „Felhasználói"/„Adminisztrátori" fül, a tényleges felület alapján írva.
 - **Melléktalálat, javítva:** egy önálló RLS-regresszió a javaslat-beküldésben — lásd 5. fejezet és a 3. fejezet záró bekezdése.
+
+**Komponens-szintű "Megnevezés" + több azonos típusú komponens (v1.9, specifikáció 5.3/6.3/6.4, 10.10 lezárva):**
+- Opcionális, szabad szöveges `megnevezes` mező minden komponensen ("Típus #N" fallback, ha üres és 1-nél több példány van egy típusból).
+- Egy Számon egy típusból mostantól TÖBB, egyedi példány is felvehető (pl. két különböző Lego-csomag) — sem a `components`, sem a `draft_components` tábla nem korlátozta ezt DB-szinten, tisztán a kliens `it.comps[típus]` (egy objektum, nem tömb) modellje volt a gát. Ez most `it.comps[típus]` = **tömb** mindenütt (`js/state.js`, `data.js`, `render.js`, `main.js`, `my-data.js`, `draft-items.js`, `excel.js`, `draft-excel.js`, `changes.js`).
+- "+ Még egy [Típus] hozzáadása" gomb a Karbantartás draft-szerkesztőjében ÉS a "+ Új tétel" gyors-felvitelnél is.
+- Színezés kiterjesztve: "legrosszabb eset nyer" a domináns típus(ok) ÖSSZES példányára (rangsor: hiányzik > jelöletlen > nem kell > megvan) — 1 példánynál nincs viselkedésváltozás a régihez képest.
+- Excel-sablon mindkét helyen (élő sorozat + draft/javaslat) új "megnevezés" oszlopot kapott típusonként, kizárólag az elsődleges (első) példányra.
+- `publish_draft_series()` és `propose_bulk_issues()` SQL-függvények frissítve — a `megnevezes` a szokásos diff/verzió/change_log-gépezeten megy át.
+- SQL: `laprol-lapra-komponens-megnevezes.sql`, `-rpc.sql`, `-publish.sql`.
+- **Melléktalálat, javítva:** a Karbantartásban egy "Új javaslat" sehol nem mutatta a sorozat nevét (Beérkezett/Munkaanyag listában és a szerkesztő címében sem) — tisztán megjelenítési hiba a `karbantartas.js`-ben (`pool_type==="new"`-nál a felirat kihagyta a nevet), NEM RLS/JOIN-probléma.
 
 ---
 

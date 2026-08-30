@@ -46,25 +46,44 @@ export function nextStatus(cur){
   return o[(o.indexOf(cur)+1)%o.length];
 }
 
-// Hierarchia: a nem-magazin komponens dominál; ha csak egy van, az.
-export function dominantType(s){
-  const nm=s.components.filter(t=>t!=="magazin");
-  return nm.length ? nm[0] : (s.components[0]||null);
+// it.comps[tipus] mostantól TÖMB (egy típusból több, egyedi Megnevezésű
+// példány is lehet egy Számon) — ez a segéd mindig tömböt ad vissza, üres
+// tömböt is, sose undefined-et.
+export const compsOfType = (it,t) => (it.comps && it.comps[t]) || [];
+export const allComps = it => Object.values(it.comps||{}).flat();
+export const findCompById = (it,id) => allComps(it).find(c=>c.id===id) || null;
+
+// "Legrosszabb eset nyer": egy típus (vagy típusok) összes példánya közül az
+// összesített állapot — hiányzik a legrosszabb, utána jelöletlen, utána nem
+// kell, a legjobb a megvan. Egyetlen példánynál ez pontosan a példány saját
+// állapotát adja vissza (nincs viselkedésváltozás a mai, egy-komponenses esetben).
+export function worstStatus(instances){
+  if(!instances.length) return null;
+  if(instances.some(c=>c.status==="hianyzik")) return "hianyzik";
+  if(instances.some(c=>!c.status)) return null;
+  if(instances.some(c=>c.status==="nemkell")) return "nemkell";
+  return "megvan";
 }
 
-// Legalább egy komponens 'megvan' — ekkor tekintjük a tételt ténylegesen megvettnek
-// (ettől függ a "fizetve" felirat és a "Fizetett ár alapján" összeg).
+// Legalább egy komponens-PÉLDÁNY 'megvan' — ekkor tekintjük a tételt ténylegesen
+// megvettnek (ettől függ a "fizetve" felirat és a "Fizetett ár alapján" összeg).
 export function hasOwnedComponent(it,s){
-  return s.components.some(t=>it.comps[t] && it.comps[t].status==="megvan");
+  return allComps(it).some(c=>c.status==="megvan");
 }
 
+// A lapszám színe a domináns TÍPUS(OK) összes példányának együttes állapotából
+// jön ("legrosszabb eset nyer", 6.3–6.4 kiterjesztve): a Szám csak akkor zöld,
+// ha a domináns típus(ok) MINDEN példánya megvan.
 export function issueState(it,s){
   if(it.date && it.date>todayISO) return null;                  // még nem jelent meg → semleges
-  const dt=dominantType(s); if(!dt) return null;
-  const d=(it.comps[dt]&&it.comps[dt].status)||null;
+  const nm=s.components.filter(t=>t!=="magazin");
+  const dominantTypes = nm.length ? nm : s.components;
+  if(!dominantTypes.length) return null;
+  const instances = dominantTypes.flatMap(t=>compsOfType(it,t));
+  const d = worstStatus(instances);
   if(!d) return null;                                           // domináns jelöletlen → semleges
   if(d==="megvan") return "megvan";                             // zöld
   if(d==="nemkell") return "nemkell";                           // szürke
-  const mag = s.components.includes("magazin") ? ((it.comps.magazin&&it.comps.magazin.status)||null) : null;
+  const mag = s.components.includes("magazin") ? worstStatus(compsOfType(it,"magazin")) : null;
   return mag==="megvan" ? "reszleges" : "hianyzik";             // sárga, ha a magazin megvan; egyébként piros
 }

@@ -54,7 +54,9 @@ async function markSeen(entityType, entityId, version){
   if(error) throw error;
 }
 
-function componentEntries(it){ return Object.entries(it.comps).filter(([,c])=>c.id); }
+// it.comps[tipus] TÖMB (egy típusból több, egyedi Megnevezésű példány is
+// lehet) — [tipus,komponens] párokra lapítva, példányonként.
+function componentEntries(it){ return Object.entries(it.comps).flatMap(([t,arr])=>arr.filter(c=>c.id).map(c=>[t,c])); }
 const isDeletionDiff = diffs => diffs.some(d=>d.field==="is_deleted" && d.new==="true");
 const DELETED_MSG = `<div class="example" style="color:#f3b6b6">Ez a szám törölve lett a sorozatból.</div>`;
 
