@@ -187,9 +187,13 @@ export function renderList(){
           <button class="pstepbtn" data-step="-" data-n="${it.n}" data-cid="${c.id}" aria-label="Kevesebb">−</button>
           <span class="pcount">${cdb} db</span>
           <button class="pstepbtn" data-step="+" data-n="${it.n}" data-cid="${c.id}" aria-label="Több">+</button></div>` : "";
+        // Ugyanaz a .mark gomb/logika, mint a kompakt sorban — itt PÉLDÁNYONKÉNT
+        // külön, mert a kompakt gomb 2+ példánynál a panelt nyitja (nem ciklizál).
+        const statusBtn = !future ? `<button class="mark block${c.status?" m-"+c.status:""}" data-n="${it.n}" data-cid="${c.id}" aria-label="Státusz">
+          <span class="mlab">${c.status?MLAB[c.status]:"jelöletlen"}</span></button>` : "";
         return `<div class="imgcard"><div class="imgbox">${img}</div>
           <div class="imgcap"><div class="cn">${label}</div>
-          <div class="cc">${scode}-${pad(it.n,4)}-${pad(ci+1,2)}</div></div>${pstep}
+          <div class="cc">${scode}-${pad(it.n,4)}-${pad(ci+1,2)}</div></div>${pstep}${statusBtn}
           ${c.id?imageControlsHtml(c,c.id):""}</div>`;
       }).join("") + `</div>
       <div class="panelmoney">

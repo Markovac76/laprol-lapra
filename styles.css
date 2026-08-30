@@ -147,6 +147,10 @@ header.top{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,va
 .imgcap{margin-top:5px;text-align:center}
 .imgcap .cn{font-size:12px;font-weight:600;color:var(--ink)}
 .imgcap .cc{font-size:10.5px;color:var(--faint);font-family:ui-monospace,monospace}
+/* A panelbeli, példányonkénti státusz-gomb — ugyanaz a .mark/.m-xxx szín-
+   logika, mint a kompakt sorban, de teljes szélességű, vízszintes elrendezésben. */
+.mark.block{width:100%;flex-direction:row;justify-content:center;padding:8px;margin-top:8px;gap:6px}
+.mark.block .mlab{font-size:13px;min-height:0}
 .pstepper{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px}
 .pstepbtn{border:1px solid var(--line);background:var(--panel);color:var(--ink);width:42px;height:42px;
   border-radius:11px;font-size:22px;font-weight:700;line-height:1;cursor:pointer;padding:0}
