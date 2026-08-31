@@ -31,6 +31,18 @@ export async function uploadLiveImage(componentId, file){
   if(error) throw error;
 }
 
+// Staff: élő kép törlése — visszaáll "Nincs kép" állapotra. A tárból is
+// takarítunk (ne maradjon árva fájl), de a fájl hiánya nem akadályozza a
+// kep_url nullázását (ugyanaz az elv, mint rejectProposal-nál). "Nincs kép"
+// állapotnál a feltöltés/javaslás usereknek is mindig engedélyezett — ehhez
+// nem kell külön beállítás, a meglévő !c.kep_url feltétel automatikusan
+// érvényesül a megjelenítésnél.
+export async function deleteLiveImage(componentId){
+  await supabase.storage.from(BUCKET).remove([livePath(componentId)]);
+  const { error } = await supabase.from("components").update({ kep_url: null }).eq("id", componentId);
+  if(error) throw error;
+}
+
 export async function setUploadEnabled(componentId, enabled){
   const { error } = await supabase.from("components").update({ upload_enabled: enabled }).eq("id", componentId);
   if(error) throw error;

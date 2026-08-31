@@ -13,7 +13,7 @@ import { karbantartasForm } from "./karbantartas.js";
 import { helpForm } from "./help.js";
 import { downloadTemplate, handleUpload } from "./excel.js";
 import { showIssueChangePopup } from "./changes.js";
-import { uploadLiveImage, proposeImage, approveProposal, rejectProposal, setUploadEnabled } from "./component-images.js";
+import { uploadLiveImage, proposeImage, approveProposal, rejectProposal, setUploadEnabled, deleteLiveImage } from "./component-images.js";
 import { reload } from "./data.js";
 import { err } from "./modal.js";
 import { showApp, loginWithPassword, registerWithPassword, logout, initSession } from "./auth.js";
@@ -77,6 +77,12 @@ document.getElementById("list").addEventListener("click",async e=>{
   }
   const it2=e.target.closest("[data-imgtoggle]");
   if(it2){ try{ await setUploadEnabled(it2.dataset.imgtoggle, it2.dataset.current!=="1"); await reload(); }catch(e2){ err(e2); } return; }
+  const idel=e.target.closest("[data-imgdelete]");
+  if(idel){
+    if(!confirm("Biztosan törlöd a képet?")) return;
+    try{ await deleteLiveImage(idel.dataset.imgdelete); await reload(); }catch(e2){ err(e2); }
+    return;
+  }
 
   const mk=e.target.closest(".mark"); if(!mk||mk.disabled) return;
   const it=S().items.find(x=>x.n===+mk.dataset.n);

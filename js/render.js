@@ -109,7 +109,8 @@ function imageControlsHtml(c, componentId){
   }
   if(staff){
     const toggle = c.kep_url ? `<button class="imgtogglebtn" data-imgtoggle="${componentId}" data-current="${c.upload_enabled?1:0}">${c.upload_enabled?"🔓 userek javasolhatnak":"🔒 userek nem javasolhatnak"}</button>` : "";
-    return `<div class="imgctrl"><button class="imgbtn" data-imgupload="${componentId}">Kép feltöltése/csere</button>${toggle}</div>`;
+    const del = c.kep_url ? `<button class="imgtogglebtn danger" data-imgdelete="${componentId}">🗑 Kép törlése</button>` : "";
+    return `<div class="imgctrl"><button class="imgbtn" data-imgupload="${componentId}">Kép feltöltése/csere</button>${toggle}${del}</div>`;
   }
   if(c.upload_enabled || !c.kep_url){
     return `<div class="imgctrl"><button class="imgbtn" data-imgpropose="${componentId}">${c.kep_url?"Csere javaslása":"Kép javaslása"}</button></div>`;
