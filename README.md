@@ -78,16 +78,20 @@ Adatbázis-migráció (`laprol-lapra-*.sql`) **soha nem fut le automatikusan
 jóváhagyás nélkül** — a teljes SQL-t meg kell mutatni, és meg kell várni
 az explicit jóváhagyást, mielőtt lefut. Futtatás előtt mindig készül egy
 friss `db-backups/` pillanatkép (a táblák nyers JSON-exportja) — ez a
-mappa gitignore-olt, csak helyi biztonsági háló. Migrációt közvetlen
-Postgres-kapcsolattal futtatunk (`scripts/run-migration.js`, a `pg`
-npm-csomaggal — nincs Supabase CLI/Docker ehhez a gépen), egy
-tranzakcióba csomagolva (`BEGIN`/`COMMIT`, hiba esetén `ROLLBACK`), hogy
-soha ne maradjon félig alkalmazott állapotban a séma.
+mappa gitignore-olt, csak helyi biztonsági háló. Migrációt Postgres-
+kapcsolattal futtatunk (`scripts/run-migration.js`, a `pg` npm-csomaggal
+— nincs Supabase CLI/Docker ehhez a gépen), egy tranzakcióba csomagolva
+(`BEGIN`/`COMMIT`, hiba esetén `ROLLBACK`), hogy soha ne maradjon félig
+alkalmazott állapotban a séma.
 
 A connection stringet a `db.local.js` (gitignore-olt, sosem kerül
 git-be — másold le `db.local.example.js`-ből) tárolja, a Supabase
-Dashboard → Project Settings → Database → Connection string → "Direct
-connection" alapján (nem a connection pooler).
+Dashboard → Connect → Connection String → **"Session pooler"** alapján.
+**Váltás oka (2026-08-31):** a "Direct connection" host kizárólag
+IPv6-címet publikál, ami sok hálózatról/gépről elérhetetlen (élesben
+ütköztünk bele) — a Session pooler IPv4-kompatibilis, és bizonyítottan
+megtartja a session-t egy tranzakción belül, tehát a `BEGIN`/`COMMIT`
+migrációkhoz is jó (a "Transaction pooler" NEM lenne jó erre).
 
 Használat:
 ```bash

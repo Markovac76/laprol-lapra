@@ -54,6 +54,20 @@ async function markSeen(entityType, entityId, version){
   if(error) throw error;
 }
 
+// Egy VADONATÚJ Szám (a rajta lévő komponensekkel együtt) member_seen
+// alapvonalát tölti fel MINDEN jelenlegi feliratkozónak (nem csak a
+// létrehozónak) — enélkül a friss tétel version=1 > hiányzó alapvonal(0)
+// miatt ÖRÖKRE "változott!"-nak látszana, miközben a change_log-ban
+// nincs mit mutatni rá (semmi nem MÓDOSULT, csak létrejött). Ugyanezt a
+// segédfüggvényt hívja a publish_draft_series() SQL-oldalon is minden
+// publikált tételre — így az itt-közvetlenül (draft nélkül) létrehozott
+// ÚJ Számok (itemForm, excel.js) ugyanabból az egy mechanizmusból kapják
+// az alapvonalukat.
+export async function seedNewIssueSeen(issueId){
+  const { error } = await supabase.rpc("seed_issue_seen_for_subscribers", { p_issue_id: issueId });
+  if(error) throw error;
+}
+
 // it.comps[tipus] TÖMB (egy típusból több, egyedi Megnevezésű példány is
 // lehet) — [tipus,komponens] párokra lapítva, példányonként.
 function componentEntries(it){ return Object.entries(it.comps).flatMap(([t,arr])=>arr.filter(c=>c.id).map(c=>[t,c])); }

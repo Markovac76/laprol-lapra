@@ -18,6 +18,7 @@ import { state, S, COMP_TYPES, esc } from "./state.js";
 import { openModal, closeModal, err } from "./modal.js";
 import { reload } from "./data.js";
 import { upsertMyIssueData, upsertMyStatus } from "./personal.js";
+import { seedNewIssueSeen } from "./changes.js";
 
 let _xlsx=null;
 async function xlsx(){ if(!_xlsx) _xlsx=await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm"); return _xlsx; }
@@ -162,6 +163,7 @@ ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új
             if(cerr) throw cerr;
             if(c.status!==undefined){ const serr=await upsertMyStatus(cd.id, {status:c.status}); if(serr) throw serr; }
           }
+          await seedNewIssueSeen(issueId);
           ins++;
         } else {
           const liveIssue = s.items.find(x=>x.n===item.n);

@@ -9,6 +9,7 @@ import { state, S, COMP_TYPES, esc, pad, opts } from "./state.js";
 import { openModal, closeModal, err, sheet } from "./modal.js";
 import { reload } from "./data.js";
 import { upsertMyStatus, upsertMyIssueData } from "./personal.js";
+import { seedNewIssueSeen } from "./changes.js";
 
 /* ---- Új szám létrehozása (staff-only) ----
    Csak ÚJ tétel felvitelére való — meglévő publikált tétel törzsadat-
@@ -130,6 +131,7 @@ export function itemForm(){
           const merr=await upsertMyStatus(cd.id,{status:inst.status, db:dbv, jegyzet:(inst.jegyzet||"").trim()||null});
           if(merr) throw merr;
         }
+        await seedNewIssueSeen(issueId);
         closeModal(); await reload();
       }catch(e){ err(e); }
     };

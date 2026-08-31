@@ -6,20 +6,42 @@ import { state, OWNER_UID, PAL_FALLBACK, todayISO, issueState, hasOwnedComponent
 import { renderAll } from "./render.js";
 import { err } from "./modal.js";
 
+// Supabase/PostgREST alapból max. 1000 sort ad vissza egy .select()-re,
+// range() nélkül — ÉLESBEN kiderült, hogy ez csendben, hibaüzenet nélkül
+// VÁGJA LE a választ (a member_seen tábla egy aktív usernél már 1000+
+// sor, a components pedig a teljes appban 800+ és folyamatosan nő).
+// A levágott sorok hiánya a felkiáltójel-logikánál "sosem látott, tehát
+// változott" hamis jelzést okozott, amit sem az egyedi "OK, nyugtázom",
+// sem a "Mind elfogadom" nem tudott javítani — a DB-ben a sor ott volt,
+// csak a kliens nem kérte le, mert a lapozás nélküli select levágta.
+// Ez a segéd lapozva (1000-esével) kéri le a TELJES eredményhalmazt.
+async function fetchAllRows(queryFactory, pageSize = 1000){
+  let all = [], from = 0;
+  while(true){
+    const { data, error } = await queryFactory().range(from, from + pageSize - 1);
+    if(error) return { data: null, error };
+    if(!data || !data.length) break;
+    all = all.concat(data);
+    if(data.length < pageSize) break;
+    from += pageSize;
+  }
+  return { data: all, error: null };
+}
+
 export async function loadData(){
   document.getElementById("list").innerHTML=`<div class="loading">Adatok betöltése…</div>`;
   const { data: userData } = await supabase.auth.getUser();
   state.myId = userData?.user?.id || null;
   state.isOwner = state.myId === OWNER_UID;
   const [s,i,c,l,ms,mid,msel,msn,ip]=await Promise.all([
-    supabase.from("series").select("*").order("sort_order"),
-    supabase.from("issues").select("*"),
-    supabase.from("components").select("*"),
+    fetchAllRows(()=>supabase.from("series").select("*").order("sort_order")),
+    fetchAllRows(()=>supabase.from("issues").select("*")),
+    fetchAllRows(()=>supabase.from("components").select("*")),
     supabase.from("lists").select("*").order("sort_order"),
-    supabase.from("member_status").select("*").eq("user_id",state.myId),
-    supabase.from("member_issue_data").select("*").eq("user_id",state.myId),
+    fetchAllRows(()=>supabase.from("member_status").select("*").eq("user_id",state.myId)),
+    fetchAllRows(()=>supabase.from("member_issue_data").select("*").eq("user_id",state.myId)),
     supabase.from("member_series").select("series_id").eq("user_id",state.myId).eq("is_selected",true),
-    supabase.from("member_seen").select("*").eq("user_id",state.myId),
+    fetchAllRows(()=>supabase.from("member_seen").select("*").eq("user_id",state.myId)),
     supabase.from("image_proposals").select("*").eq("status","pending"),
   ]);
   if(s.error||i.error||c.error){ throw (s.error||i.error||c.error); }
