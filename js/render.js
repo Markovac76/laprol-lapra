@@ -182,6 +182,10 @@ export function renderList(){
         typeSeen[t]=(typeSeen[t]||0)+1;
         const label = c.megnevezes ? esc(c.megnevezes) : (typeCounts[t]>1 ? `${COMP_TYPES[t]||t} #${typeSeen[t]}` : (COMP_TYPES[t]||t));
         const img=c.kep_url?`<img src="${esc(c.kep_url)}" alt="${COMP_TYPES[t]||t}">`:`nincs adat`;
+        // Magazin/Könyv szinte mindig álló (portré) borító — ezeknél a doboz
+        // magasabb/keskenyebb, hogy a teljes borító (cím, kiadói logó is)
+        // beleférjen levágás nélkül. A többi típusnál a doboz alakja marad.
+        const boxClass = (t==="magazin"||t==="konyv") ? "imgbox tall" : "imgbox";
         // A tényleges darabszám-állítás itt, a panelben — nagyobb, kényelmesen érinthető gombokkal.
         const pstep = !future ? `<div class="pstepper">
           <button class="pstepbtn" data-step="-" data-n="${it.n}" data-cid="${c.id}" aria-label="Kevesebb">−</button>
@@ -191,7 +195,7 @@ export function renderList(){
         // külön, mert a kompakt gomb 2+ példánynál a panelt nyitja (nem ciklizál).
         const statusBtn = !future ? `<button class="mark block${c.status?" m-"+c.status:""}" data-n="${it.n}" data-cid="${c.id}" aria-label="Státusz">
           <span class="mlab">${c.status?MLAB[c.status]:"jelöletlen"}</span></button>` : "";
-        return `<div class="imgcard"><div class="imgbox">${img}</div>
+        return `<div class="imgcard"><div class="${boxClass}">${img}</div>
           <div class="imgcap"><div class="cn">${label}</div>
           <div class="cc">${scode}-${pad(it.n,4)}-${pad(ci+1,2)}</div></div>${pstep}${statusBtn}
           ${c.id?imageControlsHtml(c,c.id):""}</div>`;

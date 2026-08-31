@@ -19,7 +19,7 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.11** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.12** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 - **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
@@ -135,6 +135,8 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 
 **SÜRGŐS hibajavítás — "eltüntethetetlen felkiáltójel" (v1.10, specifikáció 13.6):** egy vadonatúj Szám/komponens `version=1`-gyel, `change_log`/`member_seen` nélkül jött létre — a badge örökre aktív maradt, a "Összes változás" modal joggal üresnek látta, és a "Mind elfogadom" is csak a kattintó saját alapvonalát javította, a sorozatra feliratkozott TÖBBI usernek nem. Élesben megerősítve a "Fast & Furious modellek" #1 tételén (a tulajdonosnak rendben volt, egy másik feliratkozott usernek egyetlen `member_seen` sora sem volt rá). Javítás: új `seed_issue_seen_for_subscribers()` SQL-függvény minden új Szám/komponens létrejöttekor lefut (`publish_draft_series()`, "+ Új tétel", Excel új sor) — MINDEN jelenlegi feliratkozónak azonnal alapvonalat ad. Egyszeri, biztonságos visszatöltés a már létrejött, alapvonal nélküli (és SOHA nem módosult) tételekre. SQL: `laprol-lapra-uj-tetel-seen-baseline.sql`.
 **Melléktalálat:** a migrációs DB-kapcsolat "Direct connection"-ról "Session pooler"-re váltva — a Direct connection host kizárólag IPv6-címet publikál, ami egy munkamenetből elérhetetlennek bizonyult.
+
+**Komponens-kép levágás nélküli megjelenítése (v1.12):** a hibajavítási kör 15. pontja ("nagyobb kép-placeholder") kiegészítve — magas, álló formátumú magazin-borítóknál (pl. Forma-1 #28, II. VH Repülők #35) a `cover`-vágás levágta a cím/kiadói logó sávot; a nagyobb doboz önmagában nem volt elég. Váltás `object-fit: contain`-re mindenhol (panel + képjavaslat-előnézet); Magazin/Könyv típusnál a doboz 150×210px-re (kb. A4-arány) állítva, a többi típusnál (Modell, Figura, Lego, Egyéb) változatlan.
 
 **Teljeskörű 1000-soros lapozási átvizsgálás (v1.11):** a fenti hiba gyökere (Supabase/PostgREST alapból max. 1000 sort ad vissza `.select()`-re, `range()` nélkül, hibaüzenet nélkül) elvben BÁRMELYIK lapozatlan lekérdezést érintheti — átnéztük a teljes kódbázist. A közös `fetchAllRows()` segéd (`js/supabase.js`) mostantól ott is lapoz, ahol eddig nem: `change_log`/`member_seen` (`js/changes.js`), `components` egy nagy sorozat/draft összes tételére (`js/karbantartas.js`, `js/my-series.js`, `js/draft-items.js` — a több-komponens funkció óta nagyobb lehet), és két, MINDEN userre vonatkozó app-szintű lekérdezés (`member_series`, `members` — `js/karbantartas.js`, `js/admin-users.js`).
 
