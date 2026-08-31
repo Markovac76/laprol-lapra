@@ -2,7 +2,7 @@
    Változás-jelzés (felkiáltójel) — sorozat/szám/komponens
    mezőváltozásainak megjelenítése és nyugtázása (member_seen).
    ============================================================ */
-import { supabase } from "./supabase.js";
+import { supabase, fetchAllRows } from "./supabase.js";
 import { state, esc, COMP_TYPES, listName } from "./state.js";
 import { openModal, err } from "./modal.js";
 import { reload } from "./data.js";
@@ -16,10 +16,13 @@ const FIELD_LABELS = {
 const fieldLabel = f => FIELD_LABELS[f] || f;
 const fieldValue = (f,v) => f==="tipus" ? esc(listName("komponens",v) || v || "—") : esc(v??"—");
 
+// Lapozva (fetchAllRows) — egy nagy sorozatnál a change_log (minden
+// mezőváltozás önálló sor, sosem törlődik) vagy a member_seen könnyen
+// átléphetné az 1000-es alapértelmezett Supabase-limitet.
 async function fetchSeenMap(ids){
   if(!ids.length) return {};
-  const { data, error } = await supabase.from("member_seen").select("entity_type,entity_id,last_seen_version")
-    .eq("user_id", state.myId).in("entity_id", ids);
+  const { data, error } = await fetchAllRows(()=>supabase.from("member_seen").select("entity_type,entity_id,last_seen_version")
+    .eq("user_id", state.myId).in("entity_id", ids));
   if(error) throw error;
   const m={}; (data||[]).forEach(r=>{ m[r.entity_type+":"+r.entity_id]=r.last_seen_version; });
   return m;
@@ -27,7 +30,7 @@ async function fetchSeenMap(ids){
 
 async function fetchChangeLog(ids){
   if(!ids.length) return [];
-  const { data, error } = await supabase.from("change_log").select("*").in("entity_id", ids).order("version");
+  const { data, error } = await fetchAllRows(()=>supabase.from("change_log").select("*").in("entity_id", ids).order("version"));
   if(error) throw error;
   return data||[];
 }

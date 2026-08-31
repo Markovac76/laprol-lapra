@@ -8,20 +8,22 @@
    különböző Lego-csomag) — ezért a `comps` mindig FLAT tömb (nem
    típusonkénti map), soha nem dedupelünk típus szerint.
    ============================================================ */
-import { supabase } from "./supabase.js";
+import { supabase, fetchAllRows } from "./supabase.js";
 import { state, COMP_TYPES, esc, fmtDate, opts, listName } from "./state.js";
 import { openModal, err } from "./modal.js";
 
 const typeLabel = t => listName("komponens", t) || COMP_TYPES[t] || t;
 
 export async function fetchDraftItems(draftSeriesId){
-  const { data: issues, error: ie } = await supabase.from("draft_issues")
-    .select("*").eq("draft_series_id", draftSeriesId).order("lapszam");
+  const { data: issues, error: ie } = await fetchAllRows(()=>supabase.from("draft_issues")
+    .select("*").eq("draft_series_id", draftSeriesId).order("lapszam"));
   if(ie) throw ie;
   const issueIds = (issues||[]).map(x=>x.id);
   let comps=[];
   if(issueIds.length){
-    const { data, error: ce } = await supabase.from("draft_components").select("*").in("draft_issue_id", issueIds);
+    // A "több azonos típusú komponens" funkció óta ez könnyebben átlépheti a
+    // 1000-es alapértelmezett Supabase-limitet egy nagy sorozat draftjánál.
+    const { data, error: ce } = await fetchAllRows(()=>supabase.from("draft_components").select("*").in("draft_issue_id", issueIds));
     if(ce) throw ce;
     comps = data||[];
   }

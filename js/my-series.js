@@ -3,7 +3,7 @@
    szeretné a saját fülsávjában látni (member_series réteg — 2.3).
    Minden bejelentkezett usernek elérhető, staffnak is.
    ============================================================ */
-import { supabase } from "./supabase.js";
+import { supabase, fetchAllRows } from "./supabase.js";
 import { state, esc, listName } from "./state.js";
 import { openModal, err, sheet } from "./modal.js";
 import { reload } from "./data.js";
@@ -99,10 +99,12 @@ async function confirmDeselect(seriesId, purge){
 // Leválasztáskor "törlöm" választásra a saját member_status/member_issue_data
 // sorok törlése erre a sorozatra nézve (a törzsadat, más userek adata érintetlen).
 async function purgePersonalData(seriesId){
-  const { data: issues } = await supabase.from("issues").select("id").eq("series_id", seriesId);
+  const { data: issues } = await fetchAllRows(()=>supabase.from("issues").select("id").eq("series_id", seriesId));
   const issueIds = (issues||[]).map(x=>x.id);
   if(!issueIds.length) return;
-  const { data: comps } = await supabase.from("components").select("id").in("issue_id", issueIds);
+  // A "több azonos típusú komponens" funkció óta ez könnyebben átlépheti a
+  // 1000-es alapértelmezett Supabase-limitet egy nagy sorozatnál.
+  const { data: comps } = await fetchAllRows(()=>supabase.from("components").select("id").in("issue_id", issueIds));
   const compIds = (comps||[]).map(x=>x.id);
   if(compIds.length) await supabase.from("member_status").delete().eq("user_id",state.myId).in("component_id",compIds);
   await supabase.from("member_issue_data").delete().eq("user_id",state.myId).in("issue_id",issueIds);

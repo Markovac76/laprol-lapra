@@ -1,32 +1,10 @@
 /* ============================================================
    Adatbetöltés a Supabase-ből, statisztika, újratöltés.
    ============================================================ */
-import { supabase } from "./supabase.js";
+import { supabase, fetchAllRows } from "./supabase.js";
 import { state, OWNER_UID, PAL_FALLBACK, todayISO, issueState, hasOwnedComponent, compsOfType, allComps } from "./state.js";
 import { renderAll } from "./render.js";
 import { err } from "./modal.js";
-
-// Supabase/PostgREST alapból max. 1000 sort ad vissza egy .select()-re,
-// range() nélkül — ÉLESBEN kiderült, hogy ez csendben, hibaüzenet nélkül
-// VÁGJA LE a választ (a member_seen tábla egy aktív usernél már 1000+
-// sor, a components pedig a teljes appban 800+ és folyamatosan nő).
-// A levágott sorok hiánya a felkiáltójel-logikánál "sosem látott, tehát
-// változott" hamis jelzést okozott, amit sem az egyedi "OK, nyugtázom",
-// sem a "Mind elfogadom" nem tudott javítani — a DB-ben a sor ott volt,
-// csak a kliens nem kérte le, mert a lapozás nélküli select levágta.
-// Ez a segéd lapozva (1000-esével) kéri le a TELJES eredményhalmazt.
-async function fetchAllRows(queryFactory, pageSize = 1000){
-  let all = [], from = 0;
-  while(true){
-    const { data, error } = await queryFactory().range(from, from + pageSize - 1);
-    if(error) return { data: null, error };
-    if(!data || !data.length) break;
-    all = all.concat(data);
-    if(data.length < pageSize) break;
-    from += pageSize;
-  }
-  return { data: all, error: null };
-}
 
 export async function loadData(){
   document.getElementById("list").innerHTML=`<div class="loading">Adatok betöltése…</div>`;

@@ -8,7 +8,7 @@
      (admin API / Edge Function) tudatosan később.
    Az RLS + a members-trigger szerver-oldalon is kikényszeríti ezeket.
    ============================================================ */
-import { supabase } from "./supabase.js";
+import { supabase, fetchAllRows } from "./supabase.js";
 import { state, esc } from "./state.js";
 import { openModal, err, sheet } from "./modal.js";
 import { isOwnerRole } from "./permissions.js";
@@ -39,7 +39,7 @@ function rowActions(m){
 
 export async function usersForm(){
   openModal(`<h2>Felhasználók</h2><p class="msub">Betöltés…</p>`);
-  const { data, error } = await supabase.from("members").select("*").order("created_at");
+  const { data, error } = await fetchAllRows(()=>supabase.from("members").select("*").order("created_at"));
   if(error){ err(error); return; }
   render(data||[]);
 }

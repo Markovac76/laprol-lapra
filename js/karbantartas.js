@@ -6,7 +6,7 @@
    A "Publikálás" a publish_draft_series(uuid) SQL-függvényt hívja — a teljes
    diff/verzióemelés/change_log egy tranzakcióban fut a szerveren.
    ============================================================ */
-import { supabase } from "./supabase.js";
+import { supabase, fetchAllRows } from "./supabase.js";
 import { state, esc, listName, opts, fmtDate, DISPLAY_MAX, PAL12, PAL_FAMILIES } from "./state.js";
 import { openModal, err, sheet } from "./modal.js";
 import { reload } from "./data.js";
@@ -27,8 +27,11 @@ export async function karbantartasForm(){
   const [{data:series,error:se},{data:drafts,error:de},{data:memberSeries,error:mse},{data:members,error:mee}] = await Promise.all([
     supabase.from("series").select("*").order("sort_order"),
     supabase.from("draft_series").select("*").order("created_at"),
-    supabase.from("member_series").select("series_id,is_selected"),
-    supabase.from("members").select("user_id,display_name"),
+    // member_series/members: MINDEN userre vonatkozik (nem csak a sajátodra)
+    // — lapozva, mert (userek × követett sorozatok) szorzattal nő, nem a
+    // sajátod méretével.
+    fetchAllRows(()=>supabase.from("member_series").select("series_id,is_selected")),
+    fetchAllRows(()=>supabase.from("members").select("user_id,display_name")),
   ]);
   if(se||de||mse||mee){ err(se||de||mse||mee); return; }
   renderMain(series||[], drafts||[], memberSeries||[], members||[]);
@@ -172,11 +175,13 @@ async function startEdit(s){
     }).select().single();
     if(error) throw error;
 
-    const { data: liveIssues, error: ie } = await supabase.from("issues").select("*").eq("series_id", s.id);
+    const { data: liveIssues, error: ie } = await fetchAllRows(()=>supabase.from("issues").select("*").eq("series_id", s.id));
     if(ie) throw ie;
     if(liveIssues && liveIssues.length){
       const issueIds = liveIssues.map(x=>x.id);
-      const { data: liveComps, error: ce } = await supabase.from("components").select("*").in("issue_id", issueIds);
+      // A "több azonos típusú komponens" funkció óta ez könnyebben átlépheti
+      // a 1000-es alapértelmezett Supabase-limitet egy nagy sorozatnál.
+      const { data: liveComps, error: ce } = await fetchAllRows(()=>supabase.from("components").select("*").in("issue_id", issueIds));
       if(ce) throw ce;
 
       const issuePayload = liveIssues.map(li=>({
