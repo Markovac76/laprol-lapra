@@ -19,7 +19,7 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.14** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.15** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 - **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
@@ -136,6 +136,8 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 **SÜRGŐS hibajavítás — "eltüntethetetlen felkiáltójel" (v1.10, specifikáció 13.6):** egy vadonatúj Szám/komponens `version=1`-gyel, `change_log`/`member_seen` nélkül jött létre — a badge örökre aktív maradt, a "Összes változás" modal joggal üresnek látta, és a "Mind elfogadom" is csak a kattintó saját alapvonalát javította, a sorozatra feliratkozott TÖBBI usernek nem. Élesben megerősítve a "Fast & Furious modellek" #1 tételén (a tulajdonosnak rendben volt, egy másik feliratkozott usernek egyetlen `member_seen` sora sem volt rá). Javítás: új `seed_issue_seen_for_subscribers()` SQL-függvény minden új Szám/komponens létrejöttekor lefut (`publish_draft_series()`, "+ Új tétel", Excel új sor) — MINDEN jelenlegi feliratkozónak azonnal alapvonalat ad. Egyszeri, biztonságos visszatöltés a már létrejött, alapvonal nélküli (és SOHA nem módosult) tételekre. SQL: `laprol-lapra-uj-tetel-seen-baseline.sql`.
 **Melléktalálat:** a migrációs DB-kapcsolat "Direct connection"-ról "Session pooler"-re váltva — a Direct connection host kizárólag IPv6-címet publikál, ami egy munkamenetből elérhetetlennek bizonyult.
 
+**Sorozat-színek tematizálása + Változásnapló (v1.15):** Modellek → Kék, Mese → Magenta, Lego → Zöld színcsalád, a meglévő hue/szaturáció megtartva, csak a világosság-lépcső bővítve (Kék 5, Magenta 4, Zöld 8 árnyalat — utóbbi 6 tartalék a tervezett Spider-Man/Batman/Jurassic Park/Ninjago sorozatoknak). A 9 jelenleg létező érintett sorozat átszínezve (`laprol-lapra-sorozat-szin-tematizalas.sql`). **Új, állandó rendszer:** 🔔 "Újdonságok" changelog (`js/changelog-content.js`/`changelog.js`) — mostantól minden láthatóan megjelenő változtatáshoz kötelező egy egyszerű nyelvű bejegyzés.
+
 **SÜRGŐS hibajavítás: publikálás ütközött soft-delete-elt/élő lapszámmal (v1.14):** az `issues_series_id_lapszam_key` sima `UNIQUE(series_id, lapszam)` volt, a soft-delete-et figyelmen kívül hagyva — egy törölt Szám lapszáma örökre foglalt maradt. Konkrét eset: a "Volkswagen modellautógyűjtemény" draftjában 20 db, hibás AI-adatot javító tétel (#4-19, #27, #30, #59, #61) élő pár nélkül maradt (a "Szám törlése a draftból" gomb csak a draft-tételt törli, az élő Számot nem) és vadonatúj beszúrásként ütközött a még élő, régi sorral. Javítás: **részleges unique index** (`WHERE NOT is_deleted`), + a konkrét draft 20 tételének visszakötése az élő párjához (adatvesztés nélkül). SQL: `laprol-lapra-lapszam-reszleges-unique.sql`.
 
 **Kép törlésének lehetősége (v1.13):** staff (admin/owner) "🗑 Kép törlése" gombbal eltávolíthatja az élő komponens-képet (visszaáll "Nincs kép" állapotra), azonnali megerősítéssel, türelmi idő nélkül — a Storage-fájl is törlődik. Nincs SQL-változás, a meglévő jogosultság/Storage-policy már fedte.
@@ -174,10 +176,11 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.8).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.15).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.
+- **Állandó szabály (v1.15 óta): minden láthatóan/érezhetően megjelenő, felhasználó által észlelhető változtatáshoz kötelező egy egyszerű nyelvű bejegyzés a 🔔 "Újdonságok" changelogba** (`js/changelog-content.js`) — nem csak a specifikáció naplójába, ami fejlesztői dokumentum. Ha egy hibajavítás csak a háttérben javít valamit (a user soha nem is látta a hibát), az NEM kell a changelogba.
 - **A Claude Code-dal külön munkamenetben dolgozom** — a Home-felület (ez itt) és a Code egymástól független kontextussal bír; a köztük lévő hidat ez a dokumentum és a specifikáció adja.
 - Fontos nekem a **konzisztencia** és a **"keep it simple"** elv.
 

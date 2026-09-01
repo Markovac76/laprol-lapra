@@ -12,13 +12,17 @@ export const state = {
   myId: null, isOwner: false, role: "user", status: "active",
 };
 
+// Kék/Magenta/Zöld — kategória-tematizáláshoz bővítve (Modellek/Mese/Lego,
+// v1.15): a meglévő hue+szaturáció megtartva, csak a világosság-lépcső
+// bővült szisztematikusan (azonos hue/szat, egyenletes lightness-lépések),
+// hogy a családon belüli árnyalatok is jól elkülönüljenek egymástól.
 export const PAL_FAMILIES = [
-  {nev:"Kék",    szinek:["#2f5f8f","#3a6ea5","#4f8ac4","#6ea6dd"]},
+  {nev:"Kék",    szinek:["#1d4063","#295c8e","#377abe","#5d96d0","#88b3dd"]},
   {nev:"Vörös",  szinek:["#a8202b","#d21f2b","#e04c47","#eb7a6b"]},
   {nev:"Lila",   szinek:["#5b3d96","#7b52b8","#9a72d4","#b795e6"]},
-  {nev:"Zöld",   szinek:["#1f7a5e","#2e9e8f","#4fbf9b","#6bbf59"]},
+  {nev:"Zöld",   szinek:["#1d6351","#247b65","#2c967c","#32ae8f","#3dc7a4","#55ceb0","#71d6bc","#88ddc8"]},
   {nev:"Barna",  szinek:["#8a4f22","#c9772e","#d99a4e","#b0504d"]},
-  {nev:"Magenta",szinek:["#9c3a78","#c94f9e","#dd7ab6","#8a7dd6"]},
+  {nev:"Magenta",szinek:["#611f49","#9b3174","#c8519c","#da8bbd"]},
 ];
 export const PAL12 = PAL_FAMILIES.flatMap(f=>f.szinek);   // visszafelé kompatibilis, sík lista
 export const DISPLAY_MAX = 16;
