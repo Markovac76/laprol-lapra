@@ -68,9 +68,24 @@ export function renderHero(){
          <button class="costbtn" id="costToggle">elrejt</button></div>`
     : `<div class="stat"><div class="k">Összeg</div>
          <button class="costbtn show" id="costToggle">összeg megjelenítése</button></div>`;
+  // Sorozat-szintű borítókép (az 1-es szám előtti ingyenes bemutató-
+  // füzethez) — tisztán vizuális/referencia mező, NEM Szám, sehol nem
+  // számít bele darabszám/százalék-számításba. Ugyanaz a workflow, mint a
+  // komponens-képeknél (imageControlsHtml, "series" típussal).
+  const coverEntity = { kep_url: s.borito_url||null, upload_enabled: !!s.borito_upload_enabled, pending: s.pendingBorito||null };
+  const coverImg = s.borito_url ? `<img src="${esc(s.borito_url)}" alt="Borítókép">` : `<span class="herocover-ph">📷</span>`;
+  const heroCover = `<div class="herocoverwrap">
+      <div class="herocover${s.borito_url?"":" empty"}">${coverImg}</div>
+      ${imageControlsHtml("series", coverEntity, s.id)}
+    </div>`;
   document.getElementById("hero").innerHTML=`
-    <div class="kiado">${esc(s.kiado?listName("kiado",s.kiado):"")}${s.changed?`<button class="chgbtn" id="heroChgBtn" title="Mi változott?">!</button>`:""}</div>
-    <div class="name display">${esc(s.sorozat)}${closed}</div>
+    <div class="herohead">
+      ${heroCover}
+      <div class="herotext">
+        <div class="kiado">${esc(s.kiado?listName("kiado",s.kiado):"")}${s.changed?`<button class="chgbtn" id="heroChgBtn" title="Mi változott?">!</button>`:""}</div>
+        <div class="name display">${esc(s.sorozat)}${closed}</div>
+      </div>
+    </div>
     ${bars}
     <div class="stats">
       ${costBox}
@@ -114,28 +129,34 @@ const ICONS={
 const MLAB={megvan:"megvan",hianyzik:"hiány",nemkell:"nem kell"};
 const CHEV='<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
 
-// Kép feltöltés/csere/javaslás vezérlők egy komponensen — a szerep (staff/user)
-// és a jelenlegi állapot (van-e függő javaslat, van-e már élő kép) dönti el.
-function imageControlsHtml(c, componentId){
+// Kép feltöltés/csere/javaslás vezérlők egy komponensen VAGY egy sorozat-
+// szintű borítóképen (type: "component"|"series") — a szerep (staff/user)
+// és a jelenlegi állapot (van-e függő javaslat, van-e már élő kép) dönti
+// el, melyik gomb(ok) jelenjenek meg. `c` egységes alakú: {kep_url,
+// upload_enabled, pending} — sorozat-borítónál a hívó adja át így
+// leképezve (borito_url→kep_url stb.), hogy ez a függvény ne tudjon a
+// mező-nevek eltéréséről.
+function imageControlsHtml(type, c, entityId){
   const staff = isStaff();
+  const t = type==="series" ? ` data-enttype="series"` : "";
   if(c.pending){
     if(staff){
-      const thumb = publicUrl(proposedPath(componentId, c.pending.id));
+      const thumb = publicUrl(proposedPath(type, entityId, c.pending.id));
       return `<div class="imgctrl pending">
         <img class="imgthumb" src="${esc(thumb)}" alt="Javasolt kép">
-        <div class="modrow"><button class="btn" data-imgapprove="${c.pending.id}">Elfogad</button><button class="btn danger" data-imgreject="${c.pending.id}">Elutasít</button></div>
+        <div class="modrow"><button class="btn" data-imgapprove="${c.pending.id}"${t}>Elfogad</button><button class="btn danger" data-imgreject="${c.pending.id}"${t}>Elutasít</button></div>
       </div>`;
     }
     const mine = c.pending.proposed_by===state.myId;
     return `<div class="unote">${mine?"A javaslatod":"Javaslat"} elbírálás alatt.</div>`;
   }
   if(staff){
-    const toggle = c.kep_url ? `<button class="imgtogglebtn" data-imgtoggle="${componentId}" data-current="${c.upload_enabled?1:0}">${c.upload_enabled?"🔓 userek javasolhatnak":"🔒 userek nem javasolhatnak"}</button>` : "";
-    const del = c.kep_url ? `<button class="imgtogglebtn danger" data-imgdelete="${componentId}">🗑 Kép törlése</button>` : "";
-    return `<div class="imgctrl"><button class="imgbtn" data-imgupload="${componentId}">Kép feltöltése/csere</button>${toggle}${del}</div>`;
+    const toggle = c.kep_url ? `<button class="imgtogglebtn" data-imgtoggle="${entityId}"${t} data-current="${c.upload_enabled?1:0}">${c.upload_enabled?"🔓 userek javasolhatnak":"🔒 userek nem javasolhatnak"}</button>` : "";
+    const del = c.kep_url ? `<button class="imgtogglebtn danger" data-imgdelete="${entityId}"${t}>🗑 Kép törlése</button>` : "";
+    return `<div class="imgctrl"><button class="imgbtn" data-imgupload="${entityId}"${t}>Kép feltöltése/csere</button>${toggle}${del}</div>`;
   }
   if(c.upload_enabled || !c.kep_url){
-    return `<div class="imgctrl"><button class="imgbtn" data-imgpropose="${componentId}">${c.kep_url?"Csere javaslása":"Kép javaslása"}</button></div>`;
+    return `<div class="imgctrl"><button class="imgbtn" data-imgpropose="${entityId}"${t}>${c.kep_url?"Csere javaslása":"Kép javaslása"}</button></div>`;
   }
   return "";
 }
@@ -221,7 +242,7 @@ export function renderList(){
         return `<div class="imgcard"><div class="${boxClass}">${img}</div>
           <div class="imgcap"><div class="cn">${label}</div>
           <div class="cc">${scode}-${pad(it.n,4)}-${pad(ci+1,2)}</div></div>${pstep}${statusBtn}
-          ${c.id?imageControlsHtml(c,c.id):""}</div>`;
+          ${c.id?imageControlsHtml("component",c,c.id):""}</div>`;
       }).join("") + `</div>
       <div class="panelmoney">
         <div class="pmrow"><span class="pmk">eredeti ár</span><span class="pmv">${it.eredeti_ar!=null?fmtFt(it.eredeti_ar):"nem ismert"}</span></div>

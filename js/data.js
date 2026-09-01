@@ -35,14 +35,21 @@ export async function loadData(){
   const seenMap={};
   if(!msn.error && msn.data) msn.data.forEach(r=>{ seenMap[r.entity_type+":"+r.entity_id]=r.last_seen_version; });
   const seenOf=(type,id)=> seenMap[type+":"+id] ?? 0;
-  // Függő képjavaslatok komponensenként (globálisan olvasható — mindenkinek
-  // látnia kell, hogy már fut-e javaslat, mielőtt sajátot próbálna beküldeni).
-  const pendingByComp={};
-  if(!ip.error && ip.data) ip.data.forEach(r=>{ pendingByComp[r.component_id]=r; });
+  // Függő képjavaslatok — komponensenként ÉS sorozat-szintű borítónként
+  // (globálisan olvasható — mindenkinek látnia kell, hogy már fut-e
+  // javaslat, mielőtt sajátot próbálna beküldeni). Az entity_type dönti el,
+  // melyik map-be kerül (a másikban a hiányzó id-kulcs miatt nem zavarna
+  // egyébként sem, de explicit szűrés a világosabb).
+  const pendingByComp={}, pendingBySeries={};
+  if(!ip.error && ip.data) ip.data.forEach(r=>{
+    if(r.entity_type==="series") pendingBySeries[r.series_id]=r;
+    else pendingByComp[r.component_id]=r;
+  });
   // A fülsáv csak a SAJÁT, bepipált sorozatokból épül (member_series.is_selected) — nem az összesből.
   const selectedIds = new Set((msel.data||[]).map(r=>r.series_id));
   const byS={}, byI={};
   state.SERIES = s.data.filter(r=>selectedIds.has(r.id)).map(r=>{ const o={id:r.id,kiado:r.kiado,kategoria:r.kategoria||null,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,version:r.version||1,changed:(r.version||1)>seenOf("series",r.id),
+      borito_url:r.borito_url||null, borito_upload_enabled:!!r.borito_upload_enabled, pendingBorito:pendingBySeries[r.id]||null,
       fdRequestedAt:r.force_delete_requested_at||null, fdGraceEnd:r.force_delete_grace_end||null, items:[]}; byS[r.id]=o; return o; });
   i.data.forEach(r=>{ const mi=myIssue[r.id]||{}; const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,
       eredeti_ar:r.eredeti_ar, version:r.version||1, ownChanged:(r.version||1)>seenOf("issue",r.id), deleted:!!r.is_deleted,

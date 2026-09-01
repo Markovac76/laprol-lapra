@@ -78,6 +78,8 @@ export const HELP_CONTENT = {
         a:"<p>Két lehetséges ok: már van egy függőben lévő javaslat azon a komponensen (ilyenkor „elbírálás alatt” feliratot látsz helyette — egyszerre csak egy javaslat lehet), vagy a staff nem engedélyezte a cserét arra a komponensre (ha már van rajta valódi kép, ehhez a staffnak külön be kell kapcsolnia — ha még nincs kép, automatikusan engedélyezett).</p>" },
       { q:"Mi történik a javaslatommal, miután beküldtem?",
         a:"<p>A staff elbírálja (elfogadja vagy elutasítja). Nem kapsz külön értesítést: ha elfogadta, legközelebb az új képet látod; ha elutasította, a régi kép (vagy „nincs adat”) marad — egyik esetben sincs figyelmeztetés, egyszerűen ez lesz az állapot.</p>" },
+      { q:"Mi az a kis kép a sorozat neve mellett a hero-dobozban?",
+        a:"<p>Ez a sorozat <b>borítóképe</b> — sok részletsorozatnál a számozott 1-es szám előtt jár egy ingyenes bemutató-/reklámfüzet, aminek nincs saját „Száma”, csak ez a vizuális/referencia hely. Nem számít bele semmilyen darabszám- vagy százalék-összesítőbe. Ha még nincs feltöltve, szaggatott keretű helyet látsz — ugyanúgy javasolhatsz rá képet, mint egy komponensre (csak olyan sorozatnál, amit a 📚 Sorozataimban már kiválasztottál).</p>" },
     ]},
 
     { id:"valtozasok", title:"Változás-értesítések", open:false, items:[
@@ -167,13 +169,15 @@ export const HELP_CONTENT = {
 
     { id:"kepjavaslatok", title:"Képjavaslatok elbírálása", open:false, items:[
       { q:"Hol találom a függő képjavaslatokat?",
-        a:"<p>Nyisd le annál a számnál a képsávot, aminél van javaslat — staffnak egy kis 📷 jelzés is megjelenik a lenyitó (▾) gombon, ha az adott számon vár elbírálásra javaslat.</p>" },
+        a:"<p>Komponens-képnél nyisd le annál a számnál a képsávot, aminél van javaslat — staffnak egy kis 📷 jelzés is megjelenik a lenyitó (▾) gombon, ha az adott számon vár elbírálásra javaslat. A sorozat-szintű <b>borítókép</b> javaslata a hero-dobozban, a kis borítókép alatt jelenik meg — ugyanaz a mechanizmus, csak a sorozatra vonatkozik, nem egy komponensre.</p>" },
       { q:"Hogyan fogadom el vagy utasítom el egy javaslatot?",
-        a:"<p>A lenyitott képsávban a jelenlegi kép mellett/helyett megjelenik a javasolt kép előnézete, alatta <b>„Elfogad”</b> és <b>„Elutasít”</b> gombbal. Elfogadáskor a javasolt kép azonnal lecseréli az élőt; elutasításkor a régi kép (vagy „nincs adat”) marad.</p>" },
+        a:"<p>A jelenlegi kép mellett/helyett megjelenik a javasolt kép előnézete, alatta <b>„Elfogad”</b> és <b>„Elutasít”</b> gombbal. Elfogadáskor a javasolt kép azonnal lecseréli az élőt; elutasításkor a régi kép (vagy „nincs adat”) marad. Ez komponens-képnél és a sorozat-borítóképnél egyformán működik.</p>" },
       { q:"Kap-e értesítést a felhasználó a döntésről?",
         a:"<p>Nem, szándékosan nincs külön értesítés — a user egyszerűen legközelebb látja az eredményt (az új képet, vagy hogy nem változott semmi).</p>" },
-      { q:"Hogyan engedélyezem vagy tiltom le a képfeltöltést egy komponensen?",
-        a:"<p>Ha a komponensen MÁR van valódi kép, egy kapcsoló jelenik meg staffnak: <b>„🔓 userek javasolhatnak”</b> / <b>„🔒 userek nem javasolhatnak”</b> — erre koppintva ki/be kapcsolhatod. Ha a komponensen még NINCS kép, a feltöltés automatikusan engedélyezett, nincs mit kapcsolni.</p>" },
+      { q:"Hogyan engedélyezem vagy tiltom le a képfeltöltést egy komponensen (vagy a sorozat-borítón)?",
+        a:"<p>Ha MÁR van valódi kép, egy kapcsoló jelenik meg staffnak: <b>„🔓 userek javasolhatnak”</b> / <b>„🔒 userek nem javasolhatnak”</b> — erre koppintva ki/be kapcsolhatod. Ha még NINCS kép, a feltöltés automatikusan engedélyezett, nincs mit kapcsolni.</p>" },
+      { q:"Hogyan törlöm teljesen a képet (visszaállítás „Nincs kép” állapotra)?",
+        a:"<p>Ha van élő kép, egy <b>„🗑 Kép törlése”</b> gomb is megjelenik a feltöltés/csere gomb mellett — egyszerű megerősítő kérdés után törli a képet (a tárból is), és visszaáll „Nincs kép” állapotra, ami a userek felé automatikusan újra megnyitja a javaslási lehetőséget. Ugyanez a gomb komponens-képnél és a sorozat-borítóképnél is elérhető.</p>" },
     ]},
 
     { id:"felhasznalok", title:"Felhasználók kezelése", open:false, items:[

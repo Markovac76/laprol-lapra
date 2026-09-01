@@ -19,7 +19,7 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.16** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.17** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 - **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
@@ -135,6 +135,8 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 
 **SÜRGŐS hibajavítás — "eltüntethetetlen felkiáltójel" (v1.10, specifikáció 13.6):** egy vadonatúj Szám/komponens `version=1`-gyel, `change_log`/`member_seen` nélkül jött létre — a badge örökre aktív maradt, a "Összes változás" modal joggal üresnek látta, és a "Mind elfogadom" is csak a kattintó saját alapvonalát javította, a sorozatra feliratkozott TÖBBI usernek nem. Élesben megerősítve a "Fast & Furious modellek" #1 tételén (a tulajdonosnak rendben volt, egy másik feliratkozott usernek egyetlen `member_seen` sora sem volt rá). Javítás: új `seed_issue_seen_for_subscribers()` SQL-függvény minden új Szám/komponens létrejöttekor lefut (`publish_draft_series()`, "+ Új tétel", Excel új sor) — MINDEN jelenlegi feliratkozónak azonnal alapvonalat ad. Egyszeri, biztonságos visszatöltés a már létrejött, alapvonal nélküli (és SOHA nem módosult) tételekre. SQL: `laprol-lapra-uj-tetel-seen-baseline.sql`.
 **Melléktalálat:** a migrációs DB-kapcsolat "Direct connection"-ról "Session pooler"-re váltva — a Direct connection host kizárólag IPv6-címet publikál, ami egy munkamenetből elérhetetlennek bizonyult.
+
+**Sorozat-szintű borítókép (v1.17):** az 1-es szám előtti ingyenes bemutató-/reklámfüzethez egy önálló, vizuális/referencia mező a sorozaton — kicsi, álló formátumú miniatűr a Hero-doboz fejlécében, a kiadó/cím mellett. Sehol nem számít bele darabszám/százalék-számításba. A workflow a MEGLÉVŐ komponens-kép mechanizmus (feltöltés/csere, user-javaslat, admin jóváhagyás/elutasítás, törlés) általánosítása — az `image_proposals` tábla `entity_type` megkülönböztetéssel bővült, a `js/component-images.js` függvényei type-paraméterrel egységesek mindkét entitásra, nincs párhuzamos kód. SQL: `laprol-lapra-sorozat-borito.sql`.
 
 **Valódi Kategória (témakör) mező + élénkebb színek (v1.16):** finomítás a v1.15-ös első próbálkozáson, élesben kapott visszajelzés alapján ("nagyon hasonló színek", "jobb lenne élénkebb"). Önálló, listatár-alapú `kategoria` mező a sorozatokon (Kiadó mintájára — bővíthető ☰ Listákon, választható az Új sorozat/Karbantartás formon) — a fülsáv-választó TÉNYLEGESEN csoportosítva mutatja a sorozatokat témakör szerint (nem csak a szín családjából "visszafejtve"). Modellek → Kék, Mese → **Vörös** (a Magenta helyett — az eleve élénk, meglévő Vörös családot kapta), Lego → Zöld (8 árnyalat, 6 tartalék a tervezett Spider-Man/Batman/Jurassic Park/Ninjago sorozatoknak). A Kék/Zöld családok szaturációja jelentősen megemelve, a Zöld hue-ja teal-ről valódi zöldre tolva. SQL: `laprol-lapra-kategoria-mezo.sql`. Súgó + changelog frissítve.
 
