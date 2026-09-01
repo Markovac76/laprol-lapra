@@ -19,7 +19,7 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.13** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.14** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 - **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
@@ -135,6 +135,8 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 
 **SÜRGŐS hibajavítás — "eltüntethetetlen felkiáltójel" (v1.10, specifikáció 13.6):** egy vadonatúj Szám/komponens `version=1`-gyel, `change_log`/`member_seen` nélkül jött létre — a badge örökre aktív maradt, a "Összes változás" modal joggal üresnek látta, és a "Mind elfogadom" is csak a kattintó saját alapvonalát javította, a sorozatra feliratkozott TÖBBI usernek nem. Élesben megerősítve a "Fast & Furious modellek" #1 tételén (a tulajdonosnak rendben volt, egy másik feliratkozott usernek egyetlen `member_seen` sora sem volt rá). Javítás: új `seed_issue_seen_for_subscribers()` SQL-függvény minden új Szám/komponens létrejöttekor lefut (`publish_draft_series()`, "+ Új tétel", Excel új sor) — MINDEN jelenlegi feliratkozónak azonnal alapvonalat ad. Egyszeri, biztonságos visszatöltés a már létrejött, alapvonal nélküli (és SOHA nem módosult) tételekre. SQL: `laprol-lapra-uj-tetel-seen-baseline.sql`.
 **Melléktalálat:** a migrációs DB-kapcsolat "Direct connection"-ról "Session pooler"-re váltva — a Direct connection host kizárólag IPv6-címet publikál, ami egy munkamenetből elérhetetlennek bizonyult.
+
+**SÜRGŐS hibajavítás: publikálás ütközött soft-delete-elt/élő lapszámmal (v1.14):** az `issues_series_id_lapszam_key` sima `UNIQUE(series_id, lapszam)` volt, a soft-delete-et figyelmen kívül hagyva — egy törölt Szám lapszáma örökre foglalt maradt. Konkrét eset: a "Volkswagen modellautógyűjtemény" draftjában 20 db, hibás AI-adatot javító tétel (#4-19, #27, #30, #59, #61) élő pár nélkül maradt (a "Szám törlése a draftból" gomb csak a draft-tételt törli, az élő Számot nem) és vadonatúj beszúrásként ütközött a még élő, régi sorral. Javítás: **részleges unique index** (`WHERE NOT is_deleted`), + a konkrét draft 20 tételének visszakötése az élő párjához (adatvesztés nélkül). SQL: `laprol-lapra-lapszam-reszleges-unique.sql`.
 
 **Kép törlésének lehetősége (v1.13):** staff (admin/owner) "🗑 Kép törlése" gombbal eltávolíthatja az élő komponens-képet (visszaáll "Nincs kép" állapotra), azonnali megerősítéssel, türelmi idő nélkül — a Storage-fájl is törlődik. Nincs SQL-változás, a meglévő jogosultság/Storage-policy már fedte.
 
