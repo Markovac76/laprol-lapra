@@ -19,9 +19,31 @@ export function renderTabs(){
   tog.setAttribute("aria-expanded", state.tabsOpen);
   const el=document.getElementById("tabs");
   el.hidden = !state.tabsOpen;
-  el.innerHTML=state.SERIES.map((s,i)=>`
-    <button class="tab" role="tab" data-i="${i}" aria-selected="${i===state.activeIdx}" style="--tabc:${s.accent}">
-      <span class="lbl">${esc(s.display||s.sorozat)}</span>${s.anyChanged?'<span class="chgdot" title="Változás történt">!</span>':""}</button>`).join("");
+
+  // Csoportosítás kategória (témakör) szerint, a listatár sort_order-je
+  // szerinti sorrendben — a kategória nélküli (vagy törölt kategóriájú)
+  // sorozatok egy "Egyéb" csoportba kerülnek, a végén.
+  const catOrder = (state.LISTS.kategoria||[]).map(o=>o.ertek);
+  const groups = {}; const groupKeys = [];
+  state.SERIES.forEach((s,i)=>{
+    const key = (s.kategoria && catOrder.includes(s.kategoria)) ? s.kategoria : "__egyeb";
+    if(!groups[key]){ groups[key]=[]; groupKeys.push(key); }
+    groups[key].push(i);
+  });
+  groupKeys.sort((a,b)=>{
+    const ia = a==="__egyeb" ? catOrder.length : catOrder.indexOf(a);
+    const ib = b==="__egyeb" ? catOrder.length : catOrder.indexOf(b);
+    return ia-ib;
+  });
+
+  el.innerHTML = groupKeys.map(key=>{
+    const label = key==="__egyeb" ? "Egyéb" : listName("kategoria", key);
+    const items = groups[key].map(i=>{ const s=state.SERIES[i];
+      return `<button class="tab" role="tab" data-i="${i}" aria-selected="${i===state.activeIdx}" style="--tabc:${s.accent}">
+        <span class="lbl">${esc(s.display||s.sorozat)}</span>${s.anyChanged?'<span class="chgdot" title="Változás történt">!</span>':""}</button>`;
+    }).join("");
+    return `<div class="tabgroup"><div class="tabgroup-label">${esc(label)}</div><div class="tabgroup-items">${items}</div></div>`;
+  }).join("");
 }
 
 export function renderHero(){

@@ -141,7 +141,7 @@ export function itemForm(){
 }
 
 /* ---- Listatár bővítése ---- */
-const LIST_TITLES={kiado:"Kiadó",komponens:"Komponens-típus",azonosito:"Azonosító típusa",forras:"Beszerzés forrása"};
+const LIST_TITLES={kiado:"Kiadó",komponens:"Komponens-típus",azonosito:"Azonosító típusa",forras:"Beszerzés forrása",kategoria:"Kategória (témakör)"};
 export function listsForm(){
   const grps=Object.keys(LIST_TITLES).map(t=>`
     <div class="listgrp"><h4>${LIST_TITLES[t]}</h4>

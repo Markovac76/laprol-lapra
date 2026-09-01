@@ -9,12 +9,14 @@ import { reload } from "./data.js";
 import { purgeMyDataForIssue } from "./personal.js";
 
 const FIELD_LABELS = {
-  kiado:"Kiadó", megnevezes:"Megnevezés", megjelenites:"Megjelenítendő név", szin:"Szín", components:"Komponens-készlet",
+  kiado:"Kiadó", kategoria:"Kategória", megnevezes:"Megnevezés", megjelenites:"Megjelenítendő név", szin:"Szín", components:"Komponens-készlet",
   lapszam:"Lapszám", cim:"Cím", megjelenes:"Megjelenés dátuma", eredeti_ar:"Eredeti ár",
   azonosito_tipus:"Azonosító típusa", azonosito:"Azonosító", is_deleted:"Törölve", tipus:"Típus",
 };
 const fieldLabel = f => FIELD_LABELS[f] || f;
-const fieldValue = (f,v) => f==="tipus" ? esc(listName("komponens",v) || v || "—") : esc(v??"—");
+const fieldValue = (f,v) => f==="tipus" ? esc(listName("komponens",v) || v || "—")
+  : f==="kategoria" ? esc(listName("kategoria",v) || v || "—")
+  : esc(v??"—");
 
 // Lapozva (fetchAllRows) — egy nagy sorozatnál a change_log (minden
 // mezőváltozás önálló sor, sosem törlődik) vagy a member_seen könnyen

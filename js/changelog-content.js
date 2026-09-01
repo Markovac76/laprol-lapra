@@ -7,5 +7,5 @@
    ============================================================ */
 export const CHANGELOG = [
   { date:"2026-09-01",
-    text:"A Modellek, Mese és Lego témájú sorozatok mostantól egységes színcsaládot kapnak (kék / magenta / zöld) — a fülsávban egy pillantásra látszik, mely sorozatok tartoznak egy témakörbe, miközben egyénileg is megkülönböztethetők maradnak." },
+    text:"Valódi Kategória (témakör) mező került a sorozatokhoz — a fülsáv-választó mostantól témakörönként csoportosítva mutatja a sorozatokat (Modellek, Mese, Lego), egy-egy élénk, jól megkülönböztethető színcsaláddal (kék / piros / zöld). Új sorozat felvitelekor kiválasztható egy meglévő témakör, vagy a ☰ Listák felületen felvehető egy új." },
 ];

@@ -39,6 +39,7 @@ export function proposeSeriesForm(){
   openModal(`<h2>Új sorozat javaslása</h2>
     <p class="msub">A javaslat a feldolgozásra váró listába kerül — a staff nézi át, mielőtt élesbe kerülne.</p>
     <div class="field"><label>Kiadó</label><select id="p-kiado"><option value="">—</option>${opts("kiado","")}</select></div>
+    <div class="field"><label>Kategória (témakör)</label><select id="p-kategoria"><option value="">—</option>${opts("kategoria","")}</select></div>
     <div class="field"><label>Megnevezés (teljes név)</label><input id="p-name" placeholder="pl. Star Wars űrhajók"></div>
     <div class="field"><label>Megjelenítendő név a fülön (max ${DISPLAY_MAX}) — <span id="p-count">0/${DISPLAY_MAX}</span></label>
       <input id="p-display" maxlength="${DISPLAY_MAX}"></div>
@@ -74,6 +75,7 @@ export function proposeSeriesForm(){
       const { error } = await supabase.from("draft_series").insert({
         id: newId, pool_type:"new", pool_status:"incoming", submitted_by: state.myId,
         kiado: document.getElementById("p-kiado").value||null,
+        kategoria: document.getElementById("p-kategoria").value||null,
         megnevezes: nm, megjelenites: disp, szin: color, components: comps,
       });
       if(error) throw error;

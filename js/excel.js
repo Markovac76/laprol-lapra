@@ -215,7 +215,7 @@ async function findOrCreateEditDraft(s){
   const { data: created, error: cerr } = await supabase.from("draft_series").insert({
     pool_type:"edit", pool_status:"claimed", source_series_id:s.id,
     submitted_by: state.myId, claimed_by: state.myId, claimed_at: new Date().toISOString(),
-    kiado:s.kiado, megnevezes:s.sorozat, megjelenites:s.display, szin:s.accent, components:s.components,
+    kiado:s.kiado, kategoria:s.kategoria, megnevezes:s.sorozat, megjelenites:s.display, szin:s.accent, components:s.components,
   }).select().single();
   if(cerr) throw cerr;
   return created.id;

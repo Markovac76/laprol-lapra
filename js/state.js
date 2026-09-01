@@ -12,15 +12,16 @@ export const state = {
   myId: null, isOwner: false, role: "user", status: "active",
 };
 
-// Kék/Magenta/Zöld — kategória-tematizáláshoz bővítve (Modellek/Mese/Lego,
-// v1.15): a meglévő hue+szaturáció megtartva, csak a világosság-lépcső
-// bővült szisztematikusan (azonos hue/szat, egyenletes lightness-lépések),
-// hogy a családon belüli árnyalatok is jól elkülönüljenek egymástól.
+// Kék/Vörös/Zöld — kategória-tematizáláshoz bővítve (Modellek/Mese/Lego,
+// v1.15/v1.16): egyenletes világosság-lépcső, MAGAS szaturációval
+// ("élénk" színek, v1.16-os finomítás — az első próbálkozás túl hasonlónak/
+// fakónak bizonyult). A Mese témakör a MEGLÉVŐ Vörös családot kapja (az
+// már eleve élénk piros) — nincs rá külön "Piros" család.
 export const PAL_FAMILIES = [
-  {nev:"Kék",    szinek:["#1d4063","#295c8e","#377abe","#5d96d0","#88b3dd"]},
+  {nev:"Kék",    szinek:["#123d6e","#1a579e","#2275d3","#4b91e2","#7bafea"]},
   {nev:"Vörös",  szinek:["#a8202b","#d21f2b","#e04c47","#eb7a6b"]},
   {nev:"Lila",   szinek:["#5b3d96","#7b52b8","#9a72d4","#b795e6"]},
-  {nev:"Zöld",   szinek:["#1d6351","#247b65","#2c967c","#32ae8f","#3dc7a4","#55ceb0","#71d6bc","#88ddc8"]},
+  {nev:"Zöld",   szinek:["#16692b","#1c8235","#22a041","#27b94c","#31d359","#4ad96e","#68df85","#81e49a"]},
   {nev:"Barna",  szinek:["#8a4f22","#c9772e","#d99a4e","#b0504d"]},
   {nev:"Magenta",szinek:["#611f49","#9b3174","#c8519c","#da8bbd"]},
 ];

@@ -42,7 +42,7 @@ export async function loadData(){
   // A fülsáv csak a SAJÁT, bepipált sorozatokból épül (member_series.is_selected) — nem az összesből.
   const selectedIds = new Set((msel.data||[]).map(r=>r.series_id));
   const byS={}, byI={};
-  state.SERIES = s.data.filter(r=>selectedIds.has(r.id)).map(r=>{ const o={id:r.id,kiado:r.kiado,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,version:r.version||1,changed:(r.version||1)>seenOf("series",r.id),
+  state.SERIES = s.data.filter(r=>selectedIds.has(r.id)).map(r=>{ const o={id:r.id,kiado:r.kiado,kategoria:r.kategoria||null,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,version:r.version||1,changed:(r.version||1)>seenOf("series",r.id),
       fdRequestedAt:r.force_delete_requested_at||null, fdGraceEnd:r.force_delete_grace_end||null, items:[]}; byS[r.id]=o; return o; });
   i.data.forEach(r=>{ const mi=myIssue[r.id]||{}; const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,
       eredeti_ar:r.eredeti_ar, version:r.version||1, ownChanged:(r.version||1)>seenOf("issue",r.id), deleted:!!r.is_deleted,

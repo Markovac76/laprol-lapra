@@ -34,8 +34,8 @@ export const HELP_CONTENT = {
         a:"<p>Csak akkor, ha leváláskor a <b>Megtartom</b> opciót választottad — ekkor a régi jelöléseid/áraid visszakerülnek. Ha akkor a <b>Törlöm</b> opciót választottad, újra-beválasztáskor teljesen tiszta lappal indulsz. Korlátlanul le- és újra-választhatsz, nincs limit.</p>" },
       { q:"Miért nem tudom kiválasztani az egyik sorozatot?",
         a:"<p>Két oka lehet: <b>„publikálatlan — nem választható újra”</b> — a staff levette ezt a sorozatot, és te korábban nem voltál rajta, ezért újonnan nem választható; <b>„törlésre jelölve — nem választható”</b> — a tulajdonos elindította a végleges törlését, amíg ez fut, senki nem választhatja be újonnan.</p>" },
-      { q:"Miért van néhány sorozatnak egymáshoz hasonló színe a fülsávban?",
-        a:"<p>Az egy témakörbe tartozó sorozatok (pl. a <b>Modellek</b> — kék, a <b>Mese</b> — magenta, a <b>Lego</b> — zöld) tudatosan ugyanabból a színcsaládból kapják a fülszínüket, csak eltérő árnyalatban — így egy pillantásra látszik, mely sorozatok tartoznak össze, miközben egyénileg is megkülönböztethetők maradnak.</p>" },
+      { q:"Miért van néhány sorozatnak egymáshoz hasonló színe a fülsávban, és miért csoportosítva jelennek meg?",
+        a:"<p>Minden sorozathoz tartozik egy <b>Kategória (témakör)</b> — pl. <b>Modellek</b> (kék), <b>Mese</b> (piros), <b>Lego</b> (zöld). A <b>📚 Sorozataim</b> gomb melletti „Sorozatok” fülsáv lenyitva témakörönként csoportosítva mutatja a sorozatokat, egy-egy élénk, jól megkülönböztethető színcsaláddal — így egy pillantásra látszik, mely sorozatok tartoznak össze, miközben a családon belül egyénileg is megkülönböztethetők maradnak.</p>" },
     ]},
 
     { id:"jeloles", title:"Jelölés és státuszok", open:false, items:[
@@ -185,7 +185,9 @@ export const HELP_CONTENT = {
 
     { id:"listak", title:"Listák bővítése", open:false, items:[
       { q:"Hogyan bővítem a választható listákat (kiadó, komponens-típus stb.)?",
-        a:"<p>A 🔧 Gyors szerkesztés eszköztárban koppints a <b>„☰ Listák”</b> gombra. Négy lista bővíthető itt: Kiadó, Komponens-típus, Azonosító típusa, Beszerzés forrása — mindegyiknél egy szövegmezőbe írd be az új értéket, majd a „+” gombbal add hozzá. A bővítés csak itt lehetséges, rögzítés közben nem — így a listák nem hízhatnak el észrevétlenül.</p>" },
+        a:"<p>A 🔧 Gyors szerkesztés eszköztárban koppints a <b>„☰ Listák”</b> gombra. Öt lista bővíthető itt: Kiadó, Komponens-típus, Azonosító típusa, Beszerzés forrása, Kategória (témakör) — mindegyiknél egy szövegmezőbe írd be az új értéket, majd a „+” gombbal add hozzá. A bővítés csak itt lehetséges, rögzítés közben nem — így a listák nem hízhatnak el észrevétlenül.</p>" },
+      { q:"Hogyan adok új témakört (Kategória) egy sorozathoz?",
+        a:"<p>Az „Új sorozat javaslása” formon, illetve a Karbantartás draft-szerkesztőjében van egy <b>Kategória (témakör)</b> legördülő a Kiadó mellett — ott választhatod a meglévő témakörök egyikét. Ha egy vadonatúj témakör kell, először vedd fel a <b>„☰ Listák”</b> felületen (lásd fent), utána már választható lesz a sorozat-formon. A fülsáv-választó ez alapján csoportosítja a sorozatokat — a szín viszont továbbra is önálló, kézzel választott mező marad (érdemes a témakörhöz illő színcsaládból választani, hogy a csoportosítás vizuálisan is konzisztens legyen).</p>" },
     ]},
 
     { id:"torles", title:"Sorozat publikálatlanná tétele és törlése", open:false, items:[

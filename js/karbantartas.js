@@ -71,7 +71,7 @@ function renderAktiv(series, drafts, memberSeries){
     const inProgress = editingSourceIds.has(s.id);
     const deleteMarked = !!s.force_delete_requested_at;
     return `<div class="userrow"><div class="uinfo">
-        <div class="uname">${esc(s.megjelenites||s.megnevezes)}${s.kiado?` <span class="sc-kiado">· ${esc(listName("kiado",s.kiado))}</span>`:""}</div>
+        <div class="uname">${esc(s.megjelenites||s.megnevezes)}${s.kiado?` <span class="sc-kiado">· ${esc(listName("kiado",s.kiado))}</span>`:""}${s.kategoria?` <span class="sc-kiado">· ${esc(listName("kategoria",s.kategoria))}</span>`:""}</div>
         <div class="unote">${cnt} aktív felhasználó · aktív ${since} óta</div>
         ${deleteMarked?`<div class="unote" style="color:#f3b6b6">🗑️ törlésre jelölve — szerkesztés letiltva</div>`:""}
       </div>
@@ -171,7 +171,7 @@ async function startEdit(s){
     const { data: draft, error } = await supabase.from("draft_series").insert({
       pool_type:"edit", pool_status:"claimed", source_series_id:s.id,
       submitted_by: state.myId, claimed_by: state.myId, claimed_at: new Date().toISOString(),
-      kiado:s.kiado, megnevezes:s.megnevezes, megjelenites:s.megjelenites, szin:s.szin, components:s.components,
+      kiado:s.kiado, megnevezes:s.megnevezes, megjelenites:s.megjelenites, szin:s.szin, kategoria:s.kategoria, components:s.components,
     }).select().single();
     if(error) throw error;
 
@@ -329,6 +329,7 @@ function renderEditDraft(d, color, comps, compList, items){
   openModal(`<h2>${d.pool_type==="new"?"Új javaslat szerkesztése: "+esc(d.megnevezes):"Szerkesztés: "+esc(d.megnevezes)}</h2>
     <p class="msub">Munkaanyag — csak neked látszik, amíg nem publikálod.</p>
     <div class="field"><label>Kiadó</label><select id="d-kiado"><option value="">—</option>${opts("kiado",d.kiado)}</select></div>
+    <div class="field"><label>Kategória (témakör)</label><select id="d-kategoria"><option value="">—</option>${opts("kategoria",d.kategoria)}</select></div>
     <div class="field"><label>Megnevezés (teljes név)</label><input id="d-name" value="${esc(d.megnevezes||"")}"></div>
     <div class="field"><label>Megjelenítendő név a fülön (max ${DISPLAY_MAX}) — <span id="d-count">${(d.megjelenites||"").length}/${DISPLAY_MAX}</span></label>
       <input id="d-display" maxlength="${DISPLAY_MAX}" value="${esc(d.megjelenites||"")}"></div>
@@ -360,11 +361,12 @@ function renderEditDraft(d, color, comps, compList, items){
     try{
       const { error } = await supabase.from("draft_series").update({
         kiado: document.getElementById("d-kiado").value||null,
+        kategoria: document.getElementById("d-kategoria").value||null,
         megnevezes: nm, megjelenites: disp, szin: color, components: comps,
       }).eq("id", d.id);
       if(error) throw error;
     }catch(e){ err(e); return; }
-    d = {...d, kiado:document.getElementById("d-kiado").value||null, megnevezes:nm, megjelenites:disp, szin:color, components:comps};
+    d = {...d, kiado:document.getElementById("d-kiado").value||null, kategoria:document.getElementById("d-kategoria").value||null, megnevezes:nm, megjelenites:disp, szin:color, components:comps};
     await editDraftForm(d);
   };
   // Egy komponens-átsorolás új típust adhat a sorozat komponens-listájához
