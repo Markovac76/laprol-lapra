@@ -74,11 +74,13 @@ async function loadDraftIndex(draftSeriesId){
     .select("id,lapszam,cim,megjelenes,eredeti_ar,deleted").eq("draft_series_id", draftSeriesId);
   if(error) throw error;
   const ids=(issues||[]).map(x=>x.id);
+  // Az .in() lista az URL-be kerül — sok (több száz) azonosítónál túl hosszú lenne, ezért darabolva kérjük le.
   let comps=[];
-  if(ids.length){
+  for(let i=0;i<ids.length;i+=100){
+    const chunk=ids.slice(i,i+100);
     const { data, error: ce } = await fetchAllRows(()=>supabase.from("draft_components")
-      .select("id,draft_issue_id,tipus,azonosito,azonosito_tipus,megnevezes,created_at").in("draft_issue_id", ids).order("created_at"));
-    if(ce) throw ce; comps=data||[];
+      .select("id,draft_issue_id,tipus,azonosito,azonosito_tipus,megnevezes").in("draft_issue_id", chunk).order("id"));
+    if(ce) throw ce; comps=comps.concat(data||[]);
   }
   const byNum=new Map((issues||[]).map(i=>[i.lapszam,{...i,comps:comps.filter(c=>c.draft_issue_id===i.id)}]));
   return byNum;
@@ -93,7 +95,9 @@ function existingChanges(ex, row){
   const cc=[];
   for(const c of row.comps){
     if(c.azonosito==null && c.megnevezes==null) continue;
-    const cur=ex.comps.find(x=>x.tipus===c.tipus);
+    const same=ex.comps.filter(x=>x.tipus===c.tipus);
+    if(same.length>1) continue;   // több azonos típusú példány: nem találgatjuk, melyik az "elsődleges" — kihagyjuk
+    const cur=same[0];
     if(!cur){ cc.push({insert:true, tipus:c.tipus, azonosito:c.azonosito, megnevezes:c.megnevezes}); continue; }
     const cp={};
     if(c.azonosito!=null && c.azonosito!==cur.azonosito) cp.azonosito=c.azonosito;
