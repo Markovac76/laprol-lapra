@@ -7,7 +7,7 @@
    réteg (a draft még nem élő, senkinek nincs rajta saját adata) —
    ezért egyszerűbb, mint a live excel.js (nincs ár/státusz oszlop).
    ============================================================ */
-import { supabase } from "./supabase.js";
+import { supabase, fetchAllRows } from "./supabase.js";
 import { COMP_TYPES, esc, listName } from "./state.js";
 import { loadXlsx, coerceDate, parseHuNumber } from "./excel.js";
 
@@ -64,16 +64,80 @@ export async function parseDraftExcel(file, components){
 }
 
 // A sorokat draft_issues/draft_components soraivá írja egy adott draft
-// alá. Az ütköző (már meglévő lapszámú) sorokat kihagyja — nem írja
-// felül csendben a már kézzel szerkesztett tételeket.
-export async function bulkInsertDraftItems(draftSeriesId, rows){
-  const { data: existing, error: eerr } = await supabase.from("draft_issues")
-    .select("lapszam").eq("draft_series_id", draftSeriesId);
-  if(eerr) throw eerr;
-  const existingNums = new Set((existing||[]).map(r=>r.lapszam));
-  let inserted=0, skipped=0;
+// alá. Új lapszám → új draft-tétel. MÁR a draftban lévő lapszám (egy
+// "Szerkesztés" draftnál ez az összes élő Szám) → a draft-tétel mezői a
+// feltöltött, NEM ÜRES értékekre frissülnek (üres cella nem töröl), így a
+// tömeges javítás a szokásos diff/verzió/felkiáltójel-folyamaton át megy
+// publikáláskor. A törlésre jelölt draft-tételt nem érinti (kihagyja).
+async function loadDraftIndex(draftSeriesId){
+  const { data: issues, error } = await supabase.from("draft_issues")
+    .select("id,lapszam,cim,megjelenes,eredeti_ar,deleted").eq("draft_series_id", draftSeriesId);
+  if(error) throw error;
+  const ids=(issues||[]).map(x=>x.id);
+  let comps=[];
+  if(ids.length){
+    const { data, error: ce } = await fetchAllRows(()=>supabase.from("draft_components")
+      .select("id,draft_issue_id,tipus,azonosito,azonosito_tipus,megnevezes,created_at").in("draft_issue_id", ids).order("created_at"));
+    if(ce) throw ce; comps=data||[];
+  }
+  const byNum=new Map((issues||[]).map(i=>[i.lapszam,{...i,comps:comps.filter(c=>c.draft_issue_id===i.id)}]));
+  return byNum;
+}
+
+// Mi változna egy MEGLÉVŐ draft-tételen a sor alapján (csak nem üres, eltérő értékek).
+function existingChanges(ex, row){
+  const p={};
+  if(row.cim!=null && row.cim!==ex.cim) p.cim=row.cim;
+  if(row.megjelenes!=null && row.megjelenes!==ex.megjelenes) p.megjelenes=row.megjelenes;
+  if(row.eredeti_ar!=null && row.eredeti_ar!==ex.eredeti_ar) p.eredeti_ar=row.eredeti_ar;
+  const cc=[];
+  for(const c of row.comps){
+    if(c.azonosito==null && c.megnevezes==null) continue;
+    const cur=ex.comps.find(x=>x.tipus===c.tipus);
+    if(!cur){ cc.push({insert:true, tipus:c.tipus, azonosito:c.azonosito, megnevezes:c.megnevezes}); continue; }
+    const cp={};
+    if(c.azonosito!=null && c.azonosito!==cur.azonosito) cp.azonosito=c.azonosito;
+    if(c.megnevezes!=null && c.megnevezes!==cur.megnevezes) cp.megnevezes=c.megnevezes;
+    if(Object.keys(cp).length) cc.push({id:cur.id, patch:cp});
+  }
+  return {p, cc, any: Object.keys(p).length>0 || cc.length>0};
+}
+
+// Előnézet a megerősítő ablakhoz: hány új / hány frissülő / hány változatlan sor.
+export async function previewDraftUpload(draftSeriesId, rows){
+  const idx=await loadDraftIndex(draftSeriesId);
+  let added=0, updated=0, unchanged=0, skipped=0;
   for(const row of rows){
-    if(existingNums.has(row.lapszam)){ skipped++; continue; }
+    const ex=idx.get(row.lapszam);
+    if(!ex){ added++; continue; }
+    if(ex.deleted){ skipped++; continue; }
+    existingChanges(ex,row).any ? updated++ : unchanged++;
+  }
+  return {added, updated, unchanged, skipped};
+}
+
+export async function bulkInsertDraftItems(draftSeriesId, rows){
+  const idx=await loadDraftIndex(draftSeriesId);
+  let inserted=0, updated=0, skipped=0;
+  for(const row of rows){
+    const ex=idx.get(row.lapszam);
+    if(ex){
+      if(ex.deleted){ skipped++; continue; }
+      const ch=existingChanges(ex,row);
+      if(!ch.any){ skipped++; continue; }
+      if(Object.keys(ch.p).length){
+        const { error } = await supabase.from("draft_issues").update(ch.p).eq("id", ex.id);
+        if(error) throw error;
+      }
+      for(const c of ch.cc){
+        const { error } = c.insert
+          ? await supabase.from("draft_components").insert({ draft_issue_id:ex.id, tipus:c.tipus, azonosito:c.azonosito, megnevezes:c.megnevezes, source_component_id:null })
+          : await supabase.from("draft_components").update(c.patch).eq("id", c.id);
+        if(error) throw error;
+      }
+      updated++;
+      continue;
+    }
     const { data, error } = await supabase.from("draft_issues").insert({
       draft_series_id: draftSeriesId, lapszam: row.lapszam, cim: row.cim,
       megjelenes: row.megjelenes, eredeti_ar: row.eredeti_ar,
@@ -84,10 +148,10 @@ export async function bulkInsertDraftItems(draftSeriesId, rows){
       const { error: cerr } = await supabase.from("draft_components").insert(payload);
       if(cerr) throw cerr;
     }
-    existingNums.add(row.lapszam);
+    idx.set(row.lapszam,{id:data.id,lapszam:row.lapszam,deleted:false,comps:[]});
     inserted++;
   }
-  return {inserted, skipped};
+  return {inserted, updated, skipped};
 }
 
 // Ugyanez, de a javaslat EREDETI beküldője hívja, MÉG A STAFF ÁLTALI
@@ -112,24 +176,33 @@ export async function bulkInsertDraftItemsAsProposer(draftSeriesId, rows){
 // már claim-elt draft) a közvetlen táblaírás az alapértelmezett; a "Új
 // sorozat javaslása" köztes lépése explicit bulkInsertDraftItemsAsProposer-t ad át.
 export function confirmDraftUpload(openModal, err, file, draftSeriesId, components, onDone, insertFn = bulkInsertDraftItems){
-  parseDraftExcel(file, components).then(({rows,dateWarnings})=>{
+  const staffPath = insertFn===bulkInsertDraftItems;
+  parseDraftExcel(file, components).then(async ({rows,dateWarnings})=>{
     if(!rows.length){ alert("Nem találtam feldolgozható sort a fájlban."); return; }
     const warnBlock = dateWarnings.length
       ? `<p class="msub" style="color:#f0cd8a">⚠ ${dateWarnings.length} sor dátuma nem volt felismerhető (#${dateWarnings.slice(0,8).join(", #")}${dateWarnings.length>8?"…":""}) — ezeknél a dátum üresen marad, a többi mező feltöltődik.</p>`
       : "";
+    let note;
+    if(staffPath){
+      const pv=await previewDraftUpload(draftSeriesId, rows);
+      note=`<p class="msub" style="margin-top:10px"><b>${pv.added}</b> új tétel jön létre a draftban, <b>${pv.updated}</b> már a draftban lévő tétel <b>frissül</b> a feltöltött (nem üres) értékekre — ezek publikáláskor a szokásos diff/verzió/felkiáltójel-folyamaton mennek át —, ${pv.unchanged} változatlan${pv.skipped?`, ${pv.skipped} törlésre jelölt, kihagyva`:""}. Üres cella nem töröl semmit.</p>`;
+    } else {
+      note=`<p class="msub" style="margin-top:10px">A már meglévő (azonos lapszámú) tételeket a feltöltés kihagyja, nem írja felül.</p>`;
+    }
     openModal(`<h2>Sablon feltöltésének megerősítése</h2>
       ${warnBlock}
       <div class="example" style="font-size:13px">
 ${rows.length} sor feldolgozva a fájlból:
 ${rows.slice(0,5).map(x=>`  #${x.lapszam}${x.cim?" – "+esc(x.cim):""}`).join("\n")}${rows.length>5?"\n  …":""}
 </div>
-      <p class="msub" style="margin-top:10px">A már meglévő (azonos lapszámú) tételeket a feltöltés kihagyja, nem írja felül.</p>
+      ${note}
       <div class="modrow"><button class="btn ghost" id="du-cancel">Mégse</button><button class="btn" id="du-confirm">Feltöltés (${rows.length} tétel)</button></div>`);
     document.getElementById("du-cancel").onclick=()=>onDone();
     document.getElementById("du-confirm").onclick=async ()=>{
       try{
-        const {inserted,skipped}=await insertFn(draftSeriesId, rows);
-        alert(`Feltöltve: ${inserted} új tétel.${skipped?` (${skipped} kihagyva, mert már létezett ilyen lapszám.)`:""}`);
+        const r=await insertFn(draftSeriesId, rows);
+        const {inserted,skipped}=r, updated=r.updated||0;
+        alert(`Feltöltve: ${inserted} új tétel${staffPath?`, ${updated} frissítve`:""}.${skipped?(staffPath?` (${skipped} változatlan/kihagyva.)`:` (${skipped} kihagyva, mert már létezett ilyen lapszám.)`):""}`);
       }catch(e){ err(e); }
       onDone();
     };

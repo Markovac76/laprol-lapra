@@ -19,7 +19,7 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.18** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.19** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 - **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
@@ -135,6 +135,8 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 
 **SÜRGŐS hibajavítás — "eltüntethetetlen felkiáltójel" (v1.10, specifikáció 13.6):** egy vadonatúj Szám/komponens `version=1`-gyel, `change_log`/`member_seen` nélkül jött létre — a badge örökre aktív maradt, a "Összes változás" modal joggal üresnek látta, és a "Mind elfogadom" is csak a kattintó saját alapvonalát javította, a sorozatra feliratkozott TÖBBI usernek nem. Élesben megerősítve a "Fast & Furious modellek" #1 tételén (a tulajdonosnak rendben volt, egy másik feliratkozott usernek egyetlen `member_seen` sora sem volt rá). Javítás: új `seed_issue_seen_for_subscribers()` SQL-függvény minden új Szám/komponens létrejöttekor lefut (`publish_draft_series()`, "+ Új tétel", Excel új sor) — MINDEN jelenlegi feliratkozónak azonnal alapvonalat ad. Egyszeri, biztonságos visszatöltés a már létrejött, alapvonal nélküli (és SOHA nem módosult) tételekre. SQL: `laprol-lapra-uj-tetel-seen-baseline.sql`.
 **Melléktalálat:** a migrációs DB-kapcsolat "Direct connection"-ról "Session pooler"-re váltva — a Direct connection host kizárólag IPv6-címet publikál, ami egy munkamenetből elérhetetlennek bizonyult.
+
+**Excel-import a draftban frissíti a meglévő lapszámot (v1.19):** a draft-szerkesztő ⬆ Sablon feltöltése (`js/draft-excel.js`) korábban minden meglévő lapszámot kihagyott (szerkesztési draftban mind létezik). Most a nem üres cellák értékeivel frissíti a draft-tételt, előnézettel (új/frissül/változatlan); a publikálás a szokásos diff→verzió→felkiáltójel úton megy. Az „Új javaslat" beküldői út továbbra is kihagyó. Nincs SQL-változás.
 
 **SÜRGŐS hibajavítás: lapszám-csere ütközött az egyediségi szabállyal (v1.18):** két AKTÍV Szám sorszámának felcserélése (#29↔#30) ugyanazt a `duplicate key`-hibát dobta, mint a korábbi (v1.14) eset, de más okból — a publikálás soros UPDATE-jei a csere köztes állapotában átmenetileg két Számot hagytak ugyanazzal a lapszámmal. Mivel a v1.14-es részleges unique index sosem lehetett volna halasztható, a végleges megoldás egy `EXCLUDE ... WHERE ... DEFERRABLE INITIALLY DEFERRED` constraint, ami egyszerre részleges ÉS halasztott — a két javítás nem zárja ki egymást. SQL: `laprol-lapra-lapszam-deferrable.sql`. Élesben tesztelve a valódi "Forma 1" #29/#30 sorain.
 
