@@ -47,7 +47,7 @@ begin
     (uid,'forras','vatera','Vatera / online piactér',4),
     (uid,'forras','ajandek','Ajándék',5),
     (uid,'forras','egyeb','Egyéb',99)
-  on conflict (user_id, tipus, ertek) do nothing;
+  on conflict do nothing;   -- (a régi (user_id,tipus,ertek) kulcs a laprol-lapra-lista-egyedi-kulcs.sql-lel megszűnt; a cél nélküli forma bármely egyedi kulcsra működik)
 end $$;
 
 -- ===== Beszerzés forrása a számokhoz (opcionális mező) =====
