@@ -332,3 +332,10 @@ footer{color:var(--faint);font-size:11.5px;text-align:center;padding:8px 0 26px}
 .issue-deleted .imeta{font-size:12.5px;font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (max-width:380px){.stats{grid-template-columns:1fr}}
+
+/* --- Listák: átnevezés (11. pont) --- */
+.listgrp .val .valedit{border:0;background:transparent;color:var(--faint);cursor:pointer;font-size:12px;line-height:1;padding:0 0 0 6px}
+.listgrp .val .valedit:hover{color:var(--ink)}
+.listgrp .val .valinput{width:140px;font-size:12px;padding:2px 6px;border-radius:6px}
+.listgrp .val .valsave,.listgrp .val .valcancel{border:0;background:transparent;cursor:pointer;font-size:13px;padding:0 4px;color:var(--muted)}
+.listgrp .val .valsave{color:var(--accent)}

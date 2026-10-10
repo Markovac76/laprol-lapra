@@ -40,6 +40,17 @@ export const S = () => state.SERIES[state.activeIdx];
 
 /* ---- Listatár-segédek (a state.LISTS-re épülnek) ---- */
 export const opts = (tipus,sel) => (state.LISTS[tipus]||[]).map(o=>`<option value="${esc(o.ertek)}"${o.ertek===sel?" selected":""}>${esc(o.nev)}</option>`).join("");
+// "Egyéb" mindig az utolsó a megjelenítésben (legördülők, választók, Listák menü) —
+// az adatbázisbeli vagy memóriabeli sorrendtől függetlenül (13. pont). A többi
+// érték relatív sorrendje változatlan.
+const isEgyeb = o => !!o && (o.ertek==="egyeb" || String(o.nev||"").trim().toLowerCase()==="egyéb");
+export const sortEgyebLast = arr => { const a=arr||[]; return a.filter(o=>!isEgyeb(o)).concat(a.filter(isEgyeb)); };
+// Listaérték megjelenített neve: szóközök egységesítve, az első betű nagybetűs (11. pont).
+export const capFirst = s => { const t=String(s==null?"":s).trim().replace(/\s+/g," "); return t ? t.charAt(0).toLocaleUpperCase("hu-HU")+t.slice(1) : t; };
+// Új listaérték azonosítója: ékezet nélküli, kisbetűs [a-z0-9_]. A MEGLÉVŐ azonosítókat
+// (pl. "krtya") nem bántjuk — csak az újak lesznek olvashatók.
+export const slugify = nev => String(nev==null?"":nev).normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+  .toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");
 export const listName = (tipus,ertek) => { const o=(state.LISTS[tipus]||[]).find(x=>x.ertek===ertek); return o?o.nev:(ertek||""); };
 
 /* ---- Tiszta domén-logika: státusz-körforgás, komponens-hierarchia, lapszám-állapot ---- */

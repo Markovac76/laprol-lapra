@@ -5,7 +5,7 @@
     modulban: admin-users.js.)
    ============================================================ */
 import { supabase } from "./supabase.js";
-import { state, S, COMP_TYPES, esc, pad, opts } from "./state.js";
+import { state, S, COMP_TYPES, esc, pad, opts, capFirst, slugify, sortEgyebLast } from "./state.js";
 import { openModal, closeModal, err, sheet, guarded } from "./modal.js";
 import { reload } from "./data.js";
 import { upsertMyStatus, upsertMyIssueData } from "./personal.js";
@@ -140,40 +140,77 @@ export function itemForm(){
   draw();
 }
 
-/* ---- Listatár bővítése ---- */
+/* ---- Listatár bővítése + átnevezése ---- */
+// A listák KÖZÖSEK (mindenki ugyanazt látja; a lists.user_id csak a létrehozó).
+// Az értékekre a sorozatok/komponensek az `ertek` (azonosító) szöveggel
+// hivatkoznak — az átnevezés ezért csak a megjelenített nevet (`megjelenites`)
+// írja át, hivatkozást nem kell javítani, és az azonosító nem változik.
 const LIST_TITLES={kiado:"Kiadó",komponens:"Komponens-típus",azonosito:"Azonosító típusa",forras:"Beszerzés forrása",kategoria:"Kategória (témakör)"};
+const normName=x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ");
+
 export function listsForm(){
   const grps=Object.keys(LIST_TITLES).map(t=>`
     <div class="listgrp"><h4>${LIST_TITLES[t]}</h4>
-      <div class="vals">${(state.LISTS[t]||[]).map(o=>`<span class="val">${esc(o.nev)}</span>`).join("")||'<span class="val">—</span>'}</div>
+      <div class="vals">${(state.LISTS[t]||[]).map(o=>`<span class="val">${esc(o.nev)}<button type="button" class="valedit" data-rename="${t}" data-e="${esc(o.ertek)}" title="Átnevezés" aria-label="Átnevezés: ${esc(o.nev)}">✎</button></span>`).join("")||'<span class="val">—</span>'}</div>
       <div class="addrow"><input id="nl-${t}" placeholder="új érték neve"><button data-add="${t}">+</button></div>
     </div>`).join("");
-  openModal(`<h2>Listák</h2><p class="msub">Itt bővítheted a választható értékeket. Rögzítés közben nem lehet bővíteni — így a listák nem híznak el.</p>
+  openModal(`<h2>Listák</h2><p class="msub">Itt bővítheted a választható értékeket, és a ✎ ikonnal átnevezheted őket (csak a megjelenített név változik, a már használt értékek nem). Rögzítés közben nem lehet bővíteni — így a listák nem híznak el.</p>
     ${grps}
     <div class="modrow"><button class="btn" onclick="closeModal()">Kész</button></div>`);
   // FONTOS (12. pont): a gombokra KÖZVETLENÜL kötünk, nem a tartós #sheet
   // elemre. A korábbi `sheet.addEventListener` minden listsForm()-hívásnál
   // (és minden sikeres hozzáadás után újra) egy ÚJABB figyelőt halmozott,
-  // így egy kattintásra N párhuzamos beszúrás indult — az első sikerült, a
-  // többi egyediségi hibát dobott. Az itteni gombok minden megnyitáskor
-  // újrajönnek létre, az onclick-hozzárendelés pedig idempotens.
+  // így egy kattintásra N párhuzamos beszúrás indult. Az itteni gombok minden
+  // megnyitáskor újrajönnek létre, az onclick-hozzárendelés pedig idempotens.
   sheet.querySelectorAll("[data-add]").forEach(b=>{
     b.onclick=guarded(async ()=>{
       const t=b.dataset.add, inp=document.getElementById("nl-"+t);
-      const nev=inp.value.trim().replace(/\s+/g," "); if(!nev) return;
-      const ertek=nev.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");
+      const nev=capFirst(inp.value); if(!nev) return;               // első betű automatikusan nagybetű (11. pont)
+      const ertek=slugify(nev);                                      // ékezet nélküli azonosító (11. pont)
       if(!ertek){ alert("Adj meg érvényes nevet."); return; }
       // Érthető duplikátum-üzenet (kis/nagybetűre és szóközre érzéketlenül).
-      const norm=x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ");
-      if((state.LISTS[t]||[]).some(o=>norm(o.nev)===norm(nev) || o.ertek===ertek)){
+      if((state.LISTS[t]||[]).some(o=>normName(o.nev)===normName(nev) || o.ertek.toLowerCase()===ertek)){
         alert("Ez az érték már szerepel a listában."); return;
       }
       try{
         const so=(state.LISTS[t]||[]).length+1;
         const {error}=await supabase.from("lists").insert({tipus:t, ertek, megjelenites:nev, sort_order:so});
         if(error) throw error;
-        (state.LISTS[t]=state.LISTS[t]||[]).push({ertek,nev}); inp.value=""; listsForm();
+        // Az "Egyéb" a megjelenítésben mindig utolsó marad (13. pont).
+        state.LISTS[t]=sortEgyebLast([...(state.LISTS[t]||[]), {ertek,nev}]);
+        inp.value=""; listsForm();
       }catch(e){ err(e); }
     });
+  });
+
+  // Átnevezés: a chip helyén egy beviteli mező jelenik meg (Enter = mentés, Esc = mégse).
+  sheet.querySelectorAll("[data-rename]").forEach(b=>{
+    b.onclick=()=>{
+      const t=b.dataset.rename, e=b.dataset.e, chip=b.closest(".val");
+      const cur=(state.LISTS[t]||[]).find(o=>o.ertek===e); if(!cur) return;
+      chip.innerHTML=`<input class="valinput" value="${esc(cur.nev)}" maxlength="60" aria-label="Új név">
+        <button type="button" class="valsave" title="Mentés">✓</button><button type="button" class="valcancel" title="Mégse">✕</button>`;
+      const inp=chip.querySelector(".valinput"), save=chip.querySelector(".valsave");
+      inp.focus(); inp.select();
+      chip.querySelector(".valcancel").onclick=()=>listsForm();
+      inp.onkeydown=ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); save.click(); } else if(ev.key==="Escape") listsForm(); };
+      save.onclick=guarded(async ()=>{
+        const nev=capFirst(inp.value);
+        if(!nev){ alert("Adj meg nevet."); return; }
+        if(nev===cur.nev){ listsForm(); return; }
+        if((state.LISTS[t]||[]).some(o=>o.ertek!==e && normName(o.nev)===normName(nev))){
+          alert("Ez a név már szerepel a listában."); return;
+        }
+        try{
+          // Közvetlen módosítás (nem megy a draft/verzió-folyamaton át); a hivatkozások
+          // az azonosítóra mutatnak, ezért nem kell őket átírni.
+          const {data,error}=await supabase.from("lists").update({megjelenites:nev}).eq("tipus",t).eq("ertek",e).select();
+          if(error) throw error;
+          if(!data || !data.length){ alert("Ez a lista-elem már nem található — frissítsd az oldalt."); return; }
+          await reload();            // a fülek, választók az új nevet mutassák
+        }catch(e2){ err(e2); return; }
+        listsForm();
+      });
+    };
   });
 }

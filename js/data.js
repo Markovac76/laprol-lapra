@@ -2,7 +2,7 @@
    Adatbetöltés a Supabase-ből, statisztika, újratöltés.
    ============================================================ */
 import { supabase, fetchAllRows } from "./supabase.js";
-import { state, OWNER_UID, PAL_FALLBACK, todayISO, issueState, hasOwnedComponent, compsOfType, allComps } from "./state.js";
+import { state, OWNER_UID, PAL_FALLBACK, todayISO, issueState, hasOwnedComponent, compsOfType, allComps, sortEgyebLast } from "./state.js";
 import { renderAll } from "./render.js";
 import { err } from "./modal.js";
 
@@ -25,6 +25,8 @@ export async function loadData(){
   if(s.error||i.error||c.error){ throw (s.error||i.error||c.error); }
   state.LISTS={};
   if(!l.error && l.data) l.data.forEach(r=>{ (state.LISTS[r.tipus]=state.LISTS[r.tipus]||[]).push({ertek:r.ertek,nev:r.megjelenites||r.ertek}); });
+  // "Egyéb" mindig az utolsó (13. pont) — minden legördülő/választó ezt a sorrendet használja.
+  Object.keys(state.LISTS).forEach(k=>{ state.LISTS[k]=sortEgyebLast(state.LISTS[k]); });
   const myStatus={};
   if(!ms.error && ms.data) ms.data.forEach(r=>{ myStatus[r.component_id]={status:r.status,db:(r.db==null?1:r.db),jegyzet:r.jegyzet}; });
   const myIssue={};   // szám-szintű SZEMÉLYES adat (member_issue_data)
