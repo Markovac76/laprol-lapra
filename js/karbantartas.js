@@ -105,6 +105,10 @@ function renderMunka(drafts, members){
           : `<span class="unote">🔒 ${esc(nameOf(members,d.claimed_by))} dolgozik rajta</span>`;
       } else if(st==="ready"){
         actions = `<button data-act="publish" data-id="${d.id}">Publikálás</button>`;
+        // Visszaút a "Kész" után: a lefoglaló és az owner adhatja vissza (a DB is ezt kényszeríti ki).
+        if(d.claimed_by===state.myId || isOwnerRole()){
+          actions += `<button data-act="returnedit" data-id="${d.id}">Visszaadás szerkesztésre</button>`;
+        }
       }
       return `<div class="userrow"><div class="uinfo"><div class="uname">${typeLabel}</div><div class="unote">${who}</div></div>
         <div class="uactions">${actions}</div></div>`;
@@ -160,6 +164,7 @@ async function handleAction(act, id, series, drafts){
   if(act==="ready")   return markReady(d);
   if(act==="release") return release(d);
   if(act==="publish") return publish(d);
+  if(act==="returnedit") return returnToEdit(d);
 }
 
 // Élő sorozat "Szerkesztés indítása": a draft_series létrehozása mellett a
@@ -309,7 +314,37 @@ async function publish(d){
     const { error } = await supabase.rpc("publish_draft_series", { p_draft_id: d.id });
     if(error) throw error;
     await reload();
-  }catch(e){ err(e); return; }
+  }catch(e){ showPublishError(d, e); return; }
+  await karbantartasForm();
+}
+
+// Sikertelen publikálás után nem nyers hibaüzenet-ablak: az ok mellett a
+// javasolt következő lépés (Visszaadás szerkesztésre) is egy kattintásra van.
+// A publikálás egy tranzakció, hiba esetén teljesen visszagördül — az élő
+// sorozat és a munkaanyag is érintetlen.
+function showPublishError(d, e){
+  const canReturn = d.claimed_by===state.myId || isOwnerRole();
+  openModal(`<h2>A publikálás nem sikerült</h2>
+    <p class="msub" style="white-space:pre-wrap">${esc(e.message||String(e))}</p>
+    <p class="msub">Az élő sorozat nem változott, a munkaanyag érintetlen.</p>
+    <div class="modrow">
+      <button class="btn ghost" id="pe-close">Bezár</button>
+      ${canReturn?`<button class="btn" id="pe-return">Visszaadás szerkesztésre</button>`:""}
+    </div>`);
+  document.getElementById("pe-close").onclick=()=>karbantartasForm();
+  const rb=document.getElementById("pe-return");
+  if(rb) rb.onclick=()=>returnToEdit(d, true);
+}
+
+// "Publikálásra váró" → vissza "Munkaanyag"-ba. A tartalom, a lefoglalás és
+// az élő sorozat érintetlen; a jogosultságot és a tiltásokat (force-törlés
+// türelmi ideje, közben futó publikálás) az SQL-függvény kényszeríti ki.
+async function returnToEdit(d, skipConfirm){
+  if(!skipConfirm && !confirm(`Visszaadod szerkesztésre a(z) „${d.megnevezes}” munkaanyagot? A tartalma érintetlen marad, az élő sorozat nem változik, értesítés nincs.`)) return;
+  try{
+    const { error } = await supabase.rpc("return_draft_to_edit", { p_draft_id: d.id });
+    if(error) throw error;
+  }catch(e){ err(e); }
   await karbantartasForm();
 }
 

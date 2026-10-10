@@ -127,6 +127,8 @@ export const HELP_CONTENT = {
         a:"<p>A Munka sorozatok fülön, a Beérkezett csoportban mindegyiknél van egy <b>„Felveszem”</b> gomb. Ez rád zárolja — amíg nálad van, más staff nem nyúlhat hozzá (a Munkaanyag csoportban „🔒 [név] dolgozik rajta” felirattal látják).</p>" },
       { q:"Mi történik, ha elengedem a foglalást?",
         a:"<p>A Munkaanyag alatti elemnél az <b>„Elengedem”</b> gombra kattintva az visszakerül lock nélküli Beérkezett állapotba, a addigi munkával együtt — bárki más felveheti onnantól.</p>" },
+      { q:"Mit tehetek, ha a „Publikálásra váró” munkaanyagot még javítani kell, vagy a publikálás nem sikerült?",
+        a:"<p>A Publikálásra váró elemnél a <b>„Visszaadás szerkesztésre”</b> gombbal visszaléphetsz Munkaanyag állapotba. A tartalom, a lefoglalásod és az élő sorozat érintetlen marad, verzió nem emelkedik, felhasználók felé értesítés nincs. A gombot a munkaanyagot lefoglaló admin és a tulajdonos látja; a sorozat törlési türelmi ideje alatt nem használható. Sikertelen publikálás után a hibaablak is ezt ajánlja fel — a hiba érthető szöveggel jelzi az okot (pl. mely lapszámok ütköznének), és az élő sorozat ilyenkor nem változik.</p>" },
       { q:"Mi az a 20-as korlát?",
         a:"<p>A Beérkezett és a Munkaanyag csoport elemei EGYÜTT max. 20 darabot tehetnek ki (ezt mutatja a fül felirata: „Munka sorozatok (N/20)”). A Publikálásra váró állapotú elemek nem számítanak bele. (A Publikálatlan egy teljesen más, már ÉLŐ sorozatokra vonatkozó állapot — azzal ennek a limitnek nincs kapcsolata.)</p>" },
       { q:"Mi a különbség az „Új javaslat” és a „Szerkesztés” típus között?",
