@@ -115,7 +115,10 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
       ${compBlocks}
       ${existing&&existing.source_issue_id?`<label class="ckrow" style="margin-top:10px"><input type="checkbox" id="di-deleted" ${master.deleted?"checked":""}> Ezt a Számot törlöm a sorozatból (publikáláskor)</label>`:""}
       <div class="modrow"><button class="btn ghost" id="di-back">Vissza</button><button class="btn" id="di-save">Mentés</button></div>
-      ${existing?`<div class="modrow"><button class="btn danger" id="di-del">Szám törlése a draftból</button></div>`:""}`);
+      ${existing?`<div class="modrow"><button class="btn danger" id="di-del">${
+        existing.source_issue_id
+          ? (existing.deleted ? "Törlésre jelölés visszavonása" : "Szám törlése a sorozatból (törlésre jelölés)")
+          : "Szám törlése a draftból"}</button></div>`:""}`);
 
     document.getElementById("di-back").onclick=()=>onDone();
 
@@ -128,7 +131,10 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
         const k=b.dataset.removecomp, c=comps.find(x=>keyOf(x)===k);
         if(!c) return;
         if(c.id){
-          if(!confirm("Törlöd ezt a példányt a draftból?")) return;
+          const liveComp = c.source_component_id
+            ? "\n\nFIGYELEM: ez a példány az ÉLŐ sorozatban is létezik. A draftból való törlése az élő komponenst NEM törli — publikáláskor változatlanul megmarad (komponens törlése a sorozatból egyelőre nem támogatott)."
+            : "";
+          if(!confirm("Törlöd ezt a példányt a draftból?"+liveComp)) return;
           try{ const {error}=await supabase.from("draft_components").delete().eq("id",c.id); if(error) throw error; }
           catch(e){ err(e); return; }
         }
@@ -176,9 +182,23 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
 
     const delBtn=document.getElementById("di-del");
     if(delBtn) delBtn.onclick=guarded(async ()=>{
-      const liveNote = existing.source_issue_id ? " Az élő számot ez NEM törli — csak azt jelenti, hogy publikáláskor nem frissül." : " Ez csak a munkaanyagot érinti, élő szám még nem tartozik hozzá.";
-      if(!confirm(`Biztosan törlöd a #${existing.lapszam} számot a draftból?${liveNote}`)) return;
-      try{ const {error}=await supabase.from("draft_issues").delete().eq("id",existing.id); if(error) throw error; }catch(e){ err(e); return; }
+      if(existing.source_issue_id){
+        // Élő párral rendelkező Szám: a draft-sort NEM töröljük fizikailag — egy
+        // hiányzó draft-sor azt jelentené, hogy a publikálás nem nyúl az élő
+        // Számhoz, az pedig ott maradna (és egy azonos lapszámú új tétellel
+        // ütközne). Helyette törlésre jelöljük, így a publikálás soft-delete-eli
+        // az élő párját, a felhasználók a szokásos felkiáltójelet kapják.
+        const restore = !!existing.deleted;
+        if(!restore && !confirm(`Törlésre jelölöd a #${existing.lapszam} számot?
+
+Publikáláskor ez a Szám TÖRÖLT lesz az élő sorozatban (a felhasználók felkiáltójelet kapnak; a saját adataik a nyugtázáskor törlődnek). A jelölés a publikálásig bármikor visszavonható.`)) return;
+        try{ const {error}=await supabase.from("draft_issues").update({deleted:!restore}).eq("id",existing.id); if(error) throw error; }catch(e){ err(e); return; }
+      } else {
+        if(!confirm(`Biztosan törlöd a #${existing.lapszam} számot a draftból?
+
+Ez csak a munkaanyagot érinti, élő Szám még nem tartozik hozzá.`)) return;
+        try{ const {error}=await supabase.from("draft_issues").delete().eq("id",existing.id); if(error) throw error; }catch(e){ err(e); return; }
+      }
       onDone();
     });
   }
