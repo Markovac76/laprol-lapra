@@ -13,12 +13,14 @@
 -- MINDEN deklarált típusából van egy (üres) példány.
 --
 -- A javítás szerver-oldali, hogy a kliens-logika ne tudja újra elrontani:
---   1) apply_draft_upload: a feltöltés minden ÚJ draft-Számához felveszi a
---      sorozat (draft_series.components) deklarált típusainak hiányzó üres
---      példányait — szerkesztési és új-sorozat draftban is.
---   2) propose_bulk_issues (a beküldő útja): ugyanez, hogy a három út
---      (kézi szerkesztő / beküldői RPC / Excel-út) azonos eredményt adjon.
---      Ez a blokk független az 1)-től; elhagyható, ha nem kell.
+-- az apply_draft_upload a feltöltés minden ÚJ draft-Számához felveszi a sorozat
+-- (draft_series.components) deklarált típusainak hiányzó üres példányait —
+-- szerkesztési és új-sorozat draftban is.
+--
+-- A beküldői út (propose_bulk_issues) SZÁNDÉKOSAN változatlan: azt a kliens
+-- minden csoporttal hívja, és ha a beküldő szándékosan elhagyott egy típust,
+-- azt nem szabad csendben visszatenni (egy Számon nem kell minden deklarált
+-- típusnak meglennie).
 --
 -- Az üres példány pontosan olyan, mint a kézi szerkesztőé: tipus kitöltve,
 -- azonosito_tipus / azonosito / megnevezes NULL, source_component_id NULL.
@@ -27,7 +29,7 @@
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
--- 1) apply_draft_upload — az élő definíció (laprol-lapra-draft-sablon-
+-- apply_draft_upload — az élő definíció (laprol-lapra-draft-sablon-
 --    roundtrip.sql) + az új Számok hiányzó komponens-típusainak felvétele.
 --    A visszatérési JSON új kulcsa: auto_komponens.
 -- ---------------------------------------------------------------------------
@@ -158,62 +160,5 @@ begin
 end;
 $$;
 grant execute on function public.apply_draft_upload(uuid, jsonb) to authenticated;
-
--- ---------------------------------------------------------------------------
--- 2) propose_bulk_issues — a beküldő útja (OPCIONÁLIS blokk). Az élő
---    definíció (laprol-lapra-komponens-megnevezes-rpc.sql) + ugyanaz a
---    hiányzó-típus kiegészítés az új Számokra.
--- ---------------------------------------------------------------------------
-create or replace function public.propose_bulk_issues(p_draft_id uuid, p_rows jsonb)
-  returns json language plpgsql security definer set search_path = public as $$
-declare
-  d             public.draft_series%rowtype;
-  row_data      jsonb;
-  comp          jsonb;
-  new_issue_id  uuid;
-  existing_nums int[];
-  lsz           int;
-  inserted      int := 0;
-  skipped       int := 0;
-begin
-  select * into d from public.draft_series where id = p_draft_id;
-  if not found then raise exception 'A javaslat nem található.'; end if;
-  if d.submitted_by is distinct from auth.uid() then
-    raise exception 'Csak a saját javaslatodhoz tölthetsz fel sablont.';
-  end if;
-  if d.pool_type <> 'new' or d.pool_status <> 'incoming' or d.claimed_by is not null then
-    raise exception 'Ez a javaslat már feldolgozás alatt van — a tömeges feltöltés csak beküldés után, a staff általi átvétel előtt lehetséges.';
-  end if;
-
-  select array_agg(lapszam) into existing_nums from public.draft_issues where draft_series_id = p_draft_id;
-
-  for row_data in select * from jsonb_array_elements(p_rows) loop
-    lsz := (row_data->>'lapszam')::int;
-    if existing_nums is not null and lsz = any(existing_nums) then
-      skipped := skipped + 1; continue;
-    end if;
-    insert into public.draft_issues (draft_series_id, lapszam, cim, megjelenes, eredeti_ar)
-    values (p_draft_id, lsz, row_data->>'cim',
-            nullif(row_data->>'megjelenes','')::date, (row_data->>'eredeti_ar')::int)
-    returning id into new_issue_id;
-    for comp in select * from jsonb_array_elements(coalesce(row_data->'comps','[]'::jsonb)) loop
-      insert into public.draft_components (draft_issue_id, tipus, azonosito, megnevezes, source_component_id)
-      values (new_issue_id, comp->>'tipus', nullif(comp->>'azonosito',''), nullif(comp->>'megnevezes',''), null);
-    end loop;
-    -- a sorozat minden deklarált típusából legyen legalább egy (üres) példány
-    insert into public.draft_components (draft_issue_id, tipus, azonosito, megnevezes, source_component_id)
-    select new_issue_id, t.tipus, null, null, null
-      from unnest(d.components) with ordinality as t(tipus, ord)
-     where not exists (select 1 from public.draft_components dc
-                        where dc.draft_issue_id = new_issue_id and dc.tipus = t.tipus)
-     order by t.ord;
-    existing_nums := array_append(existing_nums, lsz);
-    inserted := inserted + 1;
-  end loop;
-
-  return json_build_object('inserted', inserted, 'skipped', skipped);
-end;
-$$;
-grant execute on function public.propose_bulk_issues(uuid, jsonb) to authenticated;
 
 -- Kész.

@@ -36,6 +36,7 @@ declare
   n_ins     int;
   n_comp    int;
   n_unseen  int;
+  n_false   int;
 begin
   select * into ser from public.series where id = sid;
   if not found then
@@ -67,7 +68,7 @@ begin
   perform public.seed_issue_seen_for_subscribers(i.id)
      from public.issues i where i.series_id = sid and not i.is_deleted;
 
-  -- ellenőrzés: minden új komponenshez van member_seen sor minden feliratkozónál
+  -- ellenőrzés 1: minden új komponenshez van member_seen sor minden feliratkozónál
   select count(*) into n_unseen
     from public.components c
     join public.issues i on i.id = c.issue_id
@@ -77,6 +78,19 @@ begin
                       where x.user_id = ms.user_id and x.entity_type = 'component' and x.entity_id = c.id);
   if n_unseen <> 0 then
     raise exception '% komponenshez hiányzik a member_seen sor — visszagörgetés.', n_unseen;
+  end if;
+
+  -- ellenőrzés 2 (hamis felkiáltójel): egyetlen feliratkozónál sincs olyan
+  -- komponens, amelynek verziója nagyobb, mint az utoljára látott verzió
+  select count(*) into n_false
+    from public.components c
+    join public.issues i on i.id = c.issue_id
+    join public.member_series ms on ms.series_id = i.series_id and ms.is_selected
+   where i.series_id = sid
+     and c.version > coalesce((select x.last_seen_version from public.member_seen x
+                                where x.user_id = ms.user_id and x.entity_type = 'component' and x.entity_id = c.id), 0);
+  if n_false <> 0 then
+    raise exception '% komponensnél a verzió nagyobb a látottnál (hamis felkiáltójel) — visszagörgetés.', n_false;
   end if;
 end $$;
 

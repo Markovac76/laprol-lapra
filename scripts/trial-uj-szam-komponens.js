@@ -12,16 +12,23 @@
    számlálókkal is igazolja, külön, friss kapcsolaton is. A publikálást NEM
    hívja, így a change_log sorozata sem lép.
 
+   Védelmek: SET LOCAL lock_timeout = 3s (nem blokkol más műveletet, ha valaki
+   épp használja az appot), statement_timeout = 60s. A Lego Avengers függő
+   draftot és semmilyen élő Számot nem érint; semmit nem publikál.
+
    Mit ellenőriz:
      T1  apply_draft_upload, ÚJ sorok, ÜRES komponens-cellákkal (a hiba esete):
          minden deklarált típusból létrejön egy üres példány
      T2  részben kitöltött / két azonos típusú példányos / nem deklarált típusú
          új sor — nincs duplikálás, az új típus a sorozat listájára kerül
-     T3  a három út (kézi szerkesztő / beküldői RPC / Excel) AZONOS eredményt ad
+     T3  a három út (kézi szerkesztő / beküldői RPC / Excel) AZONOS eredményt ad;
+         a beküldői RPC VÁLTOZATLAN (hash), és a szándékosan elhagyott típust
+         nem teszi vissza
      T4  mark_draft_ready: komponens nélküli új Szám → érthető hiba;
          komponensekkel → Kész; meglévő (élő párú) komponens nélküli Szám nem blokkol
      T5  az Autós Legendák adatjavítása: 60 komponens, 0 hiányzó member_seen,
-         0 felkiáltójel; második futtatás megáll (előfeltétel-védelem)
+         0 hamis felkiáltójel (verzió > látott) — a számok kiírva; a második
+         futtatás megáll (előfeltétel-védelem)
    Használat: node scripts/trial-uj-szam-komponens.js
    ============================================================ */
 const fs = require("fs");
@@ -49,6 +56,8 @@ async function counts(c, label) {
     components:       +(await q(`select count(*) n from public.components`)).n,
     autos_szamok:     +(await q(`select count(*) n from public.issues where series_id=$1`, [AUTO])).n,
     autos_komponensek: +(await q(`select count(*) n from public.components c join public.issues i on i.id=c.issue_id where i.series_id=$1`, [AUTO])).n,
+    lego_avengers_draft_szam: +(await q(`select count(*) n from public.draft_issues where draft_series_id='de08bf50-bb92-446a-bd44-67992c1e9317'`)).n,
+    lego_avengers_draft_komp: +(await q(`select count(*) n from public.draft_components dc join public.draft_issues di on di.id=dc.draft_issue_id where di.draft_series_id='de08bf50-bb92-446a-bd44-67992c1e9317'`)).n,
     member_seen_sorok: +(await q(`select count(*) n from public.member_seen`)).n,
     change_log_sorok: +(await q(`select count(*) n from public.change_log`)).n,
     change_log_max_id: +(await q(`select coalesce(max(id),0) n from public.change_log`)).n,
@@ -78,12 +87,25 @@ const uuid = () => crypto.randomUUID();
     const { rows: [owner] } = await c.query(`select user_id from public.members where role='owner' limit 1`);
 
     await c.query("BEGIN");
+    await c.query("SET LOCAL lock_timeout = '3s'");
+    await c.query("SET LOCAL statement_timeout = '60s'");
     await c.query(`select set_config('request.jwt.claim.sub',$1,true), set_config('request.jwt.claims',$2,true)`,
       [owner.user_id, JSON.stringify({ sub: owner.user_id, role: "authenticated" })]);
 
     await c.query(SQL_ALAP);
     await c.query(SQL_KESZ);
-    console.log("\nA migrációs SQL-ek lefutottak a tranzakción belül.\n\nPróbák:");
+    const fnh = async () => (await c.query(`select
+        md5(pg_get_functiondef('public.apply_draft_upload(uuid,jsonb)'::regprocedure)) a,
+        md5(pg_get_functiondef('public.mark_draft_ready(uuid)'::regprocedure)) r,
+        md5(pg_get_functiondef('public.propose_bulk_issues(uuid,jsonb)'::regprocedure)) p`)).rows[0];
+    const inTx = await fnh();
+    console.log("\nA migrációs SQL-ek lefutottak a tranzakción belül.");
+    console.log(`  függvény-hash a migráció UTÁN (tranzakción belül): apply=${inTx.a.slice(0,8)} ready=${inTx.r.slice(0,8)} propose=${inTx.p.slice(0,8)}`);
+    console.log(`  függvény-hash ELŐTTE (commitolt):                  apply=${before.fn_apply_hash.slice(0,8)} ready=${before.fn_ready_hash.slice(0,8)} propose=${before.fn_propose_hash.slice(0,8)}`);
+    report("H1 az apply_draft_upload és a mark_draft_ready definíciója megváltozott (az új él a tranzakcióban)",
+      inTx.a !== before.fn_apply_hash && inTx.r !== before.fn_ready_hash);
+    report("H2 a propose_bulk_issues definíciója VÁLTOZATLAN (nem része a migrációnak)", inTx.p === before.fn_propose_hash);
+    console.log("\nPróbák:");
 
     let sp = 0;
     const expectErr = async fn => {
@@ -141,12 +163,14 @@ const uuid = () => crypto.randomUUID();
     const P = await newDraft("incoming", ["konyv", "figura"], "PRÓBA beküldő");
     const { rows: [{ r: pr }] } = await c.query(`select public.propose_bulk_issues($1,$2::jsonb) r`, [P, JSON.stringify([
       { lapszam: 1, cim: "Teljes comps", megjelenes: null, eredeti_ar: 100, comps: [{ tipus: "konyv", azonosito: null, megnevezes: null }, { tipus: "figura", azonosito: null, megnevezes: null }] },
-      { lapszam: 2, cim: "Üres comps", megjelenes: null, eredeti_ar: 100, comps: [] },
+      { lapszam: 2, cim: "Szándékosan csak könyv", megjelenes: null, eredeti_ar: 100, comps: [{ tipus: "konyv", azonosito: null, megnevezes: null }] },
     ])]);
     const p1 = await compsOf(await issueByNum(P, 1)), p2 = await compsOf(await issueByNum(P, 2)), m1 = await compsOf(miid);
-    const same = JSON.stringify(g1) === JSON.stringify(m1) && JSON.stringify(m1) === JSON.stringify(p1) && JSON.stringify(p1) === JSON.stringify(p2);
-    report("T3 Excel-út (üres cellák) = kézi szerkesztő = beküldői RPC (teljes és üres comps) — azonos komponens-készlet",
-      same, `Excel: ${g1.join(",")} | kézi: ${m1.join(",")} | beküldő: ${p1.join(",")} / ${p2.join(",")}`);
+    const same = JSON.stringify(g1) === JSON.stringify(m1) && JSON.stringify(m1) === JSON.stringify(p1);
+    report("T3a Excel-út (üres cellák) = kézi szerkesztő = beküldői RPC (minden csoporttal) — azonos komponens-készlet",
+      same, `Excel: ${g1.join(",")} | kézi: ${m1.join(",")} | beküldő: ${p1.join(",")}`);
+    report("T3b a beküldői RPC a szándékosan elhagyott típust (figura) NEM teszi vissza",
+      JSON.stringify(p2) === JSON.stringify(["konyv||||"]), p2.join(","));
 
     // ---------- T4: mark_draft_ready ----------
     // a) komponensekkel rendelkező új Számok → Kész (a D draftban 1–4. Szám, mind van komponens)
@@ -179,7 +203,12 @@ const uuid = () => crypto.randomUUID();
       cnt.n === 60 && cnt.nc === 60, `${cnt.n} Szám, ebből ${cnt.nc} komponens nélkül → Kész sikerült`);
 
     // ---------- T5: Autós Legendák adatjavítás ----------
+    const falseFlags = async () => (await c.query(
+      `select count(*)::int n from public.components c join public.issues i on i.id=c.issue_id
+        where i.series_id=$1 and c.version > coalesce((select last_seen_version from public.member_seen x where x.user_id=$2 and x.entity_type='component' and x.entity_id=c.id),0)`,
+      [AUTO, owner.user_id])).rows[0].n;
     const bef = (await c.query(`select count(*)::int n from public.components c join public.issues i on i.id=c.issue_id where i.series_id=$1`, [AUTO])).rows[0].n;
+    const befFalse = await falseFlags();
     await c.query(SQL_REPAIR);
     const aft = (await c.query(`select count(*)::int n, count(*) filter (where c.tipus='konyv' and c.azonosito is null and c.megnevezes is null and c.azonosito_tipus is null and c.version=1 and c.db=1 and c.user_id=$2)::int pontos
                                   from public.components c join public.issues i on i.id=c.issue_id where i.series_id=$1`, [AUTO, owner.user_id])).rows[0];
@@ -187,11 +216,13 @@ const uuid = () => crypto.randomUUID();
                                        where i.series_id=$1 and not i.is_deleted group by i.id having count(c.id)=1) x`, [AUTO])).rows[0].n;
     report("T5a az adatjavítás: 0 → 60 komponens, mindegyik üres „konyv”, version=1, db=1, user_id = tulajdonos",
       bef === 0 && aft.n === 60 && aft.pontos === 60 && perIssue === 60, `előtte ${bef}, utána ${aft.n}, pontos ${aft.pontos}, Számonként 1: ${perIssue}`);
-    const unseen = (await c.query(
+    const unseen = await falseFlags();
+    const seenRows = (await c.query(
       `select count(*)::int n from public.components c join public.issues i on i.id=c.issue_id
-        where i.series_id=$1 and c.version > coalesce((select last_seen_version from public.member_seen x where x.user_id=$2 and x.entity_type='component' and x.entity_id=c.id),0)`,
-      [AUTO, owner.user_id])).rows[0].n;
-    report("T5b a tulajdonosnál 0 komponens-felkiáltójel (verzió > látott)", unseen === 0, "felkiáltójelet adó komponens: " + unseen);
+        join public.member_seen x on x.entity_type='component' and x.entity_id=c.id and x.user_id=$2 where i.series_id=$1`, [AUTO, owner.user_id])).rows[0].n;
+    report("T5b a tulajdonosnál 0 hamis felkiáltójel: egyetlen komponens verziója sem nagyobb a látottnál",
+      unseen === 0 && seenRows === 60,
+      `komponens: ${bef} → ${aft.n}; látott-sor (member_seen): ${seenRows}; verzió>látott: előtte ${befFalse}, utána ${unseen}`);
     const e5 = await expectErr(() => c.query(SQL_REPAIR));
     report("T5c a második futtatás megáll (előfeltétel-védelem), nem duplikál", !!e5 && /nem az elvárt/.test(e5.message), e5 ? e5.message : "NEM dobott hibát");
 
