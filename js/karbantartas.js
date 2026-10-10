@@ -277,10 +277,13 @@ async function claim(d){
   await karbantartasForm();
 }
 
+// "Kész": DB-oldali függvény (mark_draft_ready) — a publikálás UTÁNI állapotot
+// szimulálja, és lapszám-ütközés esetén érthető üzenettel megtagadja, hogy a
+// hiba ne publikáláskor derüljön ki (a "Szám törlése a draftból" körüli
+// Lego Star Wars eset tanulsága).
 async function markReady(d){
   try{
-    const { error } = await supabase.from("draft_series")
-      .update({ pool_status:"ready", ready_at:new Date().toISOString() }).eq("id", d.id);
+    const { error } = await supabase.rpc("mark_draft_ready", { p_draft_id: d.id });
     if(error) throw error;
   }catch(e){ err(e); }
   await karbantartasForm();
@@ -417,7 +420,10 @@ function renderEditDraft(d, color, comps, compList, items){
   });
   document.getElementById("d-tmpl").onclick=()=>{
     if(!comps.length){ alert("Előbb válassz ki legalább egy komponenst fent."); return; }
-    downloadDraftTemplate(comps, d.megnevezes);
+    // Oda-vissza sablon: a draft AKTUÁLIS állapotát tölti le (rejtett azonosítókkal).
+    fetchDraftItems(d.id)
+      .then(items=>downloadDraftTemplate(comps, d.megnevezes, { draftSeriesId:d.id, items }))
+      .catch(err);
   };
   document.getElementById("d-tmplup").onclick=()=>{
     if(!comps.length){ alert("Előbb válassz ki legalább egy komponenst fent."); return; }
