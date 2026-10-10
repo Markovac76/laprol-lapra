@@ -24,7 +24,7 @@ const fieldValue = (f,v) => f==="tipus" ? esc(listName("komponens",v) || v || "�
 async function fetchSeenMap(ids){
   if(!ids.length) return {};
   const { data, error } = await fetchAllRows(()=>supabase.from("member_seen").select("entity_type,entity_id,last_seen_version")
-    .eq("user_id", state.myId).in("entity_id", ids));
+    .eq("user_id", state.myId).in("entity_id", ids), ["entity_type","entity_id"]);
   if(error) throw error;
   const m={}; (data||[]).forEach(r=>{ m[r.entity_type+":"+r.entity_id]=r.last_seen_version; });
   return m;
@@ -32,7 +32,7 @@ async function fetchSeenMap(ids){
 
 async function fetchChangeLog(ids){
   if(!ids.length) return [];
-  const { data, error } = await fetchAllRows(()=>supabase.from("change_log").select("*").in("entity_id", ids).order("version").order("id"));   // azonos verziónál az id dönt (a csendes lapszám-változás azonos verzión naplózódhat)
+  const { data, error } = await fetchAllRows(()=>supabase.from("change_log").select("*").in("entity_id", ids).order("version"));   // azonos verziónál az id dönt (a csendes lapszám-változás azonos verzión naplózódhat) — a fetchAllRows teszi hozzá
   if(error) throw error;
   return data||[];
 }

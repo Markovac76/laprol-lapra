@@ -19,7 +19,7 @@ export async function loadData(){
     fetchAllRows(()=>supabase.from("member_status").select("*").eq("user_id",state.myId)),
     fetchAllRows(()=>supabase.from("member_issue_data").select("*").eq("user_id",state.myId)),
     supabase.from("member_series").select("series_id").eq("user_id",state.myId).eq("is_selected",true),
-    fetchAllRows(()=>supabase.from("member_seen").select("*").eq("user_id",state.myId)),
+    fetchAllRows(()=>supabase.from("member_seen").select("*").eq("user_id",state.myId), ["entity_type","entity_id"]),
     supabase.from("image_proposals").select("*").eq("status","pending"),
   ]);
   if(s.error||i.error||c.error){ throw (s.error||i.error||c.error); }

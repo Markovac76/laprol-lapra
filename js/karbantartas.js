@@ -30,8 +30,8 @@ export async function karbantartasForm(){
     // member_series/members: MINDEN userre vonatkozik (nem csak a sajátodra)
     // — lapozva, mert (userek × követett sorozatok) szorzattal nő, nem a
     // sajátod méretével.
-    fetchAllRows(()=>supabase.from("member_series").select("series_id,is_selected")),
-    fetchAllRows(()=>supabase.from("members").select("user_id,display_name")),
+    fetchAllRows(()=>supabase.from("member_series").select("series_id,is_selected"), ["user_id","series_id"]),
+    fetchAllRows(()=>supabase.from("members").select("user_id,display_name"), "user_id"),
   ]);
   if(se||de||mse||mee){ err(se||de||mse||mee); return; }
   renderMain(series||[], drafts||[], memberSeries||[], members||[]);

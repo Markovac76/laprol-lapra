@@ -39,7 +39,7 @@ function rowActions(m){
 
 export async function usersForm(){
   openModal(`<h2>Felhasználók</h2><p class="msub">Betöltés…</p>`);
-  const { data, error } = await fetchAllRows(()=>supabase.from("members").select("*").order("created_at"));
+  const { data, error } = await fetchAllRows(()=>supabase.from("members").select("*").order("created_at"), "user_id");
   if(error){ err(error); return; }
   render(data||[]);
 }

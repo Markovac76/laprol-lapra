@@ -23,10 +23,21 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || "hianyzi
 // akár app-szintű összesítésnél). queryFactory: () => supabase.from(...)... —
 // FRISS query-builder minden lapozási körhöz, mert egy már lekérdezett
 // builder nem hívható újra .range()-dzsel.
-export async function fetchAllRows(queryFactory, pageSize = 1000){
+//
+// STABIL SORREND: a lapozás (range) rendezés nélkül nem determinisztikus —
+// a lapok között sor maradhat ki vagy duplázódhat. Ezért minden hívás a saját
+// rendezése UTÁN egy egyedi kulccsal is rendez (alapból "id"; összetett kulcsú
+// táblánál — member_seen, member_series — a kulcs oszlopait add meg tömbben,
+// a members-nél "user_id"). A kulcs a hívás saját .order()-jei után kerül be,
+// így azok sorrendjét nem írja felül, csak az egyenlőket dönti el.
+export async function fetchAllRows(queryFactory, orderBy = "id", pageSize = 1000){
+  if(typeof orderBy === "number"){ pageSize = orderBy; orderBy = "id"; }   // régi (queryFactory, pageSize) hívás
+  const keys = orderBy ? (Array.isArray(orderBy) ? orderBy : [orderBy]) : [];
   let all = [], from = 0;
   while(true){
-    const { data, error } = await queryFactory().range(from, from + pageSize - 1);
+    let q = queryFactory();
+    keys.forEach(k=>{ q = q.order(k); });
+    const { data, error } = await q.range(from, from + pageSize - 1);
     if(error) return { data: null, error };
     if(!data || !data.length) break;
     all = all.concat(data);
