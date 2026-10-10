@@ -50,6 +50,10 @@ async function snapshot(c, seriesId) {
 
     const before = seriesId ? await snapshot(c, seriesId) : null;
     if (before) console.log("ELŐTTE :", JSON.stringify(before));
+    const issuesOf = async () => (await c.query(
+      `select id, lapszam, cim, version, is_deleted from public.issues where series_id=$1 order by lapszam, cim`, [seriesId])).rows;
+    const issuesBefore = seriesId ? await issuesOf() : [];
+    const { rows: [{ maxlog }] } = await c.query(`select coalesce(max(id),0) as maxlog from public.change_log`);
 
     // A függvény pool_status='ready'-t vár. Ha a draft még "Munkaanyag", a próbához
     // a tranzakción belül ideiglenesen "ready"-re állítjuk (a ROLLBACK úgyis visszaállít).
@@ -72,6 +76,39 @@ async function snapshot(c, seriesId) {
             where version > 0 and id > (select coalesce(max(id),0) - $1 from public.change_log)
             group by 1,2 order by 3 desc`, [after.changeLog - before.changeLog]);
         console.log("Új change_log bejegyzések (mező szerint):", JSON.stringify(ch));
+
+        // --- Számok verziója előtte → utána (csak az érintettek) ---
+        const issuesAfter = await issuesOf();
+        const prevById = new Map(issuesBefore.map(i => [i.id, i]));
+        console.log("\nMeglévő Számok (a publikálás előtt is léteztek):");
+        issuesAfter.filter(i => prevById.has(i.id)).forEach(i => {
+          const p = prevById.get(i.id);
+          console.log(`  „${i.cim}”: lapszám ${p.lapszam} → ${i.lapszam} | verzió ${p.version} → ${i.version}${i.version===p.version?"  (NEM emelkedett)":"  (emelkedett)"}`);
+        });
+        console.log(`Új Számok: ${issuesAfter.filter(i => !prevById.has(i.id)).length} db`);
+
+        // --- az ÚJONNAN naplózott change_log sorok a meglévő Számokra ---
+        const { rows: logs } = await c.query(
+          `select cl.id, cl.entity_type, cl.field_name, cl.old_value, cl.new_value, cl.version, cl.is_current, i.cim, i.version as szam_verzio
+             from public.change_log cl left join public.issues i on i.id = cl.entity_id and cl.entity_type='issue'
+            where cl.id > $1 and cl.entity_id = any($2::uuid[]) order by cl.id`,
+          [maxlog, issuesBefore.map(i => i.id)]);
+        console.log("\nÚj change_log sorok a meglévő Számokra:");
+        logs.forEach(l => console.log(`  #${l.id} ${l.entity_type}.${l.field_name}: „${l.old_value}” → „${l.new_value}” | naplózott verzió=${l.version} | a Szám verziója=${l.szam_verzio} | is_current=${l.is_current}`));
+        if (!logs.length) console.log("  (nincs)");
+
+        // --- ütközik-e a naplózás ugyanannál a verziónál valamilyen szabállyal? ---
+        const { rows: cons } = await c.query(
+          `select conname, contype, pg_get_constraintdef(oid) d from pg_constraint where conrelid='public.change_log'::regclass`);
+        const { rows: idx } = await c.query(
+          `select indexname, indexdef from pg_indexes where schemaname='public' and tablename='change_log'`);
+        const { rows: trg } = await c.query(
+          `select tgname from pg_trigger where tgrelid='public.change_log'::regclass and not tgisinternal`);
+        console.log("\nchange_log szabályok — constraintek:", JSON.stringify(cons.map(x => `${x.conname} [${x.contype}] ${x.d}`)));
+        console.log("change_log indexek:", JSON.stringify(idx.map(x => x.indexdef)));
+        console.log("change_log triggerek:", JSON.stringify(trg.map(x => x.tgname)));
+        const sameVer = logs.filter(l => l.version === l.szam_verzio && l.field_name === "lapszam");
+        console.log(`Ugyanazon a verzión (a Szám verziója nem emelkedett) naplózott lapszám-sor: ${sameVer.length} db — a beszúrás HIBA NÉLKÜL lefutott, tehát egyik szabállyal sem ütközött.`);
       }
     } catch (e) {
       console.log("\n✘ A próba-publikálás HIBÁVAL állt le (éles publikálásnál is ez történne):");

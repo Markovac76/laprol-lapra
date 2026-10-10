@@ -89,6 +89,8 @@ export const HELP_CONTENT = {
         a:"<p>A felkiáltójelre koppintva megnyílik egy ablak, ami mezőnként mutatja: „régi érték → új érték”. <b>OK, nyugtázom</b> — tudomásul veszed, a jelzés eltűnik. <b>Mégse</b> — bezárja az ablakot, de a felkiáltójel megmarad, később is megnézheted.</p>" },
       { q:"Mi az a gyűjtött elfogadás gomb?",
         a:"<p>A szűrő-gombok sorának jobb szélén, egy önálló „!” gomb jelenik meg, ha a sorozaton belül bárhol van el nem fogadott változás. Erre koppintva egy listában látod az ÖSSZES változást egyszerre, és egy „Mind elfogadom” gombbal egyszerre nyugtázhatod mindet — nem kell számonként külön.</p>" },
+      { q:"Miért nem jelez felkiáltójelet, ha egy Szám sorszáma (lapszáma) megváltozott?",
+        a:"<p>Ha a staff átszámozza a sorozatot, a puszta sorszám-változás <b>csendes</b>: nem jelenik meg tételenként felkiáltójel, hogy egy tömeges átszámozás ne árassza el a listádat. A változás rögzítve van, a Szám új sorszámát egyszerűen ott látod, ahol a sor áll. Ha a sorszám mellett tartalmi adat is változott (cím, megjelenés dátuma, ár, azonosító), akkor a szokásos felkiáltójel megjelenik, és a részletes ablakban a sorszám-változás is látszik.</p>" },
       { q:"Miért van egy szám áthúzva, „Ez a szám törölve lett a sorozatból” felirattal?",
         a:"<p>A staff törölte ezt a Számot a sorozatból. Amíg nem nyugtázod a felkiáltójellel, a sor még látszik (áthúzva, szaggatott kerettel), hogy biztosan tudomást szerezz róla — utána eltűnik a listából. Nyugtázáskor a saját (státusz/darabszám/jegyzet/beszerzés) adataid arról a Számról törlődnek, a döntést nem lehet visszavonni.</p>" },
     ]},
