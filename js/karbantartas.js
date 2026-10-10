@@ -167,42 +167,16 @@ async function handleAction(act, id, series, drafts){
   if(act==="returnedit") return returnToEdit(d);
 }
 
-// Élő sorozat "Szerkesztés indítása": a draft_series létrehozása mellett a
-// jelenlegi élő szám/komponens adatok MÁSOLATA is bekerül a draftba (tömeges
-// insert, nem soronkénti — egy 200+ tételes sorozatnál ez percekig tartana
-// soronként), hogy legyen mihez képest diffelni publikáláskor.
+// Élő sorozat "Szerkesztés indítása": EGY szerver-oldali tranzakció
+// (start_edit_draft) létrehozza a draftot, lefoglalja a hívónak, és átmásolja
+// a jelenlegi élő NEM törölt Számokat/komponenseket (hogy legyen mihez képest
+// diffelni publikáláskor). Nincs félig másolt draft; egy élő sorozathoz
+// legfeljebb egy szerkesztési draft tartozhat; csak aktív sorozaton indítható —
+// a függvény érthető üzenettel utasítja vissza a többit.
 async function startEdit(s){
   try{
-    const { data: draft, error } = await supabase.from("draft_series").insert({
-      pool_type:"edit", pool_status:"claimed", source_series_id:s.id,
-      submitted_by: state.myId, claimed_by: state.myId, claimed_at: new Date().toISOString(),
-      kiado:s.kiado, megnevezes:s.megnevezes, megjelenites:s.megjelenites, szin:s.szin, kategoria:s.kategoria, components:s.components,
-    }).select().single();
+    const { error } = await supabase.rpc("start_edit_draft", { p_series_id: s.id });
     if(error) throw error;
-
-    const { data: liveIssues, error: ie } = await fetchAllRows(()=>supabase.from("issues").select("*").eq("series_id", s.id));
-    if(ie) throw ie;
-    if(liveIssues && liveIssues.length){
-      const issueIds = liveIssues.map(x=>x.id);
-      // A "több azonos típusú komponens" funkció óta ez könnyebben átlépheti
-      // a 1000-es alapértelmezett Supabase-limitet egy nagy sorozatnál.
-      const { data: liveComps, error: ce } = await fetchAllRows(()=>supabase.from("components").select("*").in("issue_id", issueIds));
-      if(ce) throw ce;
-
-      const issuePayload = liveIssues.map(li=>({
-        draft_series_id: draft.id, source_issue_id: li.id, lapszam: li.lapszam, cim: li.cim,
-        megjelenes: li.megjelenes, eredeti_ar: li.eredeti_ar,
-      }));
-      const { data: newDraftIssues, error: dierr } = await supabase.from("draft_issues").insert(issuePayload).select();
-      if(dierr) throw dierr;
-
-      const map={}; newDraftIssues.forEach(di=>{ map[di.source_issue_id]=di.id; });
-      const compPayload = (liveComps||[]).map(lc=>({
-        draft_issue_id: map[lc.issue_id], source_component_id: lc.id, tipus: lc.tipus,
-        azonosito_tipus: lc.azonosito_tipus, azonosito: lc.azonosito, megnevezes: lc.megnevezes,
-      }));
-      if(compPayload.length){ const {error:dcerr}=await supabase.from("draft_components").insert(compPayload); if(dcerr) throw dcerr; }
-    }
   }catch(e){ err(e); return; }
   currentTab="munka"; await karbantartasForm();
 }

@@ -202,7 +202,8 @@ ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új
 }
 
 // Megkeresi vagy létrehozza az "edit" típusú draftot ehhez a sorozathoz —
-// ugyanaz a claim-elv, mint a Karbantartás "Szerkesztés indítása" gombjánál.
+// ugyanaz a claim-elv és ugyanaz a létrehozó függvény (start_edit_draft), mint
+// a Karbantartás "Szerkesztés indítása" gombjánál.
 async function findOrCreateEditDraft(s){
   const { data: existing, error } = await supabase.from("draft_series")
     .select("*").eq("source_series_id", s.id).eq("pool_type","edit").maybeSingle();
@@ -221,13 +222,12 @@ async function findOrCreateEditDraft(s){
     }
     return existing.id;
   }
-  const { data: created, error: cerr } = await supabase.from("draft_series").insert({
-    pool_type:"edit", pool_status:"claimed", source_series_id:s.id,
-    submitted_by: state.myId, claimed_by: state.myId, claimed_at: new Date().toISOString(),
-    kiado:s.kiado, kategoria:s.kategoria, megnevezes:s.sorozat, megjelenites:s.display, szin:s.accent, components:s.components,
-  }).select().single();
+  // Létrehozás: ugyanaz az atomi szerver-függvény, mint a Karbantartás
+  // "Szerkesztés indítása" gombjánál — a draft a teljes élő állapot másolata
+  // (nem csak a most érintett tételeké), csak aktív sorozaton indítható.
+  const { data: newId, error: cerr } = await supabase.rpc("start_edit_draft", { p_series_id: s.id });
   if(cerr) throw cerr;
-  return created.id;
+  return newId;
 }
 
 // Egy meglévő élő tétel törzsadat-módosítása a draftban — insert vagy update

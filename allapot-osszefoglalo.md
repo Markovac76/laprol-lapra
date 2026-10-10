@@ -1,4 +1,4 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v8)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v9)
 
 **Frissítve:** 2026. október 10. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
@@ -37,7 +37,9 @@ laprol-lapra/
 │   ├── package.json, package-lock.json
 │   ├── backup-db.js
 │   ├── run-migration.js
-│   └── trial-publish.js                   ← egy draft publikálásának próbája, MINDIG visszagörget
+│   ├── trial-publish.js                   ← egy draft publikálásának próbája, MINDIG visszagörget
+│   ├── trial-renumber.js                  ← szintetikus átszámozás-próba, MINDIG visszagörget (csak jóváhagyással futtatható)
+│   └── trial-start-edit.js                ← a start_edit_draft + index próbája, MINDIG visszagörget (csak jóváhagyással futtatható)
 ├── vercel.json
 ├── manifest.json + icons/
 └── js/
@@ -166,6 +168,7 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 - **Listák:** átnevezhetők, közös egyediségi kulcs, első betű nagy, ékezetmentes új azonosító, „Egyéb" mindig utolsó.
 - **Lapszám-csendesítés:** a puszta lapszám-változás nem emel verziót (nincs felkiáltójel), a `change_log` rögzíti.
 - **A Lego Star Wars draft helyreállítása** név alapján, jóváhagyással történt; a tulajdonos publikálta (09:39 UTC, még a régi függvénnyel — ezért a #6 verziója 5 → 6 lett, nyugtázva).
+- **Szerkesztés indítása (v1.21):** egy szerver-oldali tranzakció (`start_edit_draft`), egy sorozathoz legfeljebb egy szerkesztési draft; a Gyors szerkesztés → Excel létrehozó ága ugyanezt használja (a párosítása továbbra is lapszám-alapú — nyitott 7. pont).
 
 ---
 
@@ -184,9 +187,9 @@ A hibajavítási kör 11. pontja (sablon-alapú tömeges feltöltés) a javaslat
 5. **Hordozhatóság/export** — nincs kidolgozva.
 6. **Komponens soft-delete** — ma a draftból törölt komponens-példány az élő komponenst nem törli (a gomb figyelmeztet). Önálló kör: `components.is_deleted`, a szűrések és az értesítés.
 7. **Gyors szerkesztés → Excel azonosító-alapúvá tétele** — ma lapszám alapján párosít, és az új lapszámokat közvetlenül élőbe írja (a megerősítő ablak figyelmeztet). Önálló kör.
-8. **Egy szerkesztési draft egy élő sorozathoz** — javaslat jóváhagyásra vár: részleges egyedi index `draft_series(source_series_id) WHERE pool_type='edit'` és atomi `start_edit_draft()` (a „Szerkesztés indítása” ma három külön kliens-lépés).
+8. **Egy szerkesztési draft egy élő sorozathoz** — **KÉSZ (v1.21):** részleges egyedi index + atomi `start_edit_draft()`; a Karbantartás gombja és a Gyors szerkesztés → Excel is ezt hívja (a soft-delete-elt Számokat nem másolja).
 9. **Döntés nélküli ötletek:** „tervezett” jelzés a még meg nem jelent számoknál; dátum szerinti rendezés segítségként (nem automatikus); eltolás ütközésnél felajánlott kényelmi lehetőségként.
-10. **A lapszám-csendesítés élő ellenőrzése** — a migráció él, de az első élő publikálás még nem futott rajta (a Lego-publikálás a régi logikával ment). Opcionális: visszagörgetett szintetikus próba, jóváhagyással.
+10. **A lapszám-csendesítés élő ellenőrzése** — **KÉSZ:** a visszagörgetett szintetikus próba (`scripts/trial-renumber.js`) igazolta: a puszta lapszám-változás nem emel verziót, a `change_log` rögzíti, a számlálók a ROLLBACK után azonosak.
 
 ---
 
@@ -202,7 +205,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.20).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.21).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.

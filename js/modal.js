@@ -24,6 +24,8 @@ export function friendlyError(e){
   const msg = (e && e.message) || String(e);
   if(code==="23P01" || /exclusion constraint/i.test(msg))
     return "Ez a lapszám már foglalt ebben a sorozatban egy másik, nem törölt Számnál.";
+  if(/draft_series_one_edit_per_series/.test(msg))
+    return "Ehhez a sorozathoz már van nyitott szerkesztési munkaanyag — nézd meg a Karbantartás „Munka sorozatok” fülén.";
   if(code==="23505" || /duplicate key value/i.test(msg))
     return "Ez az érték már szerepel — nem hoztam létre még egyszer.";
   if(code==="42501" || /row-level security/i.test(msg))

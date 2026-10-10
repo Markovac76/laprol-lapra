@@ -139,7 +139,7 @@ export const HELP_CONTENT = {
 
     { id:"sorozat-szerk", title:"Sorozat szerkesztése", open:false, items:[
       { q:"Hogyan indítok szerkesztést egy már élő sorozaton?",
-        a:"<p>A Karbantartás Aktív sorozatok fülén, a sorozat sorában koppints a <b>„Szerkesztés indítása”</b> gombra. Ez azonnal létrehoz egy másolatot (draftot) az összes számáról/komponenséről, és átkerül a Munka sorozatok fülre, rád claim-elve.</p>" },
+        a:"<p>A Karbantartás Aktív sorozatok fülén, a sorozat sorában koppints a <b>„Szerkesztés indítása”</b> gombra. Ez azonnal, egy lépésben létrehoz egy másolatot (draftot) az összes (nem törölt) számáról/komponenséről, és átkerül a Munka sorozatok fülre, rád claim-elve. Egy sorozathoz egyszerre egyetlen szerkesztési munkaanyag tartozhat — ha már van, a gomb ezt jelzi —, és csak aktív (publikált) sorozaton indítható.</p>" },
       { q:"Mi az a draft, és ki látja?",
         a:"<p>A draft egy munkaanyag-másolat — csak a Karbantartásban, csak a claim-elő staff-tagnak látszik, amíg publikálva nincs. A draft-nézetben mind a sorozat mezői (kiadó, név, szín, komponens-készlet), mind az egyes számok listája szerkeszthető.</p>" },
       { q:"Hogyan adok hozzá vagy szerkesztek egy számot a draftban?",
