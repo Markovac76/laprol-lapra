@@ -1,6 +1,6 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v7)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v8)
 
-**Frissítve:** 2026. augusztus 31. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
+**Frissítve:** 2026. október 10. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
 > Told fel ezt a fájlt a Claude projektbe (cseréld le a régi verziót). Új beszélgetés elején hivatkozz rá: "olvasd el az állapot-összefoglalót, onnan tudod, hol tartunk."
 
@@ -8,7 +8,7 @@
 
 ## 1. A nagy kép
 
-**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított, legutóbb a komponens-szintű "Megnevezés" + több azonos típusú komponens funkció zárva (v1.9). **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
+**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított, legutóbb a feltöltés-átalakítási kör zárva (v1.20): azonosító-alapú oda-vissza sablon, lapszám-ütközés-védelem, Visszaadás szerkesztésre, Listák átnevezése.9). **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
 
 ---
 
@@ -36,7 +36,8 @@ laprol-lapra/
 ├── scripts/                   ← ÚJ (v1.8): migrációs eszközök, saját package.json + node_modules (utóbbi NINCS git-ben)
 │   ├── package.json, package-lock.json
 │   ├── backup-db.js
-│   └── run-migration.js
+│   ├── run-migration.js
+│   └── trial-publish.js                   ← egy draft publikálásának próbája, MINDIG visszagörget
 ├── vercel.json
 ├── manifest.json + icons/
 └── js/
@@ -49,7 +50,8 @@ laprol-lapra/
     ├── changes.js                              ← verziókövetés/felkiáltójel
     ├── component-images.js, image-resize.js    ← képfeltöltés/-javaslat
     ├── my-data.js                               ← „Saját adatlap", leváltotta a price-edit.js-t
-    ├── draft-excel.js                           ← sablon-alapú tömeges tétel-feltöltés draftokhoz
+    ├── draft-excel.js                           ← oda-vissza sablon: letöltés/beolvasás/előnézet/alkalmazás (v1.20)
+    ├── draft-excel-plan.js                      ← ugyanennek a TISZTA logikája (párosítás, osztályozás, ujjlenyomat) — Node-ban tesztelhető
     └── help.js, help-content.js                 ← beépített súgó
 ```
 `price-edit.js` **megszűnt** — a `my-data.js` teljesen leváltotta. Ha bármit módosítasz az appon (`index.html`/`js/`/`styles.css`), ebben a modul-szerkezetben kell — nem egyetlen nagy fájlban. A `scripts/` mappa ettől külön áll: helyi fejlesztői eszköz, sosem megy a Vercel build-be.
@@ -154,6 +156,17 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 
 **Teljeskörű 1000-soros lapozási átvizsgálás (v1.11):** a fenti hiba gyökere (Supabase/PostgREST alapból max. 1000 sort ad vissza `.select()`-re, `range()` nélkül, hibaüzenet nélkül) elvben BÁRMELYIK lapozatlan lekérdezést érintheti — átnéztük a teljes kódbázist. A közös `fetchAllRows()` segéd (`js/supabase.js`) mostantól ott is lapoz, ahol eddig nem: `change_log`/`member_seen` (`js/changes.js`), `components` egy nagy sorozat/draft összes tételére (`js/karbantartas.js`, `js/my-series.js`, `js/draft-items.js` — a több-komponens funkció óta nagyobb lehet), és két, MINDEN userre vonatkozó app-szintű lekérdezés (`member_series`, `members` — `js/karbantartas.js`, `js/admin-users.js`).
 
+**Feltöltés-átalakítási kör — a Lego Star Wars publikálási hiba után (v1.20, részletek: specifikáció 13.11):**
+- **Kötött elv:** a lapszám NEM azonosító (ennél a sorozatnál a felvivő által adott folyamatos sorszám), a név sem az; a Szám azonossága egy rejtett azonosító. Élő és draft tételt SOHA nem lapszám alapján kötünk össze.
+- **Visszaadás szerkesztésre** („Publikálásra váró" → „Munkaanyag") és érthető publikálási hibaüzenet (a hibaablak ezt ajánlja).
+- **Törölt-jelölés:** élő párral rendelkező Számnál a draftban nem fizikai törlés történik, hanem `deleted=true` (különben a publikálás nem nyúl az élő Számhoz, az ott marad).
+- **Azonosító-alapú oda-vissza sablon:** a letöltés a draft aktuális állapotát tükrözi, rejtett Szám-/komponens-ID-val; azonosítós sor = frissítés, azonosító nélküli = új; név-egyezés csak javaslat; üres cella nem töröl; a hiányzó sor marad; elavulás-jelzés (ujjlenyomat); blokkoló azonosító-hibák (lemásolt sor); az előnézet soronként osztályoz.
+- **Egy forrás az ütközés-ellenőrzésre** (DB): „Kész", feltöltés-előnézet és feltöltés-alkalmazás (egy tranzakcióban) ugyanazt használja; a publikálás utáni állapotot szimulálja.
+- **Mentés-védelem mindenhol** (`guarded()`), magyar hibaüzenetek; a Listák kétszeri futásának oka (halmozódó figyelő) megszűnt.
+- **Listák:** átnevezhetők, közös egyediségi kulcs, első betű nagy, ékezetmentes új azonosító, „Egyéb" mindig utolsó.
+- **Lapszám-csendesítés:** a puszta lapszám-változás nem emel verziót (nincs felkiáltójel), a `change_log` rögzíti.
+- **A Lego Star Wars draft helyreállítása** név alapján, jóváhagyással történt; a tulajdonos publikálta (09:39 UTC, még a régi függvénnyel — ezért a #6 verziója 5 → 6 lett, nyugtázva).
+
 ---
 
 ## 5. A kör során talált és javított RLS-hiba (tanulságos eset)
@@ -169,6 +182,11 @@ A hibajavítási kör 11. pontja (sablon-alapú tömeges feltöltés) a javaslat
 3. **Valódi fióktörlés** (Edge Function kell, service_role kulccsal — eddig csak letiltás épült meg).
 4. **Címkerendszer** — platform-szintű, még nem szabványosítva.
 5. **Hordozhatóság/export** — nincs kidolgozva.
+6. **Komponens soft-delete** — ma a draftból törölt komponens-példány az élő komponenst nem törli (a gomb figyelmeztet). Önálló kör: `components.is_deleted`, a szűrések és az értesítés.
+7. **Gyors szerkesztés → Excel azonosító-alapúvá tétele** — ma lapszám alapján párosít, és az új lapszámokat közvetlenül élőbe írja (a megerősítő ablak figyelmeztet). Önálló kör.
+8. **Egy szerkesztési draft egy élő sorozathoz** — javaslat jóváhagyásra vár: részleges egyedi index `draft_series(source_series_id) WHERE pool_type='edit'` és atomi `start_edit_draft()` (a „Szerkesztés indítása” ma három külön kliens-lépés).
+9. **Döntés nélküli ötletek:** „tervezett” jelzés a még meg nem jelent számoknál; dátum szerinti rendezés segítségként (nem automatikus); eltolás ütközésnél felajánlott kényelmi lehetőségként.
+10. **A lapszám-csendesítés élő ellenőrzése** — a migráció él, de az első élő publikálás még nem futott rajta (a Lego-publikálás a régi logikával ment). Opcionális: visszagörgetett szintetikus próba, jóváhagyással.
 
 ---
 
@@ -184,12 +202,14 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.15).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.20).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.
 - **Állandó szabály (v1.15 óta): minden láthatóan/érezhetően megjelenő, felhasználó által észlelhető változtatáshoz kötelező egy egyszerű nyelvű bejegyzés a 🔔 "Újdonságok" changelogba** (`js/changelog-content.js`) — nem csak a specifikáció naplójába, ami fejlesztői dokumentum. Ha egy hibajavítás csak a háttérben javít valamit (a user soha nem is látta a hibát), az NEM kell a changelogba.
 - **A Claude Code-dal külön munkamenetben dolgozom** — a Home-felület (ez itt) és a Code egymástól független kontextussal bír; a köztük lévő hidat ez a dokumentum és a specifikáció adja.
+- **Állandó szabály (a 2026-10-10-i körtől):** élő adaton DB-érintő tesztet — visszagörgetettet is — a Code csak az én előzetes jóváhagyásommal futtat; a migrációknál a teljes SQL megmutatása → jóváhagyás → backup → tranzakció sorrend kötelező.
+- **Állandó szabály:** azonosítást (élő ↔ draft párosítás) sosem lapszám vagy név alapján végzünk; a lapszám sorrend-szám.
 - Fontos nekem a **konzisztencia** és a **"keep it simple"** elv.
 
 ---
