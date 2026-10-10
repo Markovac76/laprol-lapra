@@ -30,7 +30,18 @@ export const DISPLAY_MAX = 16;
 export const COMP_TYPES = {magazin:"Magazin",modell:"Modell",konyv:"Könyv",egyeb:"Egyéb"};
 export const PAL_FALLBACK = "#3a6ea5";
 export const HU_MON = ["jan.","febr.","márc.","ápr.","máj.","jún.","júl.","aug.","szept.","okt.","nov.","dec."];
-export const todayISO = new Date().toISOString().slice(0,10);
+// A mai nap a FELHASZNÁLÓ helyi időzónájában (ÉÉÉÉ-HH-NN) — NEM UTC, és nem
+// betöltéskor befagyasztott érték: minden híváskor friss. (A korábbi UTC-s,
+// betöltéskor rögzített érték helyi 00:00–02:00 között még "tegnap" volt, a
+// fülön hagyva pedig napokig az lett volna.)
+export const localISO = (d=new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+export const today = () => localISO();
+// Egy dátum akkor "jövőbeli" (még nem jelent meg / "Várható"), ha SZIGORÚAN a
+// mai nap utáni. A mai dátumú Szám MEGJELENT. Minden "megjelent / jövőbeli /
+// várható" döntés ezt használja, hogy a szűrő, a dátum-jelzés, a színezés és a
+// "következő megjelenés" ugyanazt jelentse.
+export const isFutureDate = iso => !!iso && iso > localISO();
 
 export const fmtDate = iso => { if(!iso) return null; const [y,m,d]=iso.split("-").map(Number); return `${y}. ${HU_MON[m-1]} ${d}.`; };
 export const fmtFt = n => n==null ? null : n.toLocaleString("hu-HU").replace(/,/g," ")+" Ft";
@@ -91,7 +102,7 @@ export function hasOwnedComponent(it,s){
 // jön ("legrosszabb eset nyer", 6.3–6.4 kiterjesztve): a Szám csak akkor zöld,
 // ha a domináns típus(ok) MINDEN példánya megvan.
 export function issueState(it,s){
-  if(it.date && it.date>todayISO) return null;                  // még nem jelent meg → semleges
+  if(isFutureDate(it.date)) return null;                        // még nem jelent meg → semleges
   const nm=s.components.filter(t=>t!=="magazin");
   const dominantTypes = nm.length ? nm : s.components;
   if(!dominantTypes.length) return null;

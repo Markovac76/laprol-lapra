@@ -1,7 +1,7 @@
 /* ============================================================
    Megjelenítés: fülek, hero, szűrők, lista, tapadó fejléc.
    ============================================================ */
-import { state, S, COMP_TYPES, todayISO, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus } from "./state.js";
+import { state, S, COMP_TYPES, isFutureDate, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus } from "./state.js";
 import { stats } from "./data.js";
 import { showSeriesChangePopup, showIssueChangePopup, showCollectedChanges } from "./changes.js";
 import { isStaff } from "./permissions.js";
@@ -104,7 +104,7 @@ function issueHasStatus(it,s,stt){ return s.components.some(t=>compsOfType(it,t)
 
 export function renderChips(){
   const s=S(); const activeItems=s.items.filter(it=>!it.deleted);
-  const c=id=> id==="mind"?activeItems.length : id==="varhato"?activeItems.filter(it=>it.date&&it.date>=todayISO).length : activeItems.filter(it=>issueHasStatus(it,s,id)).length;
+  const c=id=> id==="mind"?activeItems.length : id==="varhato"?activeItems.filter(it=>isFutureDate(it.date)).length : activeItems.filter(it=>issueHasStatus(it,s,id)).length;
   const fl=FILTERS.filter(([id])=>id!=="varhato"||c("varhato")>0);
   if(state.filter==="varhato"&&c("varhato")===0) state.filter="mind";
   const chgBtn = s.anyChanged ? `<button class="chip chgchip" id="collectedChgBtn" title="Összes változás ebben a sorozatban">!</button>` : "";
@@ -114,7 +114,7 @@ export function renderChips(){
 }
 
 function matches(it){ const s=S();
-  if(state.filter==="varhato"){ if(!(it.date&&it.date>=todayISO)) return false; }
+  if(state.filter==="varhato"){ if(!isFutureDate(it.date)) return false; }
   else if(state.filter!=="mind"){ if(!issueHasStatus(it,s,state.filter)) return false; }
   if(state.query){ const q=state.query.toLowerCase(); if(!((it.name&&it.name.toLowerCase().includes(q))||String(it.n)===q)) return false; }
   return true;
@@ -188,7 +188,7 @@ export function renderList(){
         <div class="marks"><button class="chgbtn" data-changeissue="${it.n}" title="Részletek / elfogadás">!</button></div>
       </div></div>`;
     }
-    const future=it.date&&it.date>todayISO;
+    const future=isFutureDate(it.date);
     const istate=issueState(it,s);
     const hasPendingImg = isStaff() && s.components.some(t=>compsOfType(it,t).some(c=>c.pending));
     const dateHtml=it.date?`<span class="${future?"future":""}">${fmtDate(it.date)}</span>`:`<span style="color:var(--faint)">nincs dátum</span>`;

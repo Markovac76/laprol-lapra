@@ -2,7 +2,7 @@
    Adatbetöltés a Supabase-ből, statisztika, újratöltés.
    ============================================================ */
 import { supabase, fetchAllRows } from "./supabase.js";
-import { state, OWNER_UID, PAL_FALLBACK, todayISO, issueState, hasOwnedComponent, compsOfType, allComps, sortEgyebLast } from "./state.js";
+import { state, OWNER_UID, PAL_FALLBACK, isFutureDate, issueState, hasOwnedComponent, compsOfType, allComps, sortEgyebLast } from "./state.js";
 import { renderAll } from "./render.js";
 import { err } from "./modal.js";
 
@@ -85,7 +85,7 @@ export function stats(si){
   const dominantTypes = nm.length ? nm : s.components;   // a lapszám-színezéssel megegyező domináns típus(ok)
   let eredetiTotal=0, fizetettTotal=0, eredetiUnknown=false, fizetettUnknown=false, beszerzendo=0, next=null, hasFuture=false;
   for(const it of activeItems){
-    const future=it.date&&it.date>todayISO;
+    const future=isFutureDate(it.date);
     if(future) hasFuture=true;
     // Eredeti ár alapján: a DOMINÁNS típus(ok) MINDEN példánya 'megvan' (= zöld lapszám) → beszámít.
     // Szorzó: egyetlen domináns példánynál a saját darabszáma (nincs viselkedésváltozás a mai
@@ -108,7 +108,7 @@ export function stats(si){
     // Beszerzendő: LAPSZÁM-szinten — ami megjelent, és se nem kész (zöld), se nem kihúzott (szürke)
     if(!future){ const istate=issueState(it,s); if(istate!=="megvan" && istate!=="nemkell") beszerzendo++; }
     const anyOpen=s.components.some(t=>compsOfType(it,t).some(c=>c.status!=="megvan"&&c.status!=="nemkell"));
-    if(anyOpen && it.date && it.date>=todayISO){ if(!next||it.date<next.date) next=it; }
+    if(anyOpen && isFutureDate(it.date)){ if(!next||it.date<next.date) next=it; }   // a mai dátumú Szám már megjelent
   }
   return {perType,eredetiTotal,fizetettTotal,eredetiUnknown,fizetettUnknown,beszerzendo,next,hasFuture};
 }

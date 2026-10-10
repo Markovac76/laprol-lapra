@@ -1,7 +1,7 @@
 /* ============================================================
    Belépési pont: minden esemény-bekötés + indítás egy helyen.
    ============================================================ */
-import { state, S, nextStatus, hasOwnedComponent, findCompById, allComps } from "./state.js";
+import { state, S, nextStatus, hasOwnedComponent, findCompById, allComps, localISO } from "./state.js";
 import { SUPABASE_ANON_KEY } from "./supabase.js";
 import { renderAll, renderList, renderChips, renderTabs, applyPickerMode, syncHeadHeight } from "./render.js";
 import { upsertMyStatus, applyAutoPrice } from "./personal.js";
@@ -202,6 +202,23 @@ document.getElementById("logout").onclick=logout;
 
 /* ---- egyéb ---- */
 window.addEventListener("resize",syncHeadHeight);
+
+/* ---- napváltás: a "megjelent / várható" a HELYI dátumtól függ ----
+   Éjfél után (vagy ha a fül sokáig háttérben volt) a lista újrarajzolódik, hogy
+   a mai dátumú Szám megjelentnek, a tegnapi pedig múltbelinek látsszon. */
+let shownDay = localISO();
+function dayRolled(){
+  const d = localISO();
+  if(d === shownDay) return;
+  shownDay = d;
+  if(state.SERIES.length) renderAll();
+}
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) dayRolled(); });
+window.addEventListener("focus", dayRolled);
+(function scheduleMidnight(){
+  const n = new Date(), next = new Date(n.getFullYear(), n.getMonth(), n.getDate()+1, 0, 0, 1);
+  setTimeout(()=>{ dayRolled(); scheduleMidnight(); }, Math.max(1000, next - n));
+})();
 
 /* ---- indítás: van-e már munkamenet? ---- */
 initSession();
