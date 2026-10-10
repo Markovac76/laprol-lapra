@@ -32,7 +32,7 @@ async function fetchSeenMap(ids){
 
 async function fetchChangeLog(ids){
   if(!ids.length) return [];
-  const { data, error } = await fetchAllRows(()=>supabase.from("change_log").select("*").in("entity_id", ids).order("version"));
+  const { data, error } = await fetchAllRows(()=>supabase.from("change_log").select("*").in("entity_id", ids).order("version").order("id"));   // azonos verziónál az id dönt (a csendes lapszám-változás azonos verzión naplózódhat)
   if(error) throw error;
   return data||[];
 }
