@@ -10,7 +10,7 @@
    ============================================================ */
 import { supabase, fetchAllRows } from "./supabase.js";
 import { state, COMP_TYPES, esc, fmtDate, opts, listName } from "./state.js";
-import { openModal, err } from "./modal.js";
+import { openModal, err, guarded } from "./modal.js";
 
 const typeLabel = t => listName("komponens", t) || COMP_TYPES[t] || t;
 
@@ -55,6 +55,11 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
   // "+ Még egy X" példányokkal bővíthető) — csak Mentéskor kerül a DB-be.
   let comps = existing ? (existing.comps||[]).map(c=>({...c}))
     : components.map(t=>({tipus:t, azonosito_tipus:null, azonosito:"", megnevezes:"", _tmpKey:"tmp"+(tmpSeq++)}));
+  // Új tételnél az azonosítót az űrlap megnyitásakor generáljuk (nem kattintásonként):
+  // egy dupla mentés így ugyanazzal az elsődleges kulccsal próbálkozik, és a
+  // másodikat az adatbázis utasítja el — nem keletkezik két azonos tétel.
+  const newIssueId = existing ? null : crypto.randomUUID();
+  let savedIssueId = existing ? existing.id : null;   // egy félbemaradt mentés újrapróbálásakor már nem beszúrás, hanem frissítés
   let master = { lapszam: existing?existing.lapszam:"", cim: existing?(existing.cim||""):"", megjelenes: existing?(existing.megjelenes||""):"",
     eredeti_ar: existing&&existing.eredeti_ar!=null?existing.eredeti_ar:"", deleted: existing?!!existing.deleted:false };
 
@@ -118,7 +123,7 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
       b.onclick=()=>{ syncFromDom(); comps.push({tipus:b.dataset.addcomp, azonosito_tipus:null, azonosito:"", megnevezes:"", _tmpKey:"tmp"+(tmpSeq++)}); draw(); };
     });
     document.querySelectorAll("[data-removecomp]").forEach(b=>{
-      b.onclick=async ()=>{
+      b.onclick=guarded(async ()=>{
         syncFromDom();
         const k=b.dataset.removecomp, c=comps.find(x=>keyOf(x)===k);
         if(!c) return;
@@ -128,25 +133,35 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
           catch(e){ err(e); return; }
         }
         comps = comps.filter(x=>x!==c); draw();
-      };
+      });
     });
 
-    document.getElementById("di-save").onclick=async ()=>{
+    document.getElementById("di-save").onclick=guarded(async ()=>{
       syncFromDom();
       const n=parseInt(master.lapszam); if(isNaN(n)){alert("A lapszám kötelező.");return;}
       const masterPayload={ draft_series_id:draftSeriesId, lapszam:n, cim:(master.cim||"").trim()||null, megjelenes:master.megjelenes||null,
         eredeti_ar:master.eredeti_ar?parseInt(master.eredeti_ar):null, deleted: !!master.deleted };
       try{
-        let draftIssueId = existing?existing.id:null;
-        if(existing){ const {error}=await supabase.from("draft_issues").update(masterPayload).eq("id",existing.id); if(error) throw error; }
-        else { const {data,error}=await supabase.from("draft_issues").insert(masterPayload).select().single(); if(error) throw error; draftIssueId=data.id; }
+        let draftIssueId = savedIssueId;
+        if(savedIssueId){ const {error}=await supabase.from("draft_issues").update(masterPayload).eq("id",savedIssueId); if(error) throw error; }
+        else {
+          const {error}=await supabase.from("draft_issues").insert({...masterPayload, id:newIssueId});
+          if(error) throw error;
+          draftIssueId=newIssueId; savedIssueId=newIssueId;
+        }
 
         const newComponents = components.slice();
         for(const c of comps){
           if(!newComponents.includes(c.tipus)) newComponents.push(c.tipus);
           const cpayload={ tipus:c.tipus, azonosito_tipus:(c.azonosito_tipus||"").trim()||null, azonosito:(c.azonosito||"").trim()||null, megnevezes:(c.megnevezes||"").trim()||null };
           if(c.id){ const {error}=await supabase.from("draft_components").update(cpayload).eq("id",c.id); if(error) throw error; }
-          else { const {error}=await supabase.from("draft_components").insert({...cpayload, draft_issue_id:draftIssueId, source_component_id:null}); if(error) throw error; }
+          else {
+            // Az új sor azonosítóját megjegyezzük: ha a mentés később elakad és
+            // újrapróbálod, ez a példány frissül, nem szúródik be még egyszer.
+            const {data:nc,error}=await supabase.from("draft_components").insert({...cpayload, draft_issue_id:draftIssueId, source_component_id:null}).select().single();
+            if(error) throw error;
+            c.id = nc.id;
+          }
         }
         // Ha egy átsorolás/új példány olyan típust hozott be, ami még nincs a
         // sorozat komponens-listáján, azt fel kell venni oda is — enélkül a
@@ -157,15 +172,15 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
         }
       }catch(e){ err(e); return; }
       onDone();
-    };
+    });
 
     const delBtn=document.getElementById("di-del");
-    if(delBtn) delBtn.onclick=async ()=>{
+    if(delBtn) delBtn.onclick=guarded(async ()=>{
       const liveNote = existing.source_issue_id ? " Az élő számot ez NEM törli — csak azt jelenti, hogy publikáláskor nem frissül." : " Ez csak a munkaanyagot érinti, élő szám még nem tartozik hozzá.";
       if(!confirm(`Biztosan törlöd a #${existing.lapszam} számot a draftból?${liveNote}`)) return;
       try{ const {error}=await supabase.from("draft_issues").delete().eq("id",existing.id); if(error) throw error; }catch(e){ err(e); return; }
       onDone();
-    };
+    });
   }
 
   draw();

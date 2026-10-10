@@ -5,7 +5,7 @@
    ============================================================ */
 import { supabase, fetchAllRows } from "./supabase.js";
 import { state, esc, listName } from "./state.js";
-import { openModal, err, sheet } from "./modal.js";
+import { openModal, err, sheet, guarded } from "./modal.js";
 import { reload } from "./data.js";
 import { proposeSeriesForm } from "./series-proposal.js";
 
@@ -47,7 +47,7 @@ function render(series, mine){
     <div class="modrow"><button class="btn ghost" id="ms-propose">+ Új sorozat javaslása</button></div>
     <div class="modrow"><button class="btn" onclick="closeModal()">Kész</button></div>`);
   sheet.querySelectorAll('input[type=checkbox][data-id]').forEach(cb=>{
-    cb.onchange=()=>onToggle(cb, series, mine);
+    cb.onchange=guarded(()=>onToggle(cb, series, mine));
   });
   document.getElementById("ms-propose").onclick=proposeSeriesForm;
 }
@@ -81,8 +81,8 @@ function askDeselect(s, series, mine){
     </div>
     <div class="modrow"><button class="btn danger" id="ds-delete">Törlöm a saját adataimat is</button></div>`);
   document.getElementById("ds-cancel").onclick=()=>render(series, mine);
-  document.getElementById("ds-keep").onclick=()=>confirmDeselect(s.id, false);
-  document.getElementById("ds-delete").onclick=()=>confirmDeselect(s.id, true);
+  document.getElementById("ds-keep").onclick=guarded(()=>confirmDeselect(s.id, false));
+  document.getElementById("ds-delete").onclick=guarded(()=>confirmDeselect(s.id, true));
 }
 
 async function confirmDeselect(seriesId, purge){

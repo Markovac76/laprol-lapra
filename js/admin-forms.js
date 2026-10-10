@@ -6,7 +6,7 @@
    ============================================================ */
 import { supabase } from "./supabase.js";
 import { state, S, COMP_TYPES, esc, pad, opts } from "./state.js";
-import { openModal, closeModal, err, sheet } from "./modal.js";
+import { openModal, closeModal, err, sheet, guarded } from "./modal.js";
 import { reload } from "./data.js";
 import { upsertMyStatus, upsertMyIssueData } from "./personal.js";
 import { seedNewIssueSeen } from "./changes.js";
@@ -110,7 +110,7 @@ export function itemForm(){
       b.onclick=()=>{ syncFromDom(); instances=instances.filter(i=>i.key!==b.dataset.removeinst); draw(); };
     });
 
-    document.getElementById("f-save").onclick=async ()=>{
+    document.getElementById("f-save").onclick=guarded(async ()=>{
       syncFromDom();
       const n=parseInt(master.n); if(isNaN(n)){alert("A lapszám kötelező.");return;}
       const masterPayload={ lapszam:n, cim:(master.name||"").trim()||null, megjelenes:master.date||null,
@@ -134,7 +134,7 @@ export function itemForm(){
         await seedNewIssueSeen(issueId);
         closeModal(); await reload();
       }catch(e){ err(e); }
-    };
+    });
   }
 
   draw();
@@ -151,17 +151,29 @@ export function listsForm(){
   openModal(`<h2>Listák</h2><p class="msub">Itt bővítheted a választható értékeket. Rögzítés közben nem lehet bővíteni — így a listák nem híznak el.</p>
     ${grps}
     <div class="modrow"><button class="btn" onclick="closeModal()">Kész</button></div>`);
-  sheet.addEventListener("click",async e=>{
-    const b=e.target.closest("[data-add]"); if(!b) return;
-    const t=b.dataset.add, inp=document.getElementById("nl-"+t);
-    const nev=inp.value.trim(); if(!nev) return;
-    const ertek=nev.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");
-    if(!ertek){ alert("Adj meg érvényes nevet."); return; }
-    try{
-      const so=(state.LISTS[t]||[]).length+1;
-      const {error}=await supabase.from("lists").insert({tipus:t, ertek, megjelenites:nev, sort_order:so});
-      if(error) throw error;
-      (state.LISTS[t]=state.LISTS[t]||[]).push({ertek,nev}); inp.value=""; listsForm();
-    }catch(e){ err(e); }
+  // FONTOS (12. pont): a gombokra KÖZVETLENÜL kötünk, nem a tartós #sheet
+  // elemre. A korábbi `sheet.addEventListener` minden listsForm()-hívásnál
+  // (és minden sikeres hozzáadás után újra) egy ÚJABB figyelőt halmozott,
+  // így egy kattintásra N párhuzamos beszúrás indult — az első sikerült, a
+  // többi egyediségi hibát dobott. Az itteni gombok minden megnyitáskor
+  // újrajönnek létre, az onclick-hozzárendelés pedig idempotens.
+  sheet.querySelectorAll("[data-add]").forEach(b=>{
+    b.onclick=guarded(async ()=>{
+      const t=b.dataset.add, inp=document.getElementById("nl-"+t);
+      const nev=inp.value.trim().replace(/\s+/g," "); if(!nev) return;
+      const ertek=nev.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");
+      if(!ertek){ alert("Adj meg érvényes nevet."); return; }
+      // Érthető duplikátum-üzenet (kis/nagybetűre és szóközre érzéketlenül).
+      const norm=x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ");
+      if((state.LISTS[t]||[]).some(o=>norm(o.nev)===norm(nev) || o.ertek===ertek)){
+        alert("Ez az érték már szerepel a listában."); return;
+      }
+      try{
+        const so=(state.LISTS[t]||[]).length+1;
+        const {error}=await supabase.from("lists").insert({tipus:t, ertek, megjelenites:nev, sort_order:so});
+        if(error) throw error;
+        (state.LISTS[t]=state.LISTS[t]||[]).push({ertek,nev}); inp.value=""; listsForm();
+      }catch(e){ err(e); }
+    });
   });
 }

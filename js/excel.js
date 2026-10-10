@@ -15,7 +15,7 @@
    ============================================================ */
 import { supabase } from "./supabase.js";
 import { state, S, COMP_TYPES, esc } from "./state.js";
-import { openModal, closeModal, err } from "./modal.js";
+import { openModal, closeModal, err, guarded } from "./modal.js";
 import { reload } from "./data.js";
 import { upsertMyIssueData, upsertMyStatus } from "./personal.js";
 import { seedNewIssueSeen } from "./changes.js";
@@ -127,6 +127,14 @@ export async function handleUpload(file){
   const warnBlock = dateWarnings.length
     ? `<p class="msub" style="color:#f0cd8a">⚠ ${dateWarnings.length} sor dátuma nem volt felismerhető (#${dateWarnings.slice(0,8).join(", #")}${dateWarnings.length>8?"…":""}) — ezeknél a dátum üresen marad, a többi mező feltöltődik.</p>`
     : "";
+  // Az ÚJ lapszámú sorok KÖZVETLENÜL élőben jönnek létre (a draftot megkerülve),
+  // és az összepárosítás LAPSZÁM alapján történik. Ez ott veszélyes, ahol a
+  // lapszám nem a nyomtatott szám, hanem a felvivő által adott folyamatos
+  // sorszám (ilyenkor a rossz tételhez köthet), és ahol a szerkesztési draftban
+  // ugyanazzal a lapszámmal új sorok is vannak (publikáláskor ütközne).
+  const liveInsertWarn = added>0
+    ? `<p class="msub" style="color:#f0cd8a">⚠ A(z) ${added} új lapszámú sor <b>azonnal, közvetlenül az élő sorozatba</b> kerül (a szerkesztési draftot megkerülve), a párosítás pedig <b>lapszám alapján</b> történik. Ha ennél a sorozatnál a lapszám nem a nyomtatott szám, vagy a Karbantartásban nyitott szerkesztési draftban ugyanezekkel a lapszámokkal új sorok vannak, a feltöltés rossz tételhez kötődhet, vagy a későbbi publikálás ütközhet. Bizonytalanság esetén inkább <b>Mégse</b>, és a Karbantartás draft-szerkesztőjének sablonját használd.</p>`
+    : "";
   const draftNote = updated>0
     ? `<p class="msub">A ${updated} meglévő szám törzsadat-módosítása (cím/dátum/ár/azonosító) egy <b>szerkesztési draftba</b> kerül a Karbantartásban — csak publikálás után lesz élő, addig átnézhető. A saját jelöléseid és fizetett áraid MINDIG azonnal frissülnek, draft nélkül.</p>`
     : "";
@@ -140,10 +148,11 @@ ${plan.length} sor feldolgozva a fájlból:
 ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új)":" (frissül)"}`).join("\n")}${plan.length>5?"\n  …":""}
 </div>
     ${draftNote}
+    ${liveInsertWarn}
     <p class="msub" style="margin-top:10px">Ha ez nem a várt sorozat vagy a szám nem stimmel, inkább <b>Mégse</b>, és ellenőrizd, melyik fület nyitottad meg feltöltés előtt.</p>
     <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="up-confirm">Feltöltés a(z) „${esc(s.display||s.sorozat)}” sorozatba</button></div>`);
 
-  document.getElementById("up-confirm").onclick=async ()=>{
+  document.getElementById("up-confirm").onclick=guarded(async ()=>{
     closeModal();
     try{
       // A draftot csak akkor hozzuk létre/claim-eljük, ha ténylegesen kell —
@@ -189,7 +198,7 @@ ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új
         : `Feltöltve.\nÚj szám: ${ins}\nA saját jelöléseid/áraid a meglévő számokon azonnal frissültek.`;
       alert(msg);
     }catch(e){ err(e); }
-  };
+  });
 }
 
 // Megkeresi vagy létrehozza az "edit" típusú draftot ehhez a sorozathoz —

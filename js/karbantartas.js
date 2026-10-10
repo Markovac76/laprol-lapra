@@ -8,7 +8,7 @@
    ============================================================ */
 import { supabase, fetchAllRows } from "./supabase.js";
 import { state, esc, listName, opts, fmtDate, DISPLAY_MAX, PAL12, PAL_FAMILIES } from "./state.js";
-import { openModal, err, sheet } from "./modal.js";
+import { openModal, err, sheet, guarded } from "./modal.js";
 import { reload } from "./data.js";
 import { isStaff, isOwnerRole } from "./permissions.js";
 import { fetchDraftItems, renderDraftItemsList, draftItemForm } from "./draft-items.js";
@@ -57,7 +57,7 @@ function renderMain(series, drafts, memberSeries, members){
     currentTab=b.dataset.tab; renderMain(series,drafts,memberSeries,members);
   });
   sheet.querySelectorAll("#kb-body [data-act]").forEach(b=>{
-    b.onclick=()=>handleAction(b.dataset.act, b.dataset.id, series, drafts);
+    b.onclick=guarded(()=>handleAction(b.dataset.act, b.dataset.id, series, drafts));
   });
 }
 
@@ -251,11 +251,11 @@ async function finalizeDelete(s){
     <div class="field"><input id="fd-confirm" placeholder="${esc(s.megnevezes)}"></div>
     <div class="modrow"><button class="btn ghost" id="fd-cancel">Mégse</button><button class="btn danger" id="fd-go">Végleges törlés</button></div>`);
   document.getElementById("fd-cancel").onclick=()=>karbantartasForm();
-  document.getElementById("fd-go").onclick=async ()=>{
+  document.getElementById("fd-go").onclick=guarded(async ()=>{
     const v=document.getElementById("fd-confirm").value.trim();
     if(v!==s.megnevezes){ alert("A begépelt név nem egyezik pontosan."); return; }
     await doFinalize(s.id, v);
-  };
+  });
 }
 
 async function doFinalize(seriesId, confirmName){
@@ -388,7 +388,7 @@ function renderEditDraft(d, color, comps, compList, items){
   document.getElementById("d-sw").addEventListener("click",e=>{ const b=e.target.closest(".swatch"); if(!b) return;
     color=b.dataset.c; sheet.querySelectorAll("#d-sw .swatch").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
   document.getElementById("d-back").onclick=()=>karbantartasForm();
-  document.getElementById("d-save").onclick=async ()=>{
+  document.getElementById("d-save").onclick=guarded(async ()=>{
     const nm=document.getElementById("d-name").value.trim();
     if(!nm){ alert("A megnevezés kötelező."); return; }
     if(!comps.length){ alert("Legalább egy komponens kell."); return; }
@@ -403,7 +403,7 @@ function renderEditDraft(d, color, comps, compList, items){
     }catch(e){ err(e); return; }
     d = {...d, kiado:document.getElementById("d-kiado").value||null, kategoria:document.getElementById("d-kategoria").value||null, megnevezes:nm, megjelenites:disp, szin:color, components:comps};
     await editDraftForm(d);
-  };
+  });
   // Egy komponens-átsorolás új típust adhat a sorozat komponens-listájához
   // (draft-items.js) — a szerkesztőbe visszatérve ezért friss draft_series
   // sort töltünk be, nem a bezáráskori (esetleg elavult) `d`-t.

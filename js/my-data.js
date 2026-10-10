@@ -9,7 +9,7 @@
    member_issue_data saját sorait írja, a törzsadatot SOHA.
    ============================================================ */
 import { state, S, COMP_TYPES, esc, opts, compsOfType } from "./state.js";
-import { openModal, closeModal, err, sheet } from "./modal.js";
+import { openModal, closeModal, err, sheet, guarded } from "./modal.js";
 import { reload } from "./data.js";
 import { upsertMyStatus, upsertMyIssueData } from "./personal.js";
 
@@ -64,7 +64,7 @@ export function myDataForm(it){
   const chk=document.getElementById("md-unknown"), arIn=document.getElementById("md-ar");
   chk.onchange=()=>{ arIn.disabled=chk.checked; if(chk.checked) arIn.value=""; else arIn.focus(); };
 
-  document.getElementById("md-save").onclick=async ()=>{
+  document.getElementById("md-save").onclick=guarded(async ()=>{
     try{
       for(const {c:comp} of flat){
         if(!comp.id) continue;
@@ -84,5 +84,5 @@ export function myDataForm(it){
       if(pierr) throw pierr;
       closeModal(); await reload();
     }catch(e){ err(e); }
-  };
+  });
 }

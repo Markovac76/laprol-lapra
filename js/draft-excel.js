@@ -10,6 +10,7 @@
 import { supabase, fetchAllRows } from "./supabase.js";
 import { COMP_TYPES, esc, listName } from "./state.js";
 import { loadXlsx, coerceDate, parseHuNumber } from "./excel.js";
+import { guarded } from "./modal.js";
 
 const typeLabel = t => listName("komponens", t) || COMP_TYPES[t] || t;
 
@@ -202,13 +203,13 @@ ${rows.slice(0,5).map(x=>`  #${x.lapszam}${x.cim?" – "+esc(x.cim):""}`).join("
       ${note}
       <div class="modrow"><button class="btn ghost" id="du-cancel">Mégse</button><button class="btn" id="du-confirm">Feltöltés (${rows.length} tétel)</button></div>`);
     document.getElementById("du-cancel").onclick=()=>onDone();
-    document.getElementById("du-confirm").onclick=async ()=>{
+    document.getElementById("du-confirm").onclick=guarded(async ()=>{
       try{
         const r=await insertFn(draftSeriesId, rows);
         const {inserted,skipped}=r, updated=r.updated||0;
         alert(`Feltöltve: ${inserted} új tétel${staffPath?`, ${updated} frissítve`:""}.${skipped?(staffPath?` (${skipped} változatlan/kihagyva.)`:` (${skipped} kihagyva, mert már létezett ilyen lapszám.)`):""}`);
       }catch(e){ err(e); }
       onDone();
-    };
+    });
   }).catch(err);
 }

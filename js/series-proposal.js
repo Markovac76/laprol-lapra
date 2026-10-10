@@ -7,7 +7,7 @@
    ============================================================ */
 import { supabase } from "./supabase.js";
 import { state, DISPLAY_MAX, PAL12, PAL_FAMILIES, esc, opts } from "./state.js";
-import { openModal, closeModal, err, sheet } from "./modal.js";
+import { openModal, closeModal, err, sheet, guarded } from "./modal.js";
 import { downloadDraftTemplate, pickDraftExcelFile, confirmDraftUpload, bulkInsertDraftItemsAsProposer } from "./draft-excel.js";
 
 // Köztes lépés a javaslat beküldése és a "Köszönjük" képernyő között —
@@ -32,6 +32,10 @@ function renderProposalIntermediate(draftId, comps, nm){
 }
 
 export function proposeSeriesForm(){
+  // Az azonosítót az űrlap MEGNYITÁSAKOR generáljuk (nem kattintásonként): így
+  // egy dupla beküldés ugyanazzal az elsődleges kulccsal próbálkozik, és a
+  // második beszúrást az adatbázis maga utasítja el — nem jön létre két javaslat.
+  const newId = crypto.randomUUID();
   let color = PAL12[0];
   let comps = ["magazin"];
   const compList = (state.LISTS.komponens||[{ertek:"magazin",nev:"Magazin"},{ertek:"modell",nev:"Modell"},{ertek:"konyv",nev:"Könyv"},{ertek:"egyeb",nev:"Egyéb"}]);
@@ -60,7 +64,7 @@ export function proposeSeriesForm(){
   document.getElementById("p-sw").addEventListener("click",e=>{ const b=e.target.closest(".swatch"); if(!b) return;
     color=b.dataset.c; sheet.querySelectorAll("#p-sw .swatch").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
 
-  document.getElementById("p-save").onclick=async ()=>{
+  document.getElementById("p-save").onclick=guarded(async ()=>{
     const nm=document.getElementById("p-name").value.trim();
     if(!nm){ alert("A megnevezés kötelező."); return; }
     if(!comps.length){ alert("Legalább egy komponens kell."); return; }
@@ -71,15 +75,17 @@ export function proposeSeriesForm(){
       // sima .select()-es visszaolvasás egy nem-staff beküldőnél RLS-hibát
       // dobna (Postgres az INSERT...RETURNING kimenetét is a SELECT-
       // szabályon engedi át, és elutasítás esetén hibát ad, nem üres sort).
-      const newId = crypto.randomUUID();
       const { error } = await supabase.from("draft_series").insert({
         id: newId, pool_type:"new", pool_status:"incoming", submitted_by: state.myId,
         kiado: document.getElementById("p-kiado").value||null,
         kategoria: document.getElementById("p-kategoria").value||null,
         megnevezes: nm, megjelenites: disp, szin: color, components: comps,
       });
-      if(error) throw error;
+      if(error){
+        if(error.code==="23505"){ alert("Ezt a javaslatot már beküldted."); return; }
+        throw error;
+      }
       renderProposalIntermediate(newId, comps, nm);
     }catch(e){ err(e); }
-  };
+  });
 }

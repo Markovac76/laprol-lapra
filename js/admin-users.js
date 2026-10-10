@@ -10,7 +10,7 @@
    ============================================================ */
 import { supabase, fetchAllRows } from "./supabase.js";
 import { state, esc } from "./state.js";
-import { openModal, err, sheet } from "./modal.js";
+import { openModal, err, sheet, guarded } from "./modal.js";
 import { isOwnerRole } from "./permissions.js";
 
 function roleBadge(role,status){
@@ -56,7 +56,7 @@ function render(members){
     <p class="msub">A letiltás visszafordítható. Admin csak sima felhasználót kezelhet; admin-jogot csak a tulajdonos oszthat.</p>
     ${rows||'<p class="msub">Nincs felhasználó.</p>'}
     <div class="modrow"><button class="btn" onclick="closeModal()">Kész</button></div>`);
-  sheet.querySelectorAll("[data-act]").forEach(b=>{ b.onclick=()=>handleAction(b.dataset.act, b.dataset.id, members); });
+  sheet.querySelectorAll("[data-act]").forEach(b=>{ b.onclick=guarded(()=>handleAction(b.dataset.act, b.dataset.id, members)); });
 }
 
 async function handleAction(act, id, members){

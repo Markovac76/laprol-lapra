@@ -4,7 +4,7 @@
    ============================================================ */
 import { supabase, fetchAllRows } from "./supabase.js";
 import { state, esc, COMP_TYPES, listName } from "./state.js";
-import { openModal, err } from "./modal.js";
+import { openModal, err, guarded } from "./modal.js";
 import { reload } from "./data.js";
 import { purgeMyDataForIssue } from "./personal.js";
 
@@ -87,10 +87,10 @@ export async function showSeriesChangePopup(s){
     openModal(`<h2>Sorozat változásai</h2><p class="msub">„${esc(s.sorozat)}” — a törzsadat módosult.</p>
       ${diffHtml(diffs) || `<p class="msub">Nincs megjeleníthető változás.</p>`}
       <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="chg-ok">OK, nyugtázom</button></div>`);
-    document.getElementById("chg-ok").onclick=async ()=>{
+    document.getElementById("chg-ok").onclick=guarded(async ()=>{
       try{ await markSeen("series", s.id, s.version); }catch(e){ err(e); return; }
       closeModal(); await reload();
-    };
+    });
   }catch(e){ err(e); }
 }
 
@@ -115,14 +115,14 @@ export async function showIssueChangePopup(it, s){
     openModal(`<h2>#${it.n} változásai</h2><p class="msub">„${esc(s.sorozat)}” — ${it.name?esc(it.name):"ez a szám"} módosult.</p>
       ${blocks || `<p class="msub">Nincs megjeleníthető változás.</p>`}
       <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="chg-ok">OK, nyugtázom</button></div>`);
-    document.getElementById("chg-ok").onclick=async ()=>{
+    document.getElementById("chg-ok").onclick=guarded(async ()=>{
       try{
         await markSeen("issue", it.id, it.version);
         for(const [,c] of comps) await markSeen("component", c.id, c.version);
         if(deletion) await purgeMyDataForIssue(it.id, comps.map(([,c])=>c.id));
       }catch(e){ err(e); return; }
       closeModal(); await reload();
-    };
+    });
   }catch(e){ err(e); }
 }
 
@@ -162,7 +162,7 @@ export async function showCollectedChanges(s){
       <div class="modrow"><button class="btn ghost" onclick="closeModal()">Bezár</button>
       ${s.anyChanged?`<button class="btn" id="chg-all">Mind elfogadom</button>`:""}</div>`);
     const allBtn=document.getElementById("chg-all");
-    if(allBtn) allBtn.onclick=async ()=>{
+    if(allBtn) allBtn.onclick=guarded(async ()=>{
       try{
         const { error } = await supabase.rpc("seed_member_seen", { p_series_id: s.id }); if(error) throw error;
         for(const it of deletedItems){
@@ -171,6 +171,6 @@ export async function showCollectedChanges(s){
       }
       catch(e){ err(e); return; }
       closeModal(); await reload();
-    };
+    });
   }catch(e){ err(e); }
 }

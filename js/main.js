@@ -26,6 +26,16 @@ let imgTarget=null;   // {type, id, mode:"upload"|"propose"} — a rejtett #imgU
 // elágazva ("component" alapértelmezett, "series" a data-enttype-ból).
 // Visszatérési érték: kezelte-e a kattintást (a hívó ez alapján dönt,
 // essen-e át más, entitás-specifikus logikára).
+// Egyszerre csak egy módosító képművelet (elfogad/elutasít/kapcsoló/törlés)
+// futhat — a gomb mentés közben le van tiltva, az ismételt koppintás nem
+// indít második futást (12. pont, egységes minta; lásd modal.js guarded()).
+let imgActionBusy=false;
+async function runImgAction(btn, fn){
+  if(imgActionBusy) return;
+  imgActionBusy=true; if(btn && "disabled" in btn) btn.disabled=true;
+  try{ await fn(); }
+  finally{ imgActionBusy=false; if(btn && btn.isConnected && "disabled" in btn) btn.disabled=false; }
+}
 async function handleImageAction(e){
   const iu=e.target.closest("[data-imgupload]"), ipr=e.target.closest("[data-imgpropose]");
   if(iu||ipr){
@@ -46,16 +56,25 @@ async function handleImageAction(e){
       proposal = comp && comp.pending;
     }
     if(!proposal) return true;
-    try{ ia ? await approveProposal(proposal) : await rejectProposal(proposal); await reload(); }
-    catch(e2){ err(e2); }
+    await runImgAction(btn, async ()=>{
+      try{ ia ? await approveProposal(proposal) : await rejectProposal(proposal); await reload(); }
+      catch(e2){ err(e2); }
+    });
     return true;
   }
   const it2=e.target.closest("[data-imgtoggle]");
-  if(it2){ try{ await setUploadEnabled(it2.dataset.enttype||"component", it2.dataset.imgtoggle, it2.dataset.current!=="1"); await reload(); }catch(e2){ err(e2); } return true; }
+  if(it2){
+    await runImgAction(it2, async ()=>{
+      try{ await setUploadEnabled(it2.dataset.enttype||"component", it2.dataset.imgtoggle, it2.dataset.current!=="1"); await reload(); }catch(e2){ err(e2); }
+    });
+    return true;
+  }
   const idel=e.target.closest("[data-imgdelete]");
   if(idel){
     if(!confirm("Biztosan törlöd a képet?")) return true;
-    try{ await deleteLiveImage(idel.dataset.enttype||"component", idel.dataset.imgdelete); await reload(); }catch(e2){ err(e2); }
+    await runImgAction(idel, async ()=>{
+      try{ await deleteLiveImage(idel.dataset.enttype||"component", idel.dataset.imgdelete); await reload(); }catch(e2){ err(e2); }
+    });
     return true;
   }
   return false;
