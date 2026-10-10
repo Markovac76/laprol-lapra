@@ -57,10 +57,11 @@ export function renderHero(){
   const fizetettBasis = state.costBasis==="fizetett";
   const total = fizetettBasis ? st.fizetettTotal : st.eredetiTotal;
   const unknown = fizetettBasis ? st.fizetettUnknown : st.eredetiUnknown;
+  const sumCount = fizetettBasis ? st.fizetettCount : st.eredetiCount;   // hány (ismert árú) Szám alapján számolt
   const basisLabel = fizetettBasis ? "Összeg — fizetett ár alapján" : "Összeg — eredeti ár alapján";
   const unknownBadge = unknown ? `<span class="unknownbadge">+ nem ismert</span>` : "";
   const costBox = state.costVisible
-    ? `<div class="stat wide"><div class="k">${basisLabel}</div><div class="v">${fmtFt(total)||"0 Ft"}${unknownBadge}</div>
+    ? `<div class="stat wide"><div class="k">${basisLabel}</div><div class="v">${fmtFt(total)||"0 Ft"}<span class="sumcount">· ${sumCount} Szám</span>${unknownBadge}</div>
          <div class="basisrow">
            <button class="basisbtn" data-basis="eredeti" aria-pressed="${!fizetettBasis}">Eredeti ár</button>
            <button class="basisbtn" data-basis="fizetett" aria-pressed="${fizetettBasis}">Fizetett ár</button>

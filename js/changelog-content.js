@@ -7,6 +7,9 @@
    ============================================================ */
 export const CHANGELOG = [
   { date:"2026-10-11",
+    text:"Az „Összeg” kártya egységesebb lett: mindkét nézet („Eredeti ár alapján” és „Fizetett ár alapján”) ugyanazokat a Számokat adja össze — azokat, amikből legalább egy elem megvan —, és ugyanazzal a beszerzési mennyiséggel szoroz, így a kettő összevethető. Az összeg mellett látod, hány Szám alapján számolt (pl. „78 961 Ft · 39 Szám”). Az ár a Szám (a magazin) ára; a mellékletnek nincs külön ára. Ahol eddig csak a teljesen meglévő (zöld) Számok kerültek az eredeti ár szerinti összegbe — például a Lego Star Warsnál —, ott az összeg most a megvett Számok teljes eredeti árát mutatja."
+  },
+  { date:"2026-10-11",
     text:"A „megjelent” és a „várható” mostantól a saját időzónád (helyi) dátuma szerint dönt, és éjfélkor magától frissül. A mai dátumú szám már megjelentnek számít, nem „várhatónak” — a „Várható” szűrő és a „Következő megjelenés” is ehhez igazodik. Korábban helyi idő szerint éjfél és hajnali kettő között még a tegnapi nappal számolt, és a mai szám egyszerre volt „megjelent” és „várható”."
   },
   { date:"2026-10-11",
