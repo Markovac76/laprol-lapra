@@ -1,4 +1,4 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v10)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v11)
 
 **Frissítve:** 2026. október 10. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
@@ -174,6 +174,7 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 - **Autós Legendák hibája (v1.22):** az oda-vissza sablon az új sorokhoz nem hozott létre üres komponenst → komponens nélküli élő Számok. Javítva: szerver-oldali alap-komponensek az új Számokhoz, „Kész” védelem (≥1 komponens), egyszeri adatjavítás (60 komponens). A beküldői RPC szándékosan változatlan.
 - **Dátumkezelés (v1.22):** a „ma” helyi dátum (frissül); a mai dátumú Szám megjelent; a „Várható”, a piros dátum, a színezés és a „Következő megjelenés” egy szabályt (`isFutureDate`) használ.
 - **Lapozás (v1.22):** a `fetchAllRows` egyedi kulcs szerint is rendez; a `components` tábla már 1000 sor fölött van (1 025).
+- **Összeg-kártya (v1.23):** mindkét nézet azonos Számokat (≥1 komponens megvan) és a beszerzési mennyiséget használja; az ár a Szám (magazin) ára, komponens-szintű ár nem kell; a kártyán a Szám-darabszám látszik. Közös számítás: `js/totals.js` (tesztelve). A tulajdonosi fiókban csak a Lego Star Wars eredeti összege változott (10 495 → 78 961 Ft).
 
 ---
 
@@ -212,7 +213,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.22).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.23).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.

@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.22 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.23 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -133,9 +133,11 @@ RBA — II. vh. repülők (60) · Centuria — Forma 1 (60) · Hachette — Disn
 
 **Származtatott statisztikák:** belekerülési költség (Σ fizetett ár × mennyiség) · jelenlegi összérték (Σ aktuális érték) · a kettő különbsége (nyereség / ráfizetés).
 
-**Sorozat-összeg — kétféle nézet (választható) [DÖNTVE, v1.4 · v1.5-ben pontosítva]:** a hero összeg-doboza két alapon számol, kapcsolóval:
-- **„Eredeti ár alapján"** (alapértelmezett): Σ eredeti ár × a **domináns komponens** aktuális darabszáma, **csak ha a domináns komponens `megvan`** (azaz a lapszám zöld — a színezéssel megegyező logika, 6.3–6.4). *(v1.5 javítás: korábban külön magazin/könyv-referenciát nézett, ami zöld lapszámot is kihagyhatott, ha épp a magazin „nem kell".)*
-- **„Fizetett ár alapján":** Σ fizetett ár × beszerzési mennyiség, a saját tételekre (ahol ≥1 komponens `megvan`).
+**Sorozat-összeg — kétféle nézet (választható) [DÖNTVE, v1.4 · v1.5-ben pontosítva · v1.23-ban EGYSÉGESÍTVE]:** a hero összeg-doboza két alapon számol, kapcsolóval:
+- **„Eredeti ár alapján"** (alapértelmezett): Σ **eredeti ár × beszerzési mennyiség** azokra a Számokra, ahol **legalább egy komponens `megvan`** — UGYANAZ a halmaz és UGYANAZ a szorzó, mint a fizetett nézetnél, így a két érték összehasonlítható (mennyit fizettem, és mennyi lett volna a listaár ugyanerre). *(v1.23: a korábbi „a domináns komponens `megvan`, szorzó a domináns komponens darabszáma” szabály megszűnt az összegnél — a színezésnél a domináns komponens logikája marad, 6.3–6.4. A Lego Star Wars eredeti összege emiatt 10 495 → 78 961 Ft.)*
+- **„Fizetett ár alapján":** Σ **fizetett ár × beszerzési mennyiség**, ugyanazokra a Számokra (≥1 komponens `megvan`) — változatlan.
+- **Szám-darabszám [DÖNTVE, v1.23]:** az összeg mellett a kártya kiírja, hány (ismert árú) Szám alapján számolt (pl. „78 961 Ft · 39 Szám”).
+- **Az ár a Szám (a magazin) ára [DÖNTVE, v1.23]:** a melléklet (pl. lego) külön ára NINCS külön nyilvántartva, és most nem is kell (a legót magazin nélkül is lehet venni, de ezzel feleslegesen bonyolítanánk). Ha egy Számnál több legót jelölsz, az azt jelenti, hogy több magazint vettél, de csak egy példányt tartottál meg — ilyenkor az összeg a **beszerzési mennyiséggel** számol (ezt kell megadni), a komponens darabszáma (`db`) az összegnél NEM szorzó.
 - **„+nem ismert" jelzés [DÖNTVE, v1.5]:** ha egy bevont tételnek az aktuális nézet szerinti ára NULL („nem ismert"), az kimarad a Ft-összegből, de az összeg mellé **„+nem ismert"** badge kerül.
 
 **Megjelenítési szabály [DÖNTVE, v1.4]:** a **„fizetve X Ft"** felirat (lista) és a **„Fizetett ár alapján"** összeg **csak azt a tételt** veszi figyelembe, amelynél **legalább egy komponens `megvan`**. Ha semmi nincs megvan állapotban (hiányzik/jelöletlen), a „fizetve" nem jelenik meg és nem számít az összegbe — hiszen ténylegesen semmi nem lett megvéve.
@@ -307,6 +309,7 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 19. **Új Szám komponens-alap + „Kész” védelem + Autós Legendák [LEZÁRVA, megvalósítva — v1.22]** Az `a457ed7` oda-vissza sablonja az új sorokhoz csak a kitöltött komponens-celláknak hozott létre komponenst, ezért az „Autós Legendák” 60 Száma komponens nélkül jött létre. Javítás: az `apply_draft_upload` az ÚJ draft-Számhoz a sorozat minden deklarált típusából üres példányt vesz fel (szerver-oldalon, szerkesztési és új-sorozat draftban is); a `mark_draft_ready` nem enged „Kész”-re olyan ÚJ Számot, amelyiknek nincs legalább EGY komponense (nem követeli meg az összes típust — egy Számon nem kell minden deklarált típusnak meglennie); a beküldői RPC (`propose_bulk_issues`) SZÁNDÉKOSAN változatlan, hogy a szándékosan elhagyott típus ne kerüljön vissza. Egyszeri adatjavítás: az Autós Legendák 60 Száma megkapta az üres „konyv” komponenst (+ látott-állapot, hamis felkiáltójel nélkül).
 20. **„Jelöletlen” szűrő** **[NYITOTT, javaslat]** Ma nincs: a megjelent, de jelöletlen Szám egyik státusz-szűrőbe sem esik (csak a „Mind”-ben látszik), ezért a szűrők számai nem adnak össze a „Mind”-del.
 21. **Gyors szerkesztés → Excel: komponens nélküli Szám csendes kihagyása** **[NYITOTT]** A Gyors Excel (`excel.js`) a komponens nélküli meglévő Számokat csendben kihagyja; jelzés kellene.
+22. **Komponens-szintű ár [LEZÁRVA, v1.23: NEM kell]** A Szám ára a magazin ára; a mellékletet külön nem árazzuk (5.5). Az összeg a Számokra és a beszerzési mennyiségre épül.
 
 ---
 
@@ -485,6 +488,7 @@ SQL-ek: `laprol-lapra-draft-visszaadas.sql`, `-lego-sw-draft-helyreallitas.sql` 
 ---
 
 *Napló:*
+- v1.23 — **Az Összeg-kártya egységesítése** (5.5, C változat): a két nézet ugyanazokat a Számokat (≥1 komponens megvan) és ugyanazt a szorzót (beszerzési mennyiség) használja; közös, tesztelt számítás (`js/totals.js`, `scripts/tests/totals.test.mjs`); a kártyán a Szám-darabszám is látszik; a súgó „mit ér a gyűjteményed” leírása javítva. Komponens-szintű ár: nem kell (lezárt döntés). Nincs adatbázis-változás.
 - v1.22 — **Autós Legendák hibája és a javítások** (10. fejezet, 19. pont; 4.x dátumszabály): az `a457ed7` regresszió javítása (új draft-Számok komponens-alapja, „Kész” védelem, adatjavítás); a „ma” helyi dátum és a „mai dátumú Szám megjelent” egységesen (`isFutureDate`); a lapozás (`fetchAllRows`) egyedi kulcs szerint is rendez (id / összetett kulcs) — a `components` tábla 1000 sor fölé nőtt. SQL: `uj-szam-komponens-alap`, `kesz-komponens-vedelem`, `autos-legendak-komponens-javitas`. Tesztek: `scripts/tests/` (dates, paging), `scripts/trial-uj-szam-komponens.js`.
 - v1.21 — **„Szerkesztés indítása” atomi függvénye + egy szerkesztési draft egy sorozathoz** (10. fejezet, 18. pont): `start_edit_draft()` és a `draft_series_one_edit_per_series` részleges egyedi index; a Karbantartás és a Gyors szerkesztés → Excel is ezt hívja (teljes másolat, csak aktív sorozat); a `change_log` lekérdezés `order("id")` tie-breakkel (azonos verziójú lapszám-bejegyzések stabil sorrendje). Az átszámozás-próba (`scripts/trial-renumber.js`) és a függvény-próba (`scripts/trial-start-edit.js`) a repóban, mindkettő csak visszagörgetve, jóváhagyással futtatható. SQL: `start-edit-draft`.
 - v1.20 — **Feltöltés-átalakítási kör** (13.11), a Lego Star Wars publikálási hiba után: a Szám azonossága rejtett azonosító (nem lapszám, nem név); azonosító-alapú **oda-vissza sablon** előnézettel, blokkoló azonosító- és lapszám-ütközés-védelemmel, elavulás-jelzéssel; „Kész" és feltöltés ugyanazt a DB-oldali ütközés-ellenőrzést használja (`draft_lapszam_conflicts`); „Visszaadás szerkesztésre"; törölt-jelölés fizikai törlés helyett élő párral rendelkező Számnál; érthető publikálási hiba; egységes mentés-védelem és magyar hibaüzenetek (a Listák kétszeri futásának gyökér-oka: halmozódó figyelő); Listák átnevezése, közös egyediségi kulcs, „Egyéb" mindig utolsó; lapszám-csendesítés. SQL: `draft-visszaadas`, `lego-sw-draft-helyreallitas`, `draft-sablon-roundtrip`, `lista-egyedi-kulcs`, `lapszam-csendes`.
