@@ -6,6 +6,12 @@
    Legújabb elöl. Szándékosan elválasztva a UI-tól (changelog.js).
    ============================================================ */
 export const CHANGELOG = [
+  { date:"2026-10-11",
+    text:"A „megjelent” és a „várható” mostantól a saját időzónád (helyi) dátuma szerint dönt, és éjfélkor magától frissül. A mai dátumú szám már megjelentnek számít, nem „várhatónak” — a „Várható” szűrő és a „Következő megjelenés” is ehhez igazodik. Korábban helyi idő szerint éjfél és hajnali kettő között még a tegnapi nappal számolt, és a mai szám egyszerre volt „megjelent” és „várható”."
+  },
+  { date:"2026-10-11",
+    text:"Karbantartóknak: az új sorozat és a sablon-feltöltés új sorai mostantól mindig megkapják a sorozat komponenseit (üresen, később kitölthetők), és a „Kész” gomb nem enged publikálni olyan új Számot, aminek egyetlen komponense sincs. Egy hiba miatt az „Autós Legendák” Számai komponens nélkül jöttek létre (nem lehetett rajtuk státuszt vagy azonosítót állítani) — ez javítva, a sorozat Számai megkapták a Könyv komponenst."
+  },
   { date:"2026-10-10",
     text:"Átszámozásnál nem jelez többé felkiáltójelet a puszta sorszám-változás: ha a sorozatban a Számok sorszáma módosul (átszámozás), de a cím, a dátum vagy az ár nem, nem kapsz tételenkénti jelzést — a változás rögzítve van, az új sorszámot ott látod, ahol a sor áll. Tartalmi változásnál (cím, dátum, ár, azonosító) a felkiáltójel a szokásos módon megjelenik."},
   { date:"2026-10-10",
