@@ -1,4 +1,4 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v9)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v10)
 
 **Frissítve:** 2026. október 10. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
@@ -39,7 +39,9 @@ laprol-lapra/
 │   ├── run-migration.js
 │   ├── trial-publish.js                   ← egy draft publikálásának próbája, MINDIG visszagörget
 │   ├── trial-renumber.js                  ← szintetikus átszámozás-próba, MINDIG visszagörget (csak jóváhagyással futtatható)
-│   └── trial-start-edit.js                ← a start_edit_draft + index próbája, MINDIG visszagörget (csak jóváhagyással futtatható)
+│   ├── trial-start-edit.js                ← a start_edit_draft + index próbája, MINDIG visszagörget (csak jóváhagyással futtatható)
+│   ├── trial-uj-szam-komponens.js         ← új Szám komponens-alap / Kész-védelem / Autós adatjavítás próbája, MINDIG visszagörget
+│   └── tests/                             ← Node-tesztek: dates.test.mjs, paging.test.mjs
 ├── vercel.json
 ├── manifest.json + icons/
 └── js/
@@ -169,6 +171,9 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 - **Lapszám-csendesítés:** a puszta lapszám-változás nem emel verziót (nincs felkiáltójel), a `change_log` rögzíti.
 - **A Lego Star Wars draft helyreállítása** név alapján, jóváhagyással történt; a tulajdonos publikálta (09:39 UTC, még a régi függvénnyel — ezért a #6 verziója 5 → 6 lett, nyugtázva).
 - **Szerkesztés indítása (v1.21):** egy szerver-oldali tranzakció (`start_edit_draft`), egy sorozathoz legfeljebb egy szerkesztési draft; a Gyors szerkesztés → Excel létrehozó ága ugyanezt használja (a párosítása továbbra is lapszám-alapú — nyitott 7. pont).
+- **Autós Legendák hibája (v1.22):** az oda-vissza sablon az új sorokhoz nem hozott létre üres komponenst → komponens nélküli élő Számok. Javítva: szerver-oldali alap-komponensek az új Számokhoz, „Kész” védelem (≥1 komponens), egyszeri adatjavítás (60 komponens). A beküldői RPC szándékosan változatlan.
+- **Dátumkezelés (v1.22):** a „ma” helyi dátum (frissül); a mai dátumú Szám megjelent; a „Várható”, a piros dátum, a színezés és a „Következő megjelenés” egy szabályt (`isFutureDate`) használ.
+- **Lapozás (v1.22):** a `fetchAllRows` egyedi kulcs szerint is rendez; a `components` tábla már 1000 sor fölött van (1 025).
 
 ---
 
@@ -190,6 +195,8 @@ A hibajavítási kör 11. pontja (sablon-alapú tömeges feltöltés) a javaslat
 8. **Egy szerkesztési draft egy élő sorozathoz** — **KÉSZ (v1.21):** részleges egyedi index + atomi `start_edit_draft()`; a Karbantartás gombja és a Gyors szerkesztés → Excel is ezt hívja (a soft-delete-elt Számokat nem másolja).
 9. **Döntés nélküli ötletek:** „tervezett” jelzés a még meg nem jelent számoknál; dátum szerinti rendezés segítségként (nem automatikus); eltolás ütközésnél felajánlott kényelmi lehetőségként.
 10. **A lapszám-csendesítés élő ellenőrzése** — **KÉSZ:** a visszagörgetett szintetikus próba (`scripts/trial-renumber.js`) igazolta: a puszta lapszám-változás nem emel verziót, a `change_log` rögzíti, a számlálók a ROLLBACK után azonosak.
+11. **„Jelöletlen” szűrő** — javaslat: ma a megjelent, de jelöletlen Szám egyik státusz-szűrőbe sem esik.
+12. **Gyors szerkesztés → Excel: komponens nélküli Szám csendes kihagyása** — jelzés kellene.
 
 ---
 
@@ -205,7 +212,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.21).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.22).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.
