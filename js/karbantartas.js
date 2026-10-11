@@ -15,6 +15,7 @@ import { fetchDraftItems, renderDraftItemsList, draftItemForm } from "./draft-it
 import { downloadDraftTemplate, pickDraftExcelFile, confirmDraftUpload } from "./draft-excel.js";
 import { diffDraft, diffSummaryText } from "./draft-diff.js";
 import { controlsHtml, wireControls, filterSeries, sortSeries, loadSort, loadLastChanged } from "./series-list.js";
+import { defaultTemplate, hasTemplate, templateError, templateTypes, ID_RULES, TEMPLATE_SOFT_MAX, addType, removeType, setMain, move, setField } from "./component-template.js";
 
 let currentTab = "aktiv";
 // Szám-darabszámok a Munka sorozatok listához (karbantartasForm tölti): {draft: {draftId: N}, live: {seriesId: M}}
@@ -286,10 +287,37 @@ async function claim(d){
 }
 
 // "Kész": DB-oldali függvény (mark_draft_ready) — a publikálás UTÁNI állapotot
-// szimulálja, és lapszám-ütközés esetén érthető üzenettel megtagadja, hogy a
-// hiba ne publikáláskor derüljön ki (a "Szám törlése a draftból" körüli
-// Lego Star Wars eset tanulsága).
+// szimulálja, és lapszám-ütközés / hiányzó komponens / kötelező azonosító esetén érthető
+// üzenettel megtagadja (blokkoló ellenőrzések: kivétel). Előtte a draft_ready_warnings
+// NEM blokkoló figyelmeztetései (ajánlott azonosító hiánya, duplikált azonosító) egy
+// megerősítő ablakban jelennek meg, "Mégis Kész" gombbal.
 async function markReady(d){
+  // Új sorozatnál a komponens-sablon (fő elem) kötelezően megadandó — a kliens kényszeríti ki
+  // (az adatbázis üres sablonnál az alapértelmezettet használja, hogy a régi út ne törjön el).
+  if(d.pool_type==="new" && !hasTemplate(d.component_template)){
+    alert("Új sorozatnál előbb add meg a komponens-sablont (fő elem, típusok): nyisd meg a Szerkesztést, állítsd be a „Komponens-sablon” szakaszt, és mentsd a mezőket.");
+    return;
+  }
+  let warns = [];
+  try{
+    const { data, error } = await supabase.rpc("draft_ready_warnings", { p_draft_id: d.id });
+    if(error) throw error;
+    warns = data || [];
+  }catch(e){ warns = []; }          // a figyelmeztetés hibája nem akadályozza a "Kész"-et
+  if(!warns.length){ await doMarkReady(d); return; }
+  const items = warns.map(w=>{
+    const det = Array.isArray(w.tetelek) && w.tetelek.length
+      ? `<ul class="warnlist">${w.tetelek.map(t=>`<li><b>${esc(listName("komponens", t.tipus))}</b> „${esc((t.azonosito||"").trim())}”: ${(t.helyek||[]).map(esc).join(", ")}</li>`).join("")}</ul>` : "";
+    return `<li>${esc(w.szoveg)}${det}</li>`;
+  }).join("");
+  openModal(`<h2>Figyelmeztetések a „Kész” előtt</h2>
+    <p class="msub">Ezek nem akadályozzák a „Kész”-et, de érdemes átnézni:</p>
+    <ul class="warnlist">${items}</ul>
+    <div class="modrow"><button class="btn ghost" id="rw-cancel">Mégse</button><button class="btn" id="rw-ok">Mégis Kész</button></div>`);
+  document.getElementById("rw-cancel").onclick=()=>karbantartasForm();
+  document.getElementById("rw-ok").onclick=guarded(()=>doMarkReady(d));
+}
+async function doMarkReady(d){
   try{
     const { error } = await supabase.rpc("mark_draft_ready", { p_draft_id: d.id });
     if(error) throw error;
@@ -389,16 +417,48 @@ async function returnToEdit(d, skipConfirm){
 /* ---- Draft mezőinek + tételeinek szerkesztése (a claim-elő sajátja) ---- */
 async function editDraftForm(d){
   let color = d.szin || PAL12[0];
-  let comps = (d.components||[]).slice();
+  // A sorozat komponens-sablonja (új Számok kiindulása). Ha a draftnak még nincs, az alapértelmezett
+  // (a mostani komponens-listából) — a mentés írja be.
+  let tmpl = hasTemplate(d.component_template) ? d.component_template.map(e=>({...e}))
+           : defaultTemplate(d.components, state.TYPEDEFS);
   const compList = (state.LISTS.komponens||[{ertek:"magazin",nev:"Magazin"},{ertek:"modell",nev:"Modell"},{ertek:"konyv",nev:"Könyv"},{ertek:"egyeb",nev:"Egyéb"}]);
 
   openModal(`<h2>${d.pool_type==="new"?"Új javaslat szerkesztése: "+esc(d.megnevezes):"Szerkesztés: "+esc(d.megnevezes)}</h2><p class="msub">Betöltés…</p>`);
   let items;
   try{ items = await fetchDraftItems(d.id); }catch(e){ err(e); return; }
-  renderEditDraft(d, color, comps, compList, items);
+  renderEditDraft(d, color, tmpl, compList, items);
 }
 
-function renderEditDraft(d, color, comps, compList, items){
+// A komponens-sablon szerkesztője (rendezhető lista, beállítások típusonként).
+function tmplEditorHtml(tmpl, compList){
+  const name = t => (compList.find(o=>o.ertek===t)||{}).nev || listName("komponens", t) || t;
+  const ruleOpts = cur => ID_RULES.map(([v,l])=>`<option value="${v}"${v===cur?" selected":""}>${l}</option>`).join("");
+  const rows = tmpl.map((e,i)=>`<div class="tmplrow" data-t="${esc(e.tipus)}">
+      <div class="tmplhead"><b>${esc(name(e.tipus))}</b>
+        <span class="tmplbtns">
+          <button type="button" class="btn ghost" data-mv="-1" ${i===0?"disabled":""} aria-label="Feljebb">▲</button>
+          <button type="button" class="btn ghost" data-mv="1" ${i===tmpl.length-1?"disabled":""} aria-label="Lejjebb">▼</button>
+          <button type="button" class="btn ghost" data-rm="1" ${tmpl.length<=1?"disabled":""} aria-label="Eltávolítás">✕</button>
+        </span></div>
+      <label class="ckrow"><input type="radio" name="tmpl-main" value="${esc(e.tipus)}" ${e.main?"checked":""}> ★ fő elem <span class="unote">— a sorban az első helyen áll</span></label>
+      <label class="ckrow"><input type="checkbox" data-k="required" ${e.required!==false?"checked":""}> kötelező <span class="unote">— minden új Számnál létrejön egy (üres) példány</span></label>
+      <label class="ckrow"><input type="checkbox" data-k="counts_for_color" ${e.counts_for_color!==false?"checked":""}> számít a Szám színébe</label>
+      <div class="grid2">
+        <div class="field"><label>Azonosító</label><select data-k="id_rule">${ruleOpts(e.id_rule||"nincs")}</select></div>
+        <div class="field"><label>Alap azonosító-típus</label><select data-k="default_azonosito_tipus"><option value="">—</option>${opts("azonosito", e.default_azonosito_tipus)}</select></div>
+      </div>
+      <div class="field"><label>Alap megnevezés (opcionális)</label><input data-k="default_megnevezes" value="${esc(e.default_megnevezes||"")}"></div>
+    </div>`).join("");
+  const free = compList.filter(o=>!tmpl.some(e=>e.tipus===o.ertek));
+  return `<p class="msub">A sorozat új Számai ebből indulnak. A meglévő Számokat és komponenseket NEM módosítja. A sor legfeljebb ${TEMPLATE_SOFT_MAX} elemet mutat.</p>
+    ${rows}
+    ${tmpl.length>TEMPLATE_SOFT_MAX?`<div class="unote" style="color:#f0cd8a">⚠ ${tmpl.length} típus van a sablonban — a sor csak az első ${TEMPLATE_SOFT_MAX} elemet mutatja, a többit „+N” jelzi.</div>`:""}
+    ${free.length?`<div class="modrow"><select id="d-tmpl-add">${free.map(o=>`<option value="${esc(o.ertek)}">${esc(o.nev)}</option>`).join("")}</select>
+      <button type="button" class="btn ghost" id="d-tmpl-addbtn">+ Típus hozzáadása</button></div>`:""}`;
+}
+
+function renderEditDraft(d, color, tmpl, compList, items){
+  let comps = templateTypes(tmpl);   // a deklarált típusok listája = a sablon típusai (kompatibilitás)
   openModal(`<h2>${d.pool_type==="new"?"Új javaslat szerkesztése: "+esc(d.megnevezes):"Szerkesztés: "+esc(d.megnevezes)}</h2>
     <p class="msub">Munkaanyag — csak neked látszik, amíg nem publikálod.</p>
     <div class="field"><label>Kiadó</label><select id="d-kiado"><option value="">—</option>${opts("kiado",d.kiado)}</select></div>
@@ -406,8 +466,7 @@ function renderEditDraft(d, color, comps, compList, items){
     <div class="field"><label>Megnevezés (teljes név)</label><input id="d-name" value="${esc(d.megnevezes||"")}"></div>
     <div class="field"><label>Megjelenítendő név a fülön (max ${DISPLAY_MAX}) — <span id="d-count">${(d.megjelenites||"").length}/${DISPLAY_MAX}</span></label>
       <input id="d-display" maxlength="${DISPLAY_MAX}" value="${esc(d.megjelenites||"")}"></div>
-    <div class="field"><label>Komponensek (miből áll egy szám)</label><div class="compchecks" id="d-comps">
-      ${compList.map(o=>`<button type="button" class="compcheck" data-t="${esc(o.ertek)}" aria-pressed="${comps.includes(o.ertek)}">${esc(o.nev)}</button>`).join("")}</div></div>
+    <div class="field"><label>Komponens-sablon (miből áll egy szám)</label><div id="d-tmpl-wrap">${tmplEditorHtml(tmpl, compList)}</div></div>
     <div class="field"><label>Szín</label>
       <div id="d-sw">${PAL_FAMILIES.map(f=>`<div class="swfam"><span class="swfam-nev">${f.nev}</span>
         <div class="swatches">${f.szinek.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-pressed="${c===color}"></button>`).join("")}</div></div>`).join("")}</div></div>
@@ -420,48 +479,69 @@ function renderEditDraft(d, color, comps, compList, items){
 
   const dEl=document.getElementById("d-display"), cEl=document.getElementById("d-count");
   dEl.addEventListener("input",()=>cEl.textContent=`${dEl.value.length}/${DISPLAY_MAX}`);
-  document.getElementById("d-comps").addEventListener("click",e=>{ const b=e.target.closest(".compcheck"); if(!b) return;
-    const t=b.dataset.t; if(comps.includes(t)) comps=comps.filter(x=>x!==t); else comps.push(t);
-    b.setAttribute("aria-pressed", comps.includes(t)); });
+
+  // --- komponens-sablon szerkesztő (delegált kezelők, csak a szakasz rajzolódik újra) ---
+  const wrap = document.getElementById("d-tmpl-wrap");
+  const redraw = () => { comps = templateTypes(tmpl); wrap.innerHTML = tmplEditorHtml(tmpl, compList); };
+  wrap.addEventListener("click", e=>{
+    const row = e.target.closest(".tmplrow");
+    const mv = e.target.closest("[data-mv]"), rm = e.target.closest("[data-rm]"), add = e.target.closest("#d-tmpl-addbtn");
+    if(add){ const sel = document.getElementById("d-tmpl-add"); if(sel&&sel.value){ tmpl = addType(tmpl, sel.value, state.TYPEDEFS); redraw(); } return; }
+    if(!row) return;
+    const t = row.dataset.t, i = tmpl.findIndex(x=>x.tipus===t);
+    if(mv){ tmpl = move(tmpl, i, +mv.dataset.mv); redraw(); }
+    else if(rm){ tmpl = removeType(tmpl, t); redraw(); }
+  });
+  wrap.addEventListener("change", e=>{
+    const row = e.target.closest(".tmplrow"); if(!row) return;
+    const t = row.dataset.t;
+    if(e.target.name==="tmpl-main"){ tmpl = setMain(tmpl, e.target.value); redraw(); return; }
+    const k = e.target.dataset.k; if(!k) return;
+    const v = e.target.type==="checkbox" ? e.target.checked : (e.target.value || (k==="id_rule" ? "nincs" : null));
+    tmpl = setField(tmpl, t, k, v);
+    if(k==="default_megnevezes") tmpl = setField(tmpl, t, k, e.target.value.trim() || null);
+  });
+
   document.getElementById("d-sw").addEventListener("click",e=>{ const b=e.target.closest(".swatch"); if(!b) return;
     color=b.dataset.c; sheet.querySelectorAll("#d-sw .swatch").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
   document.getElementById("d-back").onclick=()=>karbantartasForm();
   document.getElementById("d-save").onclick=guarded(async ()=>{
     const nm=document.getElementById("d-name").value.trim();
     if(!nm){ alert("A megnevezés kötelező."); return; }
-    if(!comps.length){ alert("Legalább egy komponens kell."); return; }
+    const terr = templateError(tmpl);
+    if(terr){ alert("A komponens-sablon nem menthető: "+terr+"."); return; }
+    comps = templateTypes(tmpl);
     const disp=(dEl.value.trim()||nm).slice(0,DISPLAY_MAX);
     try{
       const { error } = await supabase.from("draft_series").update({
         kiado: document.getElementById("d-kiado").value||null,
         kategoria: document.getElementById("d-kategoria").value||null,
-        megnevezes: nm, megjelenites: disp, szin: color, components: comps,
+        megnevezes: nm, megjelenites: disp, szin: color, components: comps, component_template: tmpl,
       }).eq("id", d.id);
       if(error) throw error;
     }catch(e){ err(e); return; }
-    d = {...d, kiado:document.getElementById("d-kiado").value||null, kategoria:document.getElementById("d-kategoria").value||null, megnevezes:nm, megjelenites:disp, szin:color, components:comps};
+    d = {...d, kiado:document.getElementById("d-kiado").value||null, kategoria:document.getElementById("d-kategoria").value||null, megnevezes:nm, megjelenites:disp, szin:color, components:comps, component_template:tmpl};
     await editDraftForm(d);
   });
-  // Egy komponens-átsorolás új típust adhat a sorozat komponens-listájához
-  // (draft-items.js) — a szerkesztőbe visszatérve ezért friss draft_series
-  // sort töltünk be, nem a bezáráskori (esetleg elavult) `d`-t.
+  // Egy komponens-átsorolás / új típus a draft komponens-listáját érintheti (draft-items.js) —
+  // a szerkesztőbe visszatérve ezért friss draft_series sort töltünk be, nem a bezáráskori `d`-t.
   const reopen = async ()=>{
     const { data:fresh } = await supabase.from("draft_series").select("*").eq("id",d.id).single();
     await editDraftForm(fresh||d);
   };
-  document.getElementById("d-additem").onclick=()=>draftItemForm(d.id, null, comps, reopen);
+  document.getElementById("d-additem").onclick=()=>draftItemForm(d.id, null, comps, reopen, tmpl);
   sheet.querySelectorAll("#d-items [data-diedit]").forEach(b=>{
-    b.onclick=()=>{ const it=items.find(x=>x.id===b.dataset.diedit); if(it) draftItemForm(d.id, it, comps, reopen); };
+    b.onclick=()=>{ const it=items.find(x=>x.id===b.dataset.diedit); if(it) draftItemForm(d.id, it, comps, reopen, tmpl); };
   });
   document.getElementById("d-tmpl").onclick=()=>{
-    if(!comps.length){ alert("Előbb válassz ki legalább egy komponenst fent."); return; }
+    if(!comps.length){ alert("Előbb adj hozzá legalább egy komponens-típust a sablonhoz."); return; }
     // Oda-vissza sablon: a draft AKTUÁLIS állapotát tölti le (rejtett azonosítókkal).
     fetchDraftItems(d.id)
       .then(items=>downloadDraftTemplate(comps, d.megnevezes, { draftSeriesId:d.id, items }))
       .catch(err);
   };
   document.getElementById("d-tmplup").onclick=()=>{
-    if(!comps.length){ alert("Előbb válassz ki legalább egy komponenst fent."); return; }
+    if(!comps.length){ alert("Előbb adj hozzá legalább egy komponens-típust a sablonhoz."); return; }
     pickDraftExcelFile(file=>confirmDraftUpload(openModal, err, file, d.id, comps, reopen));
   };
 }

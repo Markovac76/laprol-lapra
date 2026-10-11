@@ -12,7 +12,7 @@ export async function loadData(){
   const { data: userData } = await supabase.auth.getUser();
   state.myId = userData?.user?.id || null;
   state.isOwner = state.myId === OWNER_UID;
-  const [s,i,c,l,ms,mid,msel,msn,ip]=await Promise.all([
+  const [s,i,c,l,ms,mid,msel,msn,ip,td]=await Promise.all([
     fetchAllRows(()=>supabase.from("series").select("*").order("sort_order")),
     fetchAllRows(()=>supabase.from("issues").select("*")),
     fetchAllRows(()=>supabase.from("components").select("*")),
@@ -22,8 +22,11 @@ export async function loadData(){
     supabase.from("member_series").select("series_id").eq("user_id",state.myId).eq("is_selected",true),
     fetchAllRows(()=>supabase.from("member_seen").select("*").eq("user_id",state.myId), ["entity_type","entity_id"]),
     supabase.from("image_proposals").select("*").eq("status","pending"),
+    supabase.from("component_type_defs").select("*"),   // típusleírás (alapértelmezett azonosító-típus stb.); hiánya nem végzetes
   ]);
   if(s.error||i.error||c.error){ throw (s.error||i.error||c.error); }
+  state.TYPEDEFS={};
+  if(!td.error && td.data) td.data.forEach(r=>{ state.TYPEDEFS[r.tipus]=r; });
   state.LISTS={};
   if(!l.error && l.data) l.data.forEach(r=>{ (state.LISTS[r.tipus]=state.LISTS[r.tipus]||[]).push({ertek:r.ertek,nev:r.megjelenites||r.ertek}); });
   // "Egyéb" mindig az utolsó (13. pont) — minden legördülő/választó ezt a sorrendet használja.
@@ -51,7 +54,7 @@ export async function loadData(){
   // A fülsáv csak a SAJÁT, bepipált sorozatokból épül (member_series.is_selected) — nem az összesből.
   const selectedIds = new Set((msel.data||[]).map(r=>r.series_id));
   const byS={}, byI={};
-  state.SERIES = s.data.filter(r=>selectedIds.has(r.id)).map(r=>{ const o={id:r.id,kiado:r.kiado,kategoria:r.kategoria||null,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],kodSzam:r.kod_szam||null,version:r.version||1,changed:(r.version||1)>seenOf("series",r.id),
+  state.SERIES = s.data.filter(r=>selectedIds.has(r.id)).map(r=>{ const o={id:r.id,kiado:r.kiado,kategoria:r.kategoria||null,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],template:Array.isArray(r.component_template)?r.component_template:[],kodSzam:r.kod_szam||null,version:r.version||1,changed:(r.version||1)>seenOf("series",r.id),
       borito_url:r.borito_url||null, borito_upload_enabled:!!r.borito_upload_enabled, pendingBorito:pendingBySeries[r.id]||null,
       fdRequestedAt:r.force_delete_requested_at||null, fdGraceEnd:r.force_delete_grace_end||null, items:[]}; byS[r.id]=o; return o; });
   i.data.forEach(r=>{ const mi=myIssue[r.id]||{}; const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,

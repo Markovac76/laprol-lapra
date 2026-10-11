@@ -44,7 +44,7 @@ async function loadModules(ref) {
   await c.connect();
   await c.query("BEGIN READ ONLY");
   const owner = process.argv[4] || (await c.query(`select user_id from public.members where role='owner' limit 1`)).rows[0].user_id;
-  const series = (await c.query(`select id, megjelenites, megnevezes, components, sort_order from public.series order by sort_order`)).rows;
+  const series = (await c.query(`select id, megjelenites, megnevezes, components, sort_order, component_template from public.series order by sort_order`)).rows;
   const issues = (await c.query(`select i.id, i.series_id, i.lapszam, i.cim, i.megjelenes::text date, i.eredeti_ar, i.is_deleted,
       d.fizetett_ar, d.beszerzesi_mennyiseg besz from public.issues i left join public.member_issue_data d on d.issue_id=i.id and d.user_id=$1 order by i.series_id, i.lapszam`, [owner])).rows;
   const comps = (await c.query(`select c.id, c.issue_id, c.tipus, c.created_at, ms.status, ms.db from public.components c
@@ -55,6 +55,7 @@ async function loadModules(ref) {
   comps.forEach(x => (byIssue[x.issue_id] = byIssue[x.issue_id] || []).push(x));
   const build = () => series.map(s => ({
     id: s.id, display: s.megjelenites, sorozat: s.megnevezes, components: s.components || [],
+    template: Array.isArray(s.component_template) ? s.component_template : [],
     items: issues.filter(i => i.series_id === s.id).map(i => {
       const o = { id: i.id, n: i.lapszam, name: i.cim, date: i.date, eredeti_ar: i.eredeti_ar, deleted: !!i.is_deleted,
         fizetett_ar: i.fizetett_ar == null ? null : i.fizetett_ar, besz_menny: i.besz == null ? 1 : i.besz, comps: {} };

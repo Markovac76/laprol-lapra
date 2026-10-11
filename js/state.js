@@ -8,7 +8,7 @@ export const OWNER_UID = "25cb3724-02d4-4002-98b0-c93f74ef4e42";
 
 export const state = {
   SERIES: [], activeIdx: 0, filter: "mind", query: "", adminMode: false,
-  LISTS: {}, costVisible: false, costBasis: "eredeti", openIssue: null, tabsOpen: false,
+  LISTS: {}, TYPEDEFS: {}, costVisible: false, costBasis: "eredeti", openIssue: null, tabsOpen: false,
   myId: null, isOwner: false, role: "user", status: "active",
 };
 
@@ -140,19 +140,31 @@ export function hasOwnedComponent(it,s){
   return allComps(it).some(c=>c.status==="megvan");
 }
 
-// A lapszám színe a domináns TÍPUS(OK) összes példányának együttes állapotából
-// jön ("legrosszabb eset nyer", 6.3–6.4 kiterjesztve): a Szám csak akkor zöld,
-// ha a domináns típus(ok) MINDEN példánya megvan.
+// A Szám színe a "számít a színnél" típus(ok) összes példányának együttes állapotából jön
+// ("legrosszabb eset nyer", 6.3–6.4). Ha a sorozatnak van komponens-sablonja, a sablon
+// `counts_for_color` jelzője dönt; sablon nélkül (régi adat / teszt) a korábbi szabály:
+// a domináns típusok a magazinon kívüliek (ha csak magazin van, az). A sablonban nem
+// szereplő (egy Számhoz külön hozzáadott) típus a színt NEM befolyásolja. Ha a Számon
+// nincs a színnél számító komponens, a domináns az összes komponens.
+export function colorTypeSets(s){
+  const tmpl = s && Array.isArray(s.template) && s.template.length ? s.template : null;
+  if(tmpl){
+    return { color:new Set(tmpl.filter(e=>e.counts_for_color!==false).map(e=>e.tipus)),
+             non:new Set(tmpl.filter(e=>e.counts_for_color===false).map(e=>e.tipus)) };
+  }
+  const types=(s&&s.components)||[]; const nm=types.filter(t=>t!=="magazin"); const dom=nm.length?nm:types;
+  return { color:new Set(dom), non:new Set(types.filter(t=>!dom.includes(t))) };
+}
 export function issueState(it,s){
   if(isFutureDate(it.date)) return null;                        // még nem jelent meg → semleges
-  const nm=s.components.filter(t=>t!=="magazin");
-  const dominantTypes = nm.length ? nm : s.components;
-  if(!dominantTypes.length) return null;
-  const instances = dominantTypes.flatMap(t=>compsOfType(it,t));
-  const d = worstStatus(instances);
+  const { color, non } = colorTypeSets(s);
+  const pairs = Object.entries(it.comps||{}).flatMap(([t,arr])=>(arr||[]).map(c=>({t,c})));
+  let dom = pairs.filter(p=>color.has(p.t)).map(p=>p.c);
+  if(!dom.length) dom = pairs.map(p=>p.c);                      // nincs ilyen → az összes komponens
+  const d = worstStatus(dom);
   if(!d) return null;                                           // domináns jelöletlen → semleges
   if(d==="megvan") return "megvan";                             // zöld
   if(d==="nemkell") return "nemkell";                           // szürke
-  const mag = s.components.includes("magazin") ? worstStatus(compsOfType(it,"magazin")) : null;
-  return mag==="megvan" ? "reszleges" : "hianyzik";             // sárga, ha a magazin megvan; egyébként piros
+  const m = worstStatus(pairs.filter(p=>non.has(p.t)).map(p=>p.c));
+  return m==="megvan" ? "reszleges" : "hianyzik";               // sárga, ha a nem számító elemek (ma: a magazin) megvannak; egyébként piros
 }

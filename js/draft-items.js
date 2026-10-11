@@ -11,6 +11,7 @@
 import { supabase, fetchAllRows } from "./supabase.js";
 import { state, COMP_TYPES, esc, fmtDate, opts, listName } from "./state.js";
 import { openModal, err, guarded } from "./modal.js";
+import { initialComponents } from "./component-template.js";
 
 const typeLabel = t => listName("komponens", t) || COMP_TYPES[t] || t;
 
@@ -50,11 +51,15 @@ export function renderDraftItemsList(items){
 let tmpSeq=0;
 const keyOf = c => c.id || c._tmpKey;
 
-export function draftItemForm(draftSeriesId, existing, components, onDone){
+export function draftItemForm(draftSeriesId, existing, components, onDone, template = null){
   // Munka-másolat: a `comps` itt egy FLAT tömb (session-only, még nem mentett
   // "+ Még egy X" példányokkal bővíthető) — csak Mentéskor kerül a DB-be.
   let comps = existing ? (existing.comps||[]).map(c=>({...c}))
-    : components.map(t=>({tipus:t, azonosito_tipus:null, azonosito:"", megnevezes:"", _tmpKey:"tmp"+(tmpSeq++)}));
+    : (Array.isArray(template) && template.length
+        // ÚJ Szám: a sorozat komponens-sablonjának KÖTELEZŐ típusai, az alapértelmezett
+        // azonosító-típussal / megnevezéssel; a fő elem a sablon fő típusa
+        ? initialComponents(template).map(c=>({...c, _tmpKey:"tmp"+(tmpSeq++)}))
+        : components.map(t=>({tipus:t, azonosito_tipus:null, azonosito:"", megnevezes:"", _tmpKey:"tmp"+(tmpSeq++)})));
   // Új tételnél az azonosítót az űrlap megnyitásakor generáljuk (nem kattintásonként):
   // egy dupla mentés így ugyanazzal az elsődleges kulccsal próbálkozik, és a
   // másodikat az adatbázis utasítja el — nem keletkezik két azonos tétel.
