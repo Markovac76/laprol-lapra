@@ -1,7 +1,8 @@
 /* ============================================================
    Megjelenítés: fülek, hero, szűrők, lista, tapadó fejléc.
    ============================================================ */
-import { state, S, COMP_TYPES, isFutureDate, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus } from "./state.js";
+import { state, S, COMP_TYPES, isFutureDate, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus, issueSlots } from "./state.js";
+import { thumbUrl, typeIcon } from "./thumb.js";
 import { stats } from "./data.js";
 import { showSeriesChangePopup, showIssueChangePopup, showCollectedChanges } from "./changes.js";
 import { isStaff } from "./permissions.js";
@@ -121,12 +122,17 @@ function matches(it){ const s=S();
   return true;
 }
 
-const ICONS={
-  magazin:'<svg viewBox="0 0 24 24"><path d="M4 5h9v14H4z"/><path d="M13 7h7v12h-7"/><path d="M6 8h5M6 11h5M6 14h5"/></svg>',
-  modell:'<svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>',
-  konyv:'<svg viewBox="0 0 24 24"><path d="M5 4h11a2 2 0 012 2v14H7a2 2 0 01-2-2z"/><path d="M5 17h13"/></svg>',
-  egyeb:'<svg viewBox="0 0 24 24"><path d="M4 8h16v11H4z"/><path d="M4 8l2-4h12l2 4"/><path d="M12 4v15"/></svg>'
-};
+// A kis kép a Supabase Storage saját átméretezésével jön (≈2 KB a teljes kép helyett);
+// ha a végpont nem elérhető, az eredeti képre, ha az sem, a típus-piktogramra esünk vissza.
+let thumbBroken = false;
+const thumbSrc = url => thumbBroken ? url : thumbUrl(url, 64);
+document.addEventListener("error", e=>{
+  const im = e.target;
+  if(!im || im.tagName!=="IMG" || !im.classList.contains("sl-img")) return;
+  const orig = im.dataset.orig;
+  if(orig && im.getAttribute("src")!==orig){ thumbBroken = true; im.setAttribute("src", orig); return; }
+  const box = im.parentElement; im.remove(); if(box) box.classList.remove("photo");
+}, true);
 const MLAB={megvan:"megvan",hianyzik:"hiány",nemkell:"nem kell"};
 const CHEV='<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
 
@@ -163,11 +169,8 @@ function imageControlsHtml(type, c, entityId){
 }
 
 export function renderListHead(){
-  const s=S();
-  document.getElementById("listhead").innerHTML =
-    `<span class="lh-left">szám</span>` +
-    s.components.map(t=>`<span class="lh-c">${COMP_TYPES[t]||t}</span>`).join("") +
-    `<span style="width:34px"></span>`;
+  // Az oszlopfejlécek (a gombok fölött) megszűntek: minden státuszgomb tartalmazza az elem nevét.
+  document.getElementById("listhead").innerHTML = "";
 }
 
 export function renderList(){
@@ -197,36 +200,30 @@ export function renderList(){
     const eredetiLine = `<span class="money">eredeti ár ${it.eredeti_ar!=null?fmtFt(it.eredeti_ar):"nem ismert"}</span>`;
     const fizetveLine = hasOwnedComponent(it,s) ? `<span class="money">fizetve ${it.fizetett_ar!=null?fmtFt(it.fizetett_ar):"nem ismert"}</span>` : "";
     const moneyBlock = `<div class="imoney">${eredetiLine}${fizetveLine}</div>`;
-    // A +/− léptetők a lenyíló panelbe kerültek; a listában csak a darabszám-kijelzés marad az ikonon.
-    // Ha egy típusból egy Számon TÖBB, egyedi Megnevezésű példány van, a kompakt
-    // gomb koppintással már nem cserélgethető (melyiket?) — helyette összesített,
-    // "legrosszabb eset" jelvényt mutat, és a panelt nyitja meg a részletekhez.
-    const marks=s.components.map(t=>{
-      const inst=compsOfType(it,t); const multi=inst.length>1;
-      const c=inst[0]||{status:null}; const cdb=(c.db==null?1:c.db);
-      const stt = multi ? worstStatus(inst) : c.status;
-      const showCnt = !multi && stt==="megvan" && cdb>1;
-      const countTag = multi ? `<span class="cnt">×${inst.length}</span>` : (showCnt?`<span class="cnt">${cdb}</span>`:"");
-      const title = multi
-        ? `${COMP_TYPES[t]||t}: ${inst.length} példány — legrosszabb eset: ${stt?MLAB[stt]:"jelöletlen"}`
-        : `${COMP_TYPES[t]||t}${stt?": "+stt:": jelöletlen"}${showCnt?" · "+cdb+" db":""}`;
-      const idAttr = multi ? `data-multi="1"` : `data-cid="${c.id||""}"`;
-      return `<button class="mark${stt?" m-"+stt:""}${(showCnt||multi)?" has-cnt":""}" data-n="${it.n}" data-t="${t}" ${idAttr} ${future?"disabled":""}
-        title="${title}" aria-label="${COMP_TYPES[t]||t}">
-        <span class="mrow">${ICONS[t]||ICONS.egyeb}${countTag}</span><span class="mlab">${multi?"részletek":(MLAB[stt]||"")}</span></button>`;
+    // Összecsukott sor (1. kör / A): szöveg | elem-helyek (legfeljebb 3, egymás alatt) | lenyitó.
+    // Minden elem-hely: kis kép (vagy típus-piktogram) + státuszgomb. A fő elem (★) az
+    // első; több elemnél a lenyitó gomb fölött "+N" jelzi a többit.
+    const sl = issueSlots(it, s);
+    const ST_IC = { megvan:"✓", hianyzik:"✕", nemkell:"–" };
+    const slotHtml = sl.shown.map(({t,c,label,isMain})=>{
+      const cdb=(c.db==null?1:c.db);
+      const showCnt = c.status==="megvan" && cdb>1;
+      const title = `${label}${c.status?": "+MLAB[c.status]:": jelöletlen"}${showCnt?" · "+cdb+" db":""}${isMain?" (fő elem)":""}`;
+      const img = c.kep_url
+        ? `<img class="sl-img" src="${esc(thumbSrc(c.kep_url))}" data-orig="${esc(c.kep_url)}" alt="" width="28" height="28" loading="lazy" decoding="async">`
+        : "";
+      return `<div class="sl-slot"><div class="sl-thumb${c.kep_url?" photo":""}${isMain?" main":""}">${typeIcon(t)}${img}</div>
+        <button class="mark sl-btn${c.status?" m-"+c.status:""}" data-n="${it.n}" data-t="${esc(t)}" data-cid="${c.id||""}" ${future?"disabled":""}
+          title="${esc(title)}" aria-label="${esc(label)}${c.status?": "+MLAB[c.status]:": jelöletlen"}">
+          <i class="sl-ic">${c.status?ST_IC[c.status]:"·"}</i><span class="sl-nm">${esc(label)}</span>${showCnt?`<b class="sl-cnt">${cdb}</b>`:""}</button></div>`;
     }).join("");
     const open = state.openIssue===it.n;
     // A panel a Számon TÉNYLEGESEN meglévő komponens-PÉLDÁNYOKAT listázza (nem a
-    // deklarált típusokat) — egy típusból több példány is saját kártyát kap, a
-    // Megnevezésével (vagy "Típus #N" eséssel, ha nincs kitöltve és 1-nél több van).
-    const flat = s.components.flatMap(t=>compsOfType(it,t).map(c=>({t,c})));
-    const typeCounts={}; flat.forEach(({t})=>{ typeCounts[t]=(typeCounts[t]||0)+1; });
-    const typeSeen={};
-    const panel = open ? `<div class="imgpanel">` + flat.map(({t,c},ci)=>{
+    // deklarált típusokat) — a fő elem (★) az első; a komponens-kód a régi
+    // (típus-sorrendi) pozícióból számolódik, hogy a fő elem előre vétele ne változtassa.
+    const panel = open ? `<div class="imgpanel">` + sl.all.map(({t,c,label,isMain,legacyIdx})=>{
         const cdb=(c.db==null?1:c.db);
-        typeSeen[t]=(typeSeen[t]||0)+1;
-        const label = c.megnevezes ? esc(c.megnevezes) : (typeCounts[t]>1 ? `${COMP_TYPES[t]||t} #${typeSeen[t]}` : (COMP_TYPES[t]||t));
-        const img=c.kep_url?`<img src="${esc(c.kep_url)}" alt="${COMP_TYPES[t]||t}">`:`nincs adat`;
+        const img=c.kep_url?`<img src="${esc(c.kep_url)}" alt="${esc(label)}">`:`nincs adat`;
         // Magazin/Könyv szinte mindig álló (portré) borító — ezeknél a doboz
         // magasabb/keskenyebb, hogy a teljes borító (cím, kiadói logó is)
         // beleférjen levágás nélkül. A többi típusnál a doboz alakja marad.
@@ -236,29 +233,28 @@ export function renderList(){
           <button class="pstepbtn" data-step="-" data-n="${it.n}" data-cid="${c.id}" aria-label="Kevesebb">−</button>
           <span class="pcount">${cdb} db</span>
           <button class="pstepbtn" data-step="+" data-n="${it.n}" data-cid="${c.id}" aria-label="Több">+</button></div>` : "";
-        // Ugyanaz a .mark gomb/logika, mint a kompakt sorban — itt PÉLDÁNYONKÉNT
-        // külön, mert a kompakt gomb 2+ példánynál a panelt nyitja (nem ciklizál).
+        // Ugyanaz a .mark gomb/logika, mint a kompakt sorban — itt PÉLDÁNYONKÉNT.
         const statusBtn = !future ? `<button class="mark block${c.status?" m-"+c.status:""}" data-n="${it.n}" data-cid="${c.id}" aria-label="Státusz">
           <span class="mlab">${c.status?MLAB[c.status]:"jelöletlen"}</span></button>` : "";
         return `<div class="imgcard"><div class="${boxClass}">${img}</div>
-          <div class="imgcap"><div class="cn">${label}</div>
-          <div class="cc">${scode}-${pad(it.n,4)}-${pad(ci+1,2)}</div></div>${pstep}${statusBtn}
+          <div class="imgcap"><div class="cn">${isMain?'<span class="mainstar" title="Fő elem">★</span> ':""}${esc(label)}</div>
+          <div class="cc">${scode}-${pad(it.n,4)}-${pad(legacyIdx,2)}</div></div>${pstep}${statusBtn}
           ${c.id?imageControlsHtml("component",c,c.id):""}</div>`;
       }).join("") + `</div>
       <div class="panelmoney">
         <div class="pmrow"><span class="pmk">eredeti ár</span><span class="pmv">${it.eredeti_ar!=null?fmtFt(it.eredeti_ar):"nem ismert"}</span></div>
         <div class="pmrow"><span class="pmk">fizetve</span><span class="pmv">${it.fizetett_ar!=null?fmtFt(it.fizetett_ar):"nem ismert"}</span><button class="pmedit" data-mydata="${it.n}" title="Saját adatlap (státusz, darabszám, jegyzet, ár)">✎</button></div>
       </div>` : "";
-    return `<div class="issue${istate?" i-"+istate:""}"><div class="ihead">
-      <div class="num">#${it.n}${it.changed?`<button class="chgbtn onnum" data-changeissue="${it.n}" title="Mi változott?">!</button>`:""}</div>
+    return `<div class="issue${istate?" i-"+istate:""}"><div class="ihead2">
       <div class="rmain">
-        <div class="ititle ${it.name?"":"empty"}">${esc(it.name||"még nincs cím")}</div>
+        <div class="t1"><div class="num">#${it.n}${it.changed?`<button class="chgbtn onnum" data-changeissue="${it.n}" title="Mi változott?">!</button>`:""}</div>
+          <div class="ititle ${it.name?"":"empty"}">${esc(it.name||"még nincs cím")}</div></div>
         <div class="imeta">${dateHtml}${dbTag}<span class="cid">${scode}-${pad(it.n,4)}</span></div>
         ${moneyBlock}
       </div>
-      <div class="marks">${marks}
-        <button class="expander" data-exp="${it.n}" aria-expanded="${open}" aria-label="Képek">${CHEV}${hasPendingImg?'<span class="chgdot img" title="Függő képjavaslat">📷</span>':""}</button>
-      </div>
+      <div class="sl-slots">${slotHtml}</div>
+      <div class="sl-chev">${sl.extra>0?`<span class="sl-more" title="${sl.extra} további elem — nyisd le">+${sl.extra}</span>`:""}
+        <button class="expander" data-exp="${it.n}" aria-expanded="${open}" aria-label="Elemek">${CHEV}${hasPendingImg?'<span class="chgdot img" title="Függő képjavaslat">📷</span>':""}</button></div>
     </div>${panel}</div>`;
   }).join("");
 }

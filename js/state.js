@@ -80,6 +80,48 @@ export const compsOfType = (it,t) => (it.comps && it.comps[t]) || [];
 export const allComps = it => Object.values(it.comps||{}).flat();
 export const findCompById = (it,id) => allComps(it).find(c=>c.id===id) || null;
 
+// ---- Szám-sor elem-helyei (1. kör / A) -----------------------------------
+// Egy Szám ÖSSZES komponens-példánya (típus-sorrendben: előbb a sorozat
+// deklarált típusai a listájuk sorrendjében, utána az esetleges egyéb
+// típusok ABC szerint; típuson belül a létrehozás sorrendje). A visszatérési
+// elem {t: típus, c: komponens, legacyIdx: 1-től, a régi (típus-sorrendi)
+// pozíció — a komponens-kód (pl. 012-0001-02) ebből számolódik, hogy a fő elem
+// előre vétele ne változtassa meg).
+export function orderedComps(it, s){
+  const declared = (s && s.components) || [];
+  const extra = Object.keys((it && it.comps) || {}).filter(t=>!declared.includes(t)).sort();
+  const out = [];
+  declared.concat(extra).forEach(t=>{ compsOfType(it,t).forEach(c=>out.push({t, c, legacyIdx: out.length+1})); });
+  return out;
+}
+
+// A FŐ ELEM (★): a komponensen jelölt (is_main), ennek hiányában a tartalék
+// szabály — van magazin: az első magazin; nincs: az első könyv; az sincs: az
+// első komponens (a fenti sorrend szerint). Egy Számon legfeljebb egy.
+export function mainEntry(pairs){
+  if(!pairs.length) return null;
+  return pairs.find(p=>p.c && p.c.is_main) || pairs.find(p=>p.t==="magazin") || pairs.find(p=>p.t==="konyv") || pairs[0];
+}
+
+export const typeLabel = t => COMP_TYPES[t] || listName("komponens", t) || t;
+
+// A sor elem-helyei: a fő elem az első, utána a többi a fenti sorrendben;
+// legfeljebb `max` látszik, a többit a `extra` számolja ("+N"). A címke:
+// megnevezés, különben a típus neve (több azonos típusnál "Típus #N").
+export function issueSlots(it, s, max = 3){
+  const pairs = orderedComps(it, s);
+  const main = mainEntry(pairs);
+  const counts = {}, seen = {};
+  pairs.forEach(p=>{ counts[p.t] = (counts[p.t]||0) + 1; });
+  const withLabel = pairs.map(p=>{
+    seen[p.t] = (seen[p.t]||0) + 1;
+    const nm = p.c && p.c.megnevezes ? String(p.c.megnevezes) : null;
+    return { ...p, isMain: p === main, label: nm || (counts[p.t] > 1 ? `${typeLabel(p.t)} #${seen[p.t]}` : typeLabel(p.t)) };
+  });
+  const sorted = main ? [withLabel.find(p=>p.isMain)].concat(withLabel.filter(p=>!p.isMain)) : withLabel;
+  return { all: sorted, shown: sorted.slice(0, max), extra: Math.max(0, sorted.length - max) };
+}
+
 // "Legrosszabb eset nyer": egy típus (vagy típusok) összes példánya közül az
 // összesített állapot — hiányzik a legrosszabb, utána jelöletlen, utána nem
 // kell, a legjobb a megvan. Egyetlen példánynál ez pontosan a példány saját

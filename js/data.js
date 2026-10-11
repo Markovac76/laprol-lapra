@@ -63,7 +63,7 @@ export async function loadData(){
   // nem felülírás. A típuson belüli sorrend created_at szerint stabil.
   c.data.forEach(r=>{ const it=byI[r.issue_id]; if(!it) return;
     const my=myStatus[r.id]||{status:null,db:1,jegyzet:null};
-    const comp={id:r.id,status:my.status,azonosito:r.azonosito,azonosito_tipus:r.azonosito_tipus,megnevezes:r.megnevezes||null,note:my.jegyzet,kep_url:r.kep_url,db:my.db,
+    const comp={id:r.id,tipus:r.tipus,is_main:!!r.is_main,status:my.status,azonosito:r.azonosito,azonosito_tipus:r.azonosito_tipus,megnevezes:r.megnevezes||null,note:my.jegyzet,kep_url:r.kep_url,db:my.db,
       created_at:r.created_at,
       version:r.version||1,changed:(r.version||1)>seenOf("component",r.id),
       upload_enabled:!!r.upload_enabled, pending:pendingByComp[r.id]||null};
