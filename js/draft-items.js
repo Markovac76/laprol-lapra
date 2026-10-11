@@ -123,8 +123,16 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
             : ""}
         </div>`;
       }).join("");
-      return blocks + `<button type="button" class="btn ghost" data-addcomp="${esc(t)}">+ Még egy ${esc(typeLabel(t))} hozzáadása</button>`;
+      return blocks;
     }).join("");
+    // Más típusú elem hozzáadása: az ÖSSZES komponens-típus a Listákból (nem csak a sorozat
+    // sablonjában szereplők). Az elem csak EZEN a Számon létezik: NEM kerül a sorozat sablonjába.
+    const allTypes = (state.LISTS.komponens||[]).map(o=>o.ertek);
+    const addOpts = Array.from(new Set([...components, ...allTypes]));
+    const addRow = `<div class="addcomprow">
+      <select id="di-addtype">${addOpts.map(t=>`<option value="${esc(t)}">${esc(typeLabel(t))}</option>`).join("")}</select>
+      <button type="button" class="btn ghost" id="di-addcomp">+ Elem hozzáadása</button>
+      <div class="unote">Csak ehhez a Számhoz kerül — a sorozat sablonját nem változtatja.</div></div>`;
 
     openModal(`<h2>${existing?"Szám szerkesztése (draft)":"Új szám (draft)"}</h2>
       <p class="msub">Munkaanyag — publikálásig senki más nem látja.</p>
@@ -135,6 +143,7 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
       <div class="field"><label>Cím</label><input id="di-name" value="${esc(master.cim||"")}"></div>
       <div class="field"><label>Eredeti ár (Ft)</label><input id="di-eredeti" type="number" value="${master.eredeti_ar??""}"></div>
       ${compBlocks}
+      ${addRow}
       ${existing&&existing.source_issue_id?`<label class="ckrow" style="margin-top:10px"><input type="checkbox" id="di-deleted" ${master.deleted?"checked":""}> Ezt a Számot törlöm a sorozatból (publikáláskor)</label>`:""}
       <div class="modrow"><button class="btn ghost" id="di-back">Vissza</button><button class="btn" id="di-save">Mentés</button></div>
       ${existing?`<div class="modrow"><button class="btn danger" id="di-del">${
@@ -144,9 +153,15 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
 
     document.getElementById("di-back").onclick=()=>onDone();
 
-    document.querySelectorAll("[data-addcomp]").forEach(b=>{
-      b.onclick=()=>{ syncFromDom(); comps.push({tipus:b.dataset.addcomp, azonosito_tipus:null, azonosito:"", megnevezes:"", _tmpKey:"tmp"+(tmpSeq++)}); draw(); };
-    });
+    document.getElementById("di-addcomp").onclick=()=>{
+      syncFromDom();
+      const t = document.getElementById("di-addtype").value;
+      // alapértelmezett azonosító-típus: a sablon eleméé, ennek hiányában a típusleíráson (component_type_defs)
+      const te = (Array.isArray(template)?template:[]).find(e=>e.tipus===t);
+      const def = (te && te.default_azonosito_tipus) || ((state.TYPEDEFS||{})[t]||{}).default_azonosito_tipus || null;
+      comps.push({tipus:t, azonosito_tipus:def, azonosito:"", megnevezes:(te&&te.default_megnevezes)||"", _tmpKey:"tmp"+(tmpSeq++)});
+      draw();
+    };
     document.querySelectorAll("[data-removecomp]").forEach(b=>{
       b.onclick=guarded(async ()=>{
         syncFromDom();
@@ -179,9 +194,7 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
           draftIssueId=newIssueId; savedIssueId=newIssueId;
         }
 
-        const newComponents = components.slice();
         for(const c of comps){
-          if(!newComponents.includes(c.tipus)) newComponents.push(c.tipus);
           const cpayload={ tipus:c.tipus, azonosito_tipus:(c.azonosito_tipus||"").trim()||null, azonosito:(c.azonosito||"").trim()||null, megnevezes:(c.megnevezes||"").trim()||null };
           if(c.id){ const {error}=await supabase.from("draft_components").update(cpayload).eq("id",c.id); if(error) throw error; }
           else {
@@ -202,13 +215,8 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
           const {error:e2}=await supabase.from("draft_components").update({is_main:true}).eq("id",mc.id);
           if(e2) throw e2;
         }
-        // Ha egy átsorolás/új példány olyan típust hozott be, ami még nincs a
-        // sorozat komponens-listáján, azt fel kell venni oda is — enélkül a
-        // publikálás után az élő felület sehol nem jelenítené meg.
-        if(newComponents.length!==components.length){
-          const {error}=await supabase.from("draft_series").update({components:newComponents}).eq("id",draftSeriesId);
-          if(error) throw error;
-        }
+        // (A sorozat sablonjában nem szereplő típus csak ennek a Számnak a komponense marad:
+        // a sorozat komponens-listájára / sablonjába NEM kerül.)
       }catch(e){ err(e); return; }
       onDone();
     });

@@ -1,7 +1,7 @@
 /* ============================================================
    Megjelenítés: fülek, hero, szűrők, lista, tapadó fejléc.
    ============================================================ */
-import { state, S, COMP_TYPES, isFutureDate, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus, issueSlots } from "./state.js";
+import { state, S, COMP_TYPES, isFutureDate, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus, issueSlots, typeLabel } from "./state.js";
 import { thumbUrl, typeIcon } from "./thumb.js";
 import { stats } from "./data.js";
 import { showSeriesChangePopup, showIssueChangePopup, showCollectedChanges } from "./changes.js";
@@ -49,8 +49,8 @@ export function renderTabs(){
 
 export function renderHero(){
   const s=S(), st=stats(state.activeIdx);
-  const bars=s.components.map(t=>{ const p=st.perType[t], pct=p.total?Math.round(p.owned/p.total*100):0;
-    return `<div class="prog"><div class="lab"><span>${COMP_TYPES[t]||t}</span><b>${p.owned}/${p.total} · ${pct}%</b></div><div class="bar"><i style="width:${pct}%"></i></div></div>`; }).join("");
+  const bars=Object.keys(st.perType).map(t=>{ const p=st.perType[t], pct=p.total?Math.round(p.owned/p.total*100):0;
+    return `<div class="prog"><div class="lab"><span>${esc(typeLabel(t))}</span><b>${p.owned}/${p.total} · ${pct}%</b></div><div class="bar"><i style="width:${pct}%"></i></div></div>`; }).join("");
   const bottom=st.next
     ? `<div class="stat wide"><div class="k">Következő megjelenés</div><div class="v" style="font-size:14px">${fmtDate(st.next.date)}</div><div class="sub">#${st.next.n} · ${esc(st.next.name||"még nincs cím")}</div></div>`
     : `<div class="stat wide"><div class="k">Beszerzendő szám</div><div class="v">${st.beszerzendo} db</div><div class="sub">hiányzó vagy még jelöletlen</div></div>`;
@@ -91,7 +91,7 @@ export function renderHero(){
     ${bars}
     <div class="stats">
       ${costBox}
-      <div class="stat"><div class="k">Komponensek/szám</div><div class="v">${s.components.map(t=>COMP_TYPES[t]||t).join(" + ")||"—"}</div></div>
+      <div class="stat"><div class="k">Komponensek/szám</div><div class="v">${s.components.map(t=>esc(typeLabel(t))).join(" + ")||"—"}</div></div>
       ${bottom}
     </div>`;
   const cb=document.getElementById("costToggle");

@@ -84,7 +84,13 @@ export async function loadData(){
 
 export function stats(si){
   const s=state.SERIES[si]; const activeItems=s.items.filter(it=>!it.deleted);
-  const perType={}; s.components.forEach(t=>perType[t]={owned:0,total:activeItems.length});
+  // Haladásjelzők típusonként: nevező = azoknak a Számoknak a száma, amelyeken van legalább egy
+  // ilyen típusú komponens; a deklarált típusok mellett a Számokon külön hozzáadott típusok is
+  // (pl. egy Limited Edition kártya) saját jelzőt kapnak. A deklarált típusoknál ez ma az összes Szám.
+  const extraTypes = new Set();
+  activeItems.forEach(it=>Object.keys(it.comps||{}).forEach(t=>{ if(!s.components.includes(t) && compsOfType(it,t).length) extraTypes.add(t); }));
+  const progTypes = s.components.concat([...extraTypes].sort());
+  const perType={}; progTypes.forEach(t=>perType[t]={owned:0,total:0});
   // Az összeg mindkét nézete EGY közös számításból jön (totals.js): azok a Számok,
   // amelyeken ≥1 komponens megvan; szorzó a beszerzési mennyiség.
   const tot=computeTotals(activeItems);
@@ -93,8 +99,8 @@ export function stats(si){
     const future=isFutureDate(it.date);
     if(future) hasFuture=true;
     // Típusonkénti haladás: egy típus akkor "owned" egy Számon, ha MINDEN példánya megvan.
-    for(const t of s.components){ const inst=compsOfType(it,t);
-      if(inst.length && inst.every(c=>c.status==="megvan")) perType[t].owned++; }
+    for(const t of progTypes){ const inst=compsOfType(it,t);
+      if(inst.length){ perType[t].total++; if(inst.every(c=>c.status==="megvan")) perType[t].owned++; } }
     // Beszerzendő: LAPSZÁM-szinten — ami megjelent, és se nem kész (zöld), se nem kihúzott (szürke)
     if(!future){ const istate=issueState(it,s); if(istate!=="megvan" && istate!=="nemkell") beszerzendo++; }
     const anyOpen=s.components.some(t=>compsOfType(it,t).some(c=>c.status!=="megvan"&&c.status!=="nemkell"));
