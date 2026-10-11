@@ -249,7 +249,7 @@ const J = x => JSON.stringify(x);
         J(nc));
 
       // P6: a publikálás megtagadja, ha egy Számon minden komponens törölve lenne
-      const D7 = await newDraft(["konyv"], [T("konyv", { main: true })], "PRÓBA törlés-hiba");
+      const D7 = await newDraft(["konyv"], [T("konyv", { main: true })], "PRÓBA hiba");
       await upload(D7, [newItem(1)]);
       await q(`select public.mark_draft_ready($1)`, [D7]);
       await q(`update public.draft_components set deleted=true, is_main=false where draft_issue_id=(select id from public.draft_issues where draft_series_id=$1)`, [D7]);
