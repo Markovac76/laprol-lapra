@@ -1,4 +1,4 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v12)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v13)
 
 **Frissítve:** 2026. október 10. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
@@ -178,7 +178,7 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 - **Lapozás (v1.22):** a `fetchAllRows` egyedi kulcs szerint is rendez; a `components` tábla már 1000 sor fölött van (1 025).
 - **Összeg-kártya (v1.23):** mindkét nézet azonos Számokat (≥1 komponens megvan) és a beszerzési mennyiséget használja; az ár a Szám (magazin) ára, komponens-szintű ár nem kell; a kártyán a Szám-darabszám látszik. Közös számítás: `js/totals.js` (tesztelve). A tulajdonosi fiókban csak a Lego Star Wars eredeti összege változott (10 495 → 78 961 Ft).
 - **22. lépés / 1. kör (v1.24):** összecsukott Szám-sor (legfeljebb 3 elem egymás alatt, kis kép + státuszgomb, „+N"); **fő elem (★)** a komponensen (`is_main`, csendes váltás, nem törölhető); „N Szám" a függő listákon + publikálás előtti összefoglaló (`draft-diff.js`); sorozat-lista keresés/rendezés közös komponenssel (`series-list.js`); stabil lapozás; `scripts/compare-before-after.js` (színek / haladás / összeg, minden sorozatra).
-- **A 2. kör SQL-csomagja (komponens-sablon + típusleírás + figyelmeztetések, más típusú elem, komponens-törlés)** megírva és visszagörgetve 28/28 próbával, de **még nincs élesítve** — a tulajdonos külön, függvényenkénti átnézésre vár (`laprol-lapra-komponens-sablon.sql`, `-tipus-hozzaadas.sql`, `-komponens-torles.sql`).
+- **22. lépés / 2. kör (v1.25):** komponens-sablon (sorrend, fő elem, kötelező, azonosító-szabály, alap azonosító-típus, számít a színnél) + típusleírás; sablon szerinti színezés (538 Szám, 0 eltérés); más típusú elem egy Számhoz, külön haladásjelzővel; „Kész” figyelmeztetések (ajánlott / duplikált azonosító); komponens valódi törlése (soft-delete, csendes, a fő elem nem törölhető); törölt komponens egyetlen szűrési ponton (`model.js`). SQL: `komponens-sablon`, `tipus-hozzaadas`, `komponens-torles` — ÉLESÍTVE.
 
 ---
 
@@ -205,6 +205,8 @@ A hibajavítási kör 11. pontja (sablon-alapú tömeges feltöltés) a javaslat
 13. **Az Excel-sablon a fő elemet nem viszi / nem módosítja** — új sornál tartalék szabály; a kijelölés a draft-szerkesztőben.
 14. **Új sorozat sablonja: DB-szintű kikényszerítés későbbre** — a kliens kényszeríti ki, üres sablonnál az alapértelmezett lép be.
 15. **A régi szerkesztő kompatibilitási ága** — a sablon-szerkesztő megjelenése után kivehető (+ változásnapló).
+16. **Kézi törölt-jelölés kockázata** — kézi SQL előtt ellenőrizni, hogy nincs-e függő szerkesztési draft; a visszaállítás legyen kifejezett művelet.
+17. **Kompatibilitási ág kivétele** — az SQL jóváhagyásra vár.
 
 ---
 
@@ -220,7 +222,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.24).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.25).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.
