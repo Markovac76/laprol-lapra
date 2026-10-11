@@ -40,7 +40,11 @@ export const HELP_CONTENT = {
 
     { id:"jeloles", title:"Jelölés és státuszok", open:false, items:[
       { q:"Hogyan jelölöm meg, hogy megvan egy szám?",
-        a:"<p>Koppints a szám sorában a komponens ikonjára (pl. a magazin ikonjára). Az első koppintás <b>megvan</b>-ra állítja. További koppintásokra körbeforog: megvan → hiány → nem kell → megvan… Jelöletlenre nem tér vissza magától koppintással — ehhez nyisd le a sort, és a fizetve-sor melletti <b>✎ Saját adatlap</b> gombon a „jelöletlen” választógombbal állíthatod vissza (ez mindenkinek elérhető, nem staff-funkció).</p>" },
+        a:"<p>Koppints a szám sorában az elem gombjára (kis kép és mellette a státusz-gomb az elem nevével, pl. „Magazin”). Az első koppintás <b>megvan</b>-ra állítja. További koppintásokra körbeforog: megvan → hiány → nem kell → megvan… Jelöletlenre nem tér vissza magától koppintással — ehhez nyisd le a sort, és a fizetve-sor melletti <b>✎ Saját adatlap</b> gombon a „jelöletlen” választógombbal állíthatod vissza (ez mindenkinek elérhető, nem staff-funkció).</p>" },
+      { q:"Mit látok egy Szám sorában?",
+        a:"<p>Balról jobbra: a <b>sorszám</b> és a cím, alatta a dátum és a kód, az árak; középen a Szám <b>elemei</b>, legfeljebb három, egymás alatt. Mindegyiknél egy <b>kis kép</b> (ha nincs feltöltött kép, a típus piktogramja) és mellette a <b>státusz-gomb</b> az elem nevével. A jobb szélen a lenyitó nyíl: lenyitva minden elem látszik, nagyobb képpel, darabszám-állítóval és státusz-gombbal.</p><p>Ha háromnál több elem van a Számon, a lenyitó nyíl fölött <b>+N</b> jelzi, hány további van. A sor színe és a gombok működése változatlan.</p>" },
+      { q:"Mi az a fő elem (★)?",
+        a:"<p>Egy Szám elemei közül az, amelyik a sorban mindig az <b>első</b> helyen áll, kis <b>★</b> jelöléssel — általában a magazin, ahol nincs magazin, a könyv. Karbantartók a draft-szerkesztőben állíthatják át („★ Fő elem” választó; mindig pontosan egy van). A fő elem <b>nem törölhető</b>: előbb másikat kell kijelölni. A fő elem csak a sorrendet és a ★ jelet adja — a Szám színét, a haladásjelzőket és az összegeket nem befolyásolja.</p>" },
       { q:"Mit jelentenek a szám színei?",
         a:"<ul><li><b>Zöld</b> — kész, megvan a lényeg</li><li><b>Piros</b> — hiányzik, kell</li><li><b>Sárga</b> — részleges (pl. megvan a magazin, de a hozzá tartozó modell/melléklet még hiányzik)</li><li><b>Szürke</b> — tudatosan „nem kell”-re jelölve</li><li><b>Semleges</b> — még jelöletlen, vagy a szám még nem is jelent meg</li></ul>" },
       { q:"Hogyan állítom be, ha egy komponensből több példányom van?",
@@ -65,6 +69,8 @@ export const HELP_CONTENT = {
     { id:"kereses", title:"Keresés és szűrés", open:false, items:[
       { q:"Hogyan keresek egy adott számra?",
         a:"<p>A keresőmezőbe írd be a lapszámot (pontos találat) vagy a cím egy részletét (részleges egyezés is működik).</p>" },
+      { q:"Hogyan keresek és rendezek a sorozatok között?",
+        a:"<p>A <b>📚 Sorozataim</b> ablakban és a Karbantartás <b>Aktív sorozatok</b> fülén van egy keresőmező és egy rendező. A keresés névre megy, <b>kis- és nagybetű-, valamint ékezetfüggetlenül</b> (a „forma” megtalálja a „Formula” sorozatot, az „orjarat” az „Őrjárat”-ot). Rendezés: <b>ABC szerint</b> (magyar sorrend), <b>legutóbb módosított</b> (az a legutóbbi publikálás, ami a sorozatot ténylegesen érintette; ha még sosem módosult, a létrehozás ideje), vagy a <b>Számok száma</b> szerint. A választott rendezést megjegyzi.</p>" },
       { q:"Mit jelentenek a szűrő-gombok?",
         a:"<p><b>Mind</b> — minden szám; <b>Megvan / Hiányzik / Nem kell</b> — csak azok a számok, amiknek legalább egy komponense az adott státuszban van; <b>Várható</b> — csak a még meg nem jelent, jövőbeli számok; a mai dátumú szám már megjelentnek számít (ez a gomb csak akkor látszik, ha van ilyen a sorozatban).</p>" },
     ]},
@@ -138,6 +144,8 @@ export const HELP_CONTENT = {
     ]},
 
     { id:"sorozat-szerk", title:"Sorozat szerkesztése", open:false, items:[
+      { q:"Mit mutat a publikálás előtti összefoglaló és a „N Szám” a listán?",
+        a:"<p>A <b>Munka sorozatok</b> listán minden munkaanyag mellett látszik, hány (nem törölt) Számot tartalmaz; szerkesztésnél az élő szám is („41 Szám, élőben: 40”). A <b>Publikálás</b> gomb megerősítő ablakában rövid összefoglaló áll: „X új, Y módosult, Z törölt Szám”; ahol csak a lapszám változik (átszámozás), azt külön jelzi, mert az csendes (nincs felkiáltójel). Az összefoglaló ugyanazokat a szabályokat követi, mint a tényleges publikálás.</p>" },
       { q:"Hogyan indítok szerkesztést egy már élő sorozaton?",
         a:"<p>A Karbantartás Aktív sorozatok fülén, a sorozat sorában koppints a <b>„Szerkesztés indítása”</b> gombra. Ez azonnal, egy lépésben létrehoz egy másolatot (draftot) az összes (nem törölt) számáról/komponenséről, és átkerül a Munka sorozatok fülre, rád claim-elve. Egy sorozathoz egyszerre egyetlen szerkesztési munkaanyag tartozhat — ha már van, a gomb ezt jelzi —, és csak aktív (publikált) sorozaton indítható.</p>" },
       { q:"Mi az a draft, és ki látja?",

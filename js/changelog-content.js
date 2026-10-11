@@ -7,6 +7,12 @@
    ============================================================ */
 export const CHANGELOG = [
   { date:"2026-10-11",
+    text:"Átrendeződött a Szám sora: az elemek (magazin, könyv, figura, lego…) most egymás alatt, legfeljebb háromig látszanak, mindegyik mellett egy kis képpel (ha nincs kép, a típus jelével) és a státusz-gombbal. Az első elem a „fő elem” (kis ★), ha háromnál több van, a lenyitó nyíl fölött „+N” jelzi a többit. A kis képek a feltöltött képek kicsinyített változatából töltődnek, így gyorsabban jönnek. A sor színe, a haladásjelzők és az összegek nem változtak."
+  },
+  { date:"2026-10-11",
+    text:"A sorozat-listákban (📚 Sorozataim, és a Karbantartás Aktív sorozatok fülén) keresni lehet névre — kis- és nagybetűtől, ékezettől függetlenül —, és rendezni ABC szerint, legutóbb módosított szerint vagy a Számok száma szerint; a választást megjegyzi. Karbantartóknak: a munkaanyag-listákon látszik a Számok száma, a publikálás előtt pedig egy összefoglaló, mi változik (új / módosult / törölt Szám)."
+  },
+  { date:"2026-10-11",
     text:"Az „Összeg” kártya egységesebb lett: mindkét nézet („Eredeti ár alapján” és „Fizetett ár alapján”) ugyanazokat a Számokat adja össze — azokat, amikből legalább egy elem megvan —, és ugyanazzal a beszerzési mennyiséggel szoroz, így a kettő összevethető. Az összeg mellett látod, hány Szám alapján számolt (pl. „78 961 Ft · 39 Szám”). Az ár a Szám (a magazin) ára; a mellékletnek nincs külön ára. Ahol eddig csak a teljesen meglévő (zöld) Számok kerültek az eredeti ár szerinti összegbe — például a Lego Star Warsnál —, ott az összeg most a megvett Számok teljes eredeti árát mutatja."
   },
   { date:"2026-10-11",
