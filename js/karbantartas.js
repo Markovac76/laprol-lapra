@@ -13,8 +13,11 @@ import { reload } from "./data.js";
 import { isStaff, isOwnerRole } from "./permissions.js";
 import { fetchDraftItems, renderDraftItemsList, draftItemForm } from "./draft-items.js";
 import { downloadDraftTemplate, pickDraftExcelFile, confirmDraftUpload } from "./draft-excel.js";
+import { diffDraft, diffSummaryText } from "./draft-diff.js";
 
 let currentTab = "aktiv";
+// Szám-darabszámok a Munka sorozatok listához (karbantartasForm tölti): {draft: {draftId: N}, live: {seriesId: M}}
+let kbCounts = { draft:{}, live:{} };
 
 function nameOf(members, uid){
   if(!uid) return "—";
@@ -24,7 +27,7 @@ function nameOf(members, uid){
 
 export async function karbantartasForm(){
   openModal(`<h2>Karbantartás</h2><p class="msub">Betöltés…</p>`);
-  const [{data:series,error:se},{data:drafts,error:de},{data:memberSeries,error:mse},{data:members,error:mee}] = await Promise.all([
+  const [{data:series,error:se},{data:drafts,error:de},{data:memberSeries,error:mse},{data:members,error:mee},{data:dIssues,error:die},{data:lIssues,error:lie}] = await Promise.all([
     supabase.from("series").select("*").order("sort_order"),
     supabase.from("draft_series").select("*").order("created_at"),
     // member_series/members: MINDEN userre vonatkozik (nem csak a sajátodra)
@@ -32,8 +35,14 @@ export async function karbantartasForm(){
     // sajátod méretével.
     fetchAllRows(()=>supabase.from("member_series").select("series_id,is_selected"), ["user_id","series_id"]),
     fetchAllRows(()=>supabase.from("members").select("user_id,display_name"), "user_id"),
+    // Szám-darabszámok a függő listákhoz (C): a draftok nem törölt Számai és az élő nem törölt Számok.
+    fetchAllRows(()=>supabase.from("draft_issues").select("draft_series_id,deleted")),
+    fetchAllRows(()=>supabase.from("issues").select("series_id,is_deleted")),
   ]);
-  if(se||de||mse||mee){ err(se||de||mse||mee); return; }
+  if(se||de||mse||mee||die||lie){ err(se||de||mse||mee||die||lie); return; }
+  kbCounts = { draft:{}, live:{} };
+  (dIssues||[]).forEach(r=>{ if(!r.deleted) kbCounts.draft[r.draft_series_id]=(kbCounts.draft[r.draft_series_id]||0)+1; });
+  (lIssues||[]).forEach(r=>{ if(!r.is_deleted) kbCounts.live[r.series_id]=(kbCounts.live[r.series_id]||0)+1; });
   renderMain(series||[], drafts||[], memberSeries||[], members||[]);
 }
 
@@ -93,6 +102,11 @@ function renderMunka(drafts, members){
     const rows=items.map(d=>{
       const typeLabel = d.pool_type==="new" ? `Új javaslat: ${esc(d.megnevezes)}` : `Szerkesztés: ${esc(d.megnevezes)}`;
       const who = `beküldte: ${esc(nameOf(members,d.submitted_by))} · ${fmtDate((d.created_at||"").slice(0,10))||""}`;
+      // Szám-darabszám: a draft nem törölt Számai; szerkesztési draftnál az élő szám is.
+      const nDraft = kbCounts.draft[d.id]||0;
+      const szamTxt = d.pool_type==="edit" && d.source_series_id
+        ? `${nDraft} Szám, élőben: ${kbCounts.live[d.source_series_id]||0}`
+        : `${nDraft} Szám`;
       let actions="";
       if(st==="incoming"){
         actions = `<button data-act="claim" data-id="${d.id}">Felveszem</button>`;
@@ -110,7 +124,7 @@ function renderMunka(drafts, members){
           actions += `<button data-act="returnedit" data-id="${d.id}">Visszaadás szerkesztésre</button>`;
         }
       }
-      return `<div class="userrow"><div class="uinfo"><div class="uname">${typeLabel}</div><div class="unote">${who}</div></div>
+      return `<div class="userrow"><div class="uinfo"><div class="uname">${typeLabel} <span class="sc-kiado">· ${szamTxt}</span></div><div class="unote">${who}</div></div>
         <div class="uactions">${actions}</div></div>`;
     }).join("") || `<p class="msub">Nincs elem.</p>`;
     return `<h4 class="poolgrp">${label} (${items.length})</h4>${rows}`;
@@ -285,14 +299,41 @@ async function deleteDraft(d){
 // tranzakcióban fut a szerveren (publish_draft_series), hogy félbeszakadás
 // (hálózati hiba, bezárt tab) ne hagyhasson inkonzisztens állapotot.
 async function publish(d){
-  const what = d.pool_type==="new" ? `az új „${d.megnevezes}” sorozatot` : `a(z) „${d.megnevezes}” szerkesztését`;
-  if(!confirm(`Publikálod ${what}? Azonnal élesbe kerül, és mindenkinek látszik, akit érint.`)) return;
+  const what = d.pool_type==="new" ? `az új „${esc(d.megnevezes)}” sorozatot` : `a(z) „${esc(d.megnevezes)}” szerkesztését`;
+  // Összefoglaló a publikálás előtt: mi változna (ugyanazok a szabályok, mint a
+  // publish_draft_series-ben — js/draft-diff.js). Ha az összefoglaló nem készíthető
+  // el, a publikálás ettől még elérhető (a szerver-oldali függvény a mérvadó).
+  openModal(`<h2>Publikálás</h2><p class="msub">Az összefoglaló készül…</p>`);
+  let summary = "";
   try{
-    const { error } = await supabase.rpc("publish_draft_series", { p_draft_id: d.id });
-    if(error) throw error;
-    await reload();
-  }catch(e){ showPublishError(d, e); return; }
-  await karbantartasForm();
+    const items = await fetchDraftItems(d.id);
+    let liveIssues=[], liveComps=[];
+    if(d.pool_type==="edit" && d.source_series_id){
+      const { data:li, error:lie } = await fetchAllRows(()=>supabase.from("issues").select("id,lapszam,cim,megjelenes,eredeti_ar,is_deleted").eq("series_id", d.source_series_id));
+      if(lie) throw lie;
+      liveIssues = li||[];
+      const ids = liveIssues.map(x=>x.id);
+      if(ids.length){
+        const { data:lc, error:lce } = await fetchAllRows(()=>supabase.from("components").select("id,issue_id,tipus,azonosito_tipus,azonosito,megnevezes").in("issue_id", ids));
+        if(lce) throw lce;
+        liveComps = lc||[];
+      }
+    }
+    summary = diffSummaryText(diffDraft(items, liveIssues, liveComps));
+  }catch(e){ summary = ""; }
+  openModal(`<h2>Publikálás</h2>
+    <p class="msub">Publikálod ${what}? Azonnal élesbe kerül, és mindenkinek látszik, akit érint.</p>
+    ${summary?`<div class="example" style="font-size:13px"><b>Változások:</b> ${esc(summary)}</div>`:`<p class="msub" style="color:#f0cd8a">Az összefoglaló most nem készíthető el — a publikálás ettől még elérhető.</p>`}
+    <div class="modrow"><button class="btn ghost" id="pub-cancel">Mégse</button><button class="btn" id="pub-ok">Publikálás</button></div>`);
+  document.getElementById("pub-cancel").onclick=()=>karbantartasForm();
+  document.getElementById("pub-ok").onclick=guarded(async ()=>{
+    try{
+      const { error } = await supabase.rpc("publish_draft_series", { p_draft_id: d.id });
+      if(error) throw error;
+      await reload();
+    }catch(e){ showPublishError(d, e); return; }
+    await karbantartasForm();
+  });
 }
 
 // Sikertelen publikálás után nem nyers hibaüzenet-ablak: az ok mellett a
