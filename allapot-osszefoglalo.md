@@ -204,9 +204,9 @@ A hibajavítási kör 11. pontja (sablon-alapú tömeges feltöltés) a javaslat
 12. **Gyors szerkesztés → Excel: komponens nélküli Szám csendes kihagyása** — jelzés kellene.
 13. **Az Excel-sablon a fő elemet nem viszi / nem módosítja** — új sornál tartalék szabály; a kijelölés a draft-szerkesztőben.
 14. **Új sorozat sablonja: DB-szintű kikényszerítés későbbre** — a kliens kényszeríti ki, üres sablonnál az alapértelmezett lép be.
-15. **A régi szerkesztő kompatibilitási ága** — a sablon-szerkesztő megjelenése után kivehető (+ változásnapló).
+15. **A régi szerkesztő kompatibilitási ága** — KÉSZ (lásd 17.).
 16. **Kézi törölt-jelölés kockázata** — kézi SQL előtt ellenőrizni, hogy nincs-e függő szerkesztési draft; a visszaállítás legyen kifejezett művelet.
-17. **Kompatibilitási ág kivétele** — az SQL jóváhagyásra vár.
+17. **Kompatibilitási ág kivétele** — KÉSZ: élesítve (a `sync_template_with_components` függvény megmaradt).
 
 ---
 

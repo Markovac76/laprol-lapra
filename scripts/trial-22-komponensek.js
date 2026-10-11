@@ -26,7 +26,8 @@ const { Client } = require("pg");
 const { DATABASE_URL } = require("../db.local.js");
 
 const PUBLISH = process.argv.includes("--publish");
-const FILES = ["laprol-lapra-fo-elem.sql", "laprol-lapra-komponens-sablon.sql", "laprol-lapra-tipus-hozzaadas.sql", "laprol-lapra-komponens-torles.sql"];
+const FILES = ["laprol-lapra-fo-elem.sql", "laprol-lapra-komponens-sablon.sql", "laprol-lapra-tipus-hozzaadas.sql", "laprol-lapra-komponens-torles.sql",
+               "laprol-lapra-kompatibilitas-kivetel.sql"];
 const rd = f => fs.readFileSync(path.join(__dirname, "..", f), "utf8");
 
 const FN = ["publish_draft_series(uuid)", "start_edit_draft(uuid)", "apply_draft_upload(uuid,jsonb)", "mark_draft_ready(uuid)",
