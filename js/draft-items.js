@@ -66,7 +66,8 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
   const newIssueId = existing ? null : crypto.randomUUID();
   // FŐ ELEM (★): egy Számon pontosan egy komponens. Kezdetben a jelölt (is_main), ennek
   // hiányában a tartalék szabály: magazin, könyv, első (megegyezik a szerver-oldalival).
-  const pickMainKey = list => {
+  const pickMainKey = list0 => {
+    const list = list0.filter(c=>!c.deleted);          // törölt komponens nem lehet fő elem
     const m = list.find(c=>c.is_main) || list.find(c=>c.tipus==="magazin") || list.find(c=>c.tipus==="konyv") || list[0];
     return m ? keyOf(m) : null;
   };
@@ -99,12 +100,20 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
     const slotTypes = Array.from(new Set([...components, ...comps.map(c=>c.tipus)]));
     const compBlocks = slotTypes.map(t=>{
       const list=byType[t]||[];
+      const activeInType = list.filter(x=>!x.deleted);
       const blocks=list.map((c,idx)=>{
         const k=keyOf(c);
+        if(c.deleted){
+          return `<div class="compedit compdeleted">
+            <h4><s>${esc(typeLabel(t))}${c.megnevezes?" — "+esc(c.megnevezes):""}</s> <span class="unote">(törölve)</span></h4>
+            <div class="unote">Publikáláskor eltűnik a Számról. A hozzá tartozó személyes jelölések megmaradnak, a törlés visszavonható.</div>
+            <button type="button" class="btn ghost" data-restorecomp="${k}">Törlés visszavonása</button>
+          </div>`;
+        }
         const canRetype = !!c.id;   // csak már mentett (élő párral vagy anélkül perzisztált) példány sorolható át
         const typeOpts = canRetype ? (state.LISTS.komponens||[]).map(o=>`<option value="${esc(o.ertek)}"${o.ertek===c.tipus?" selected":""}>${esc(o.nev)}</option>`).join("") : "";
         return `<div class="compedit">
-          <h4>${esc(typeLabel(t))}${list.length>1?` #${idx+1}`:""}</h4>
+          <h4>${esc(typeLabel(t))}${activeInType.length>1?` #${idx+1}`:""}</h4>
           ${canRetype?`<div class="field"><label>Típus (utólagos átsorolás)</label><select id="di-type-${k}">${typeOpts}</select></div>`:""}
           <div class="field"><label>Megnevezés (opcionális) <span style="color:var(--faint);font-weight:400">— ha üres, "${esc(typeLabel(t))}${list.length>1?" #N":""}" jelenik meg</span></label>
             <input id="di-name-${k}" value="${esc(c.megnevezes||"")}" placeholder="pl. Star Wars minifigura-csomag"></div>
@@ -112,15 +121,15 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
             <div class="field"><label>Azonosító típusa</label><select id="di-ct-${k}"><option value="">—</option>${opts("azonosito",c.azonosito_tipus)}</select></div>
             <div class="field"><label>Azonosító</label><input id="di-cid-${k}" value="${esc(c.azonosito||"")}"></div>
           </div>
-          ${comps.length>1
+          ${comps.filter(x=>!x.deleted).length>1
             ? `<label class="ckrow" style="margin-top:6px"><input type="radio" name="di-main" value="${esc(k)}" ${k===mainKey?"checked":""}> ★ Fő elem <span style="color:var(--faint);font-weight:400">— a sorban az első helyen áll</span></label>`
             : `<div class="unote" style="margin-top:6px">★ Ez a Szám egyetlen eleme, ezért ez a fő elem.</div>`}
-          ${list.length>1
+          ${comps.filter(x=>!x.deleted).length>1
             ? (k===mainKey
                 ? `<button type="button" class="btn ghost" disabled title="Ez a fő elem. Előbb jelölj ki másikat fő elemnek.">Ez a példány törlése</button>
                    <div class="unote">Ez a fő elem. Előbb jelölj ki másikat fő elemnek.</div>`
                 : `<button type="button" class="btn ghost" data-removecomp="${k}">Ez a példány törlése</button>`)
-            : ""}
+            : `<div class="unote">Ez a Szám egyetlen eleme — csak a Számot lehet törölni.</div>`}
         </div>`;
       }).join("");
       return blocks;
@@ -168,15 +177,35 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
         const k=b.dataset.removecomp, c=comps.find(x=>keyOf(x)===k);
         if(!c) return;
         if(k===mainKey){ alert("Ez a fő elem. Előbb jelölj ki másikat fő elemnek."); return; }
-        if(c.id){
-          const liveComp = c.source_component_id
-            ? "\n\nFIGYELEM: ez a példány az ÉLŐ sorozatban is létezik. A draftból való törlése az élő komponenst NEM törli — publikáláskor változatlanul megmarad (komponens törlése a sorozatból egyelőre nem támogatott)."
-            : "";
-          if(!confirm("Törlöd ezt a példányt a draftból?"+liveComp)) return;
-          try{ const {error}=await supabase.from("draft_components").delete().eq("id",c.id); if(error) throw error; }
+        if(comps.filter(x=>!x.deleted).length<=1){ alert("Egy Számnak mindig marad legalább egy komponense — csak a Számot lehet törölni."); return; }
+        if(c.id && c.source_component_id){
+          // Élő párral rendelkező komponens: TÖRÖLT-JELÖLÉS (publikáláskor lesz törölt az élő komponens);
+          // csendes, a személyes adatok megmaradnak, visszaállítható.
+          if(!confirm("Törlöd ezt a komponenst a Számról?\n\nPublikáláskor eltűnik a Számról (csendesen, felkiáltójel nélkül). A hozzá tartozó személyes jelölések megmaradnak, és a törlés a publikálásig visszavonható.")) return;
+          try{ const {error}=await supabase.from("draft_components").update({deleted:true, is_main:false}).eq("id",c.id); if(error) throw error; }
           catch(e){ err(e); return; }
+          c.deleted = true; c.is_main = false;
+        } else {
+          // Csak a draftban létező (még sosem publikált) komponens: egyszerűen elhagyjuk.
+          if(c.id){
+            if(!confirm("Törlöd ezt a komponenst a draftból?")) return;
+            try{ const {error}=await supabase.from("draft_components").delete().eq("id",c.id); if(error) throw error; }
+            catch(e){ err(e); return; }
+          }
+          comps = comps.filter(x=>x!==c);
         }
-        comps = comps.filter(x=>x!==c); draw();
+        draw();
+      });
+    });
+    document.querySelectorAll("[data-restorecomp]").forEach(b=>{
+      b.onclick=guarded(async ()=>{
+        syncFromDom();
+        const k=b.dataset.restorecomp, c=comps.find(x=>keyOf(x)===k);
+        if(!c || !c.id) return;
+        try{ const {error}=await supabase.from("draft_components").update({deleted:false}).eq("id",c.id); if(error) throw error; }
+        catch(e){ err(e); return; }
+        c.deleted = false;
+        draw();
       });
     });
 
@@ -207,7 +236,8 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
         }
         // Fő elem: pontosan egy. A sorrend számít (halasztott megszorítás, de a kérések külön
         // tranzakciók): előbb a többi lemondása, utána az új fő elem beállítása.
-        const mc = comps.find(x=>keyOf(x)===mainKey) || comps[0];
+        const active = comps.filter(x=>!x.deleted);
+        const mc = active.find(x=>keyOf(x)===mainKey) || active[0];
         if(mc && mc.id){
           const {error:e1}=await supabase.from("draft_components").update({is_main:false})
             .eq("draft_issue_id",draftIssueId).neq("id",mc.id).eq("is_main",true);
