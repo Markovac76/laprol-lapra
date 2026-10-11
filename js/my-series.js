@@ -8,14 +8,24 @@ import { state, esc, listName } from "./state.js";
 import { openModal, err, sheet, guarded } from "./modal.js";
 import { reload } from "./data.js";
 import { proposeSeriesForm } from "./series-proposal.js";
+import { controlsHtml, wireControls, filterSeries, sortSeries, loadSort, loadCounts, loadLastChanged } from "./series-list.js";
+
+// keresés + rendezés (közös komponens: series-list.js — ugyanaz, mint a Karbantartás Aktív fülén)
+let listQuery = "";
+let listSort = loadSort();
+let msMeta = { counts:{}, last:null };
 
 export async function mySeriesForm(){
+  listSort = loadSort();   // a közös (megjegyzett) rendezés — a Karbantartásban is állítható
   openModal(`<h2>Sorozataim</h2><p class="msub">Betöltés…</p>`);
   const [{data:series,error:se},{data:mine,error:me}] = await Promise.all([
-    supabase.from("series").select("id,megnevezes,megjelenites,kiado,lifecycle,force_delete_requested_at").order("sort_order"),
+    supabase.from("series").select("id,megnevezes,megjelenites,kiado,lifecycle,force_delete_requested_at,created_at").order("sort_order"),
     supabase.from("member_series").select("*").eq("user_id",state.myId),
   ]);
   if(se||me){ err(se||me); return; }
+  msMeta = { counts:{}, last:null };
+  try{ msMeta.counts = await loadCounts(); }catch(_){ /* a Számok száma szerinti rendezés nélkül is működik */ }
+  if(listSort==="modositva"){ try{ msMeta.last = await loadLastChanged(true); }catch(_){ msMeta.last = {}; } }
   render(series||[], mine||[]);
 }
 
@@ -23,7 +33,7 @@ function render(series, mine){
   const byId={}; mine.forEach(m=>byId[m.series_id]=m);
   // Publikálatlan sorozat csak akkor jelenik meg, ha valaha volt hozzá saját sorunk
   // (grandfather-hozzáférés) — brand new usernek egyáltalán nem választható.
-  const visible = series.filter(s=>s.lifecycle!=="unpublished" || !!byId[s.id]);
+  const visible = sortSeries(filterSeries(series.filter(s=>s.lifecycle!=="unpublished" || !!byId[s.id]), listQuery), listSort, msMeta);
   const rows = visible.map(s=>{
     const m=byId[s.id];
     const selected = !!(m && m.is_selected);
@@ -43,13 +53,22 @@ function render(series, mine){
   }).join("");
   openModal(`<h2>Sorozataim</h2>
     <p class="msub">Válaszd ki, mely sorozatokat szeretnéd a fülsávodban látni.</p>
-    ${rows||'<p class="msub">Nincs elérhető sorozat.</p>'}
+    ${controlsHtml("msl", listSort, listQuery)}
+    ${rows||`<p class="msub">${listQuery.trim() ? "Nincs a keresésnek megfelelő sorozat." : "Nincs elérhető sorozat."}</p>`}
     <div class="modrow"><button class="btn ghost" id="ms-propose">+ Új sorozat javaslása</button></div>
     <div class="modrow"><button class="btn" onclick="closeModal()">Kész</button></div>`);
   sheet.querySelectorAll('input[type=checkbox][data-id]').forEach(cb=>{
     cb.onchange=guarded(()=>onToggle(cb, series, mine));
   });
   document.getElementById("ms-propose").onclick=proposeSeriesForm;
+  // keresés / rendezés: a lista újrarajzolódik (a kereső fókusza és szövege megmarad)
+  wireControls(sheet, "msl", async ({query, sort})=>{
+    const hadFocus = document.activeElement && document.activeElement.id==="msl-q";
+    listQuery=query; listSort=sort;
+    if(sort==="modositva" && !msMeta.last){ try{ msMeta.last = await loadLastChanged(true); }catch(_){ msMeta.last = {}; } }
+    render(series, mine);
+    if(hadFocus){ const q=document.getElementById("msl-q"); if(q){ q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }
+  });
 }
 
 async function onToggle(cb, series, mine){

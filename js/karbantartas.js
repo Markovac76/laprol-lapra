@@ -14,10 +14,15 @@ import { isStaff, isOwnerRole } from "./permissions.js";
 import { fetchDraftItems, renderDraftItemsList, draftItemForm } from "./draft-items.js";
 import { downloadDraftTemplate, pickDraftExcelFile, confirmDraftUpload } from "./draft-excel.js";
 import { diffDraft, diffSummaryText } from "./draft-diff.js";
+import { controlsHtml, wireControls, filterSeries, sortSeries, loadSort, loadLastChanged } from "./series-list.js";
 
 let currentTab = "aktiv";
 // Szám-darabszámok a Munka sorozatok listához (karbantartasForm tölti): {draft: {draftId: N}, live: {seriesId: M}}
 let kbCounts = { draft:{}, live:{} };
+// Aktív sorozatok: keresés + rendezés (közös komponens: series-list.js)
+let listQuery = "";
+let listSort = loadSort();
+let lastMap = null;   // legutóbbi módosítás sorozatonként (lustán töltődik)
 
 function nameOf(members, uid){
   if(!uid) return "—";
@@ -26,6 +31,8 @@ function nameOf(members, uid){
 }
 
 export async function karbantartasForm(){
+  lastMap = null;
+  listSort = loadSort();   // a közös (megjegyzett) rendezés — a Sorozataim ablakban is állítható
   openModal(`<h2>Karbantartás</h2><p class="msub">Betöltés…</p>`);
   const [{data:series,error:se},{data:drafts,error:de},{data:memberSeries,error:mse},{data:members,error:mee},{data:dIssues,error:die},{data:lIssues,error:lie}] = await Promise.all([
     supabase.from("series").select("*").order("sort_order"),
@@ -65,14 +72,27 @@ function renderMain(series, drafts, memberSeries, members){
     const b=e.target.closest("button[data-tab]"); if(!b) return;
     currentTab=b.dataset.tab; renderMain(series,drafts,memberSeries,members);
   });
-  sheet.querySelectorAll("#kb-body [data-act]").forEach(b=>{
+  const bindActions = () => sheet.querySelectorAll("#kb-body [data-act]").forEach(b=>{
     b.onclick=guarded(()=>handleAction(b.dataset.act, b.dataset.id, series, drafts));
   });
+  bindActions();
+
+  if(currentTab==="aktiv"){
+    const refresh = () => { const box=document.getElementById("kb-aktiv-list"); if(box){ box.innerHTML = aktivRows(series,drafts,memberSeries); bindActions(); } };
+    const ensureLast = async () => { if(listSort==="modositva" && !lastMap){ try{ lastMap = await loadLastChanged(true); }catch(_){ lastMap = {}; } } };
+    wireControls(sheet, "kbl", async ({query, sort})=>{ listQuery=query; listSort=sort; await ensureLast(); refresh(); });
+    // visszaállított "legutóbb módosított" választásnál a lista a betöltés után frissül
+    if(listSort==="modositva" && !lastMap) ensureLast().then(refresh);
+  }
 }
 
 /* ---- Aktív sorozatok ---- */
 function renderAktiv(series, drafts, memberSeries){
-  const active = series.filter(s=>s.lifecycle==="active");
+  return controlsHtml("kbl", listSort, listQuery) + `<div id="kb-aktiv-list">${aktivRows(series, drafts, memberSeries)}</div>`;
+}
+
+function aktivRows(series, drafts, memberSeries){
+  const active = sortSeries(filterSeries(series.filter(s=>s.lifecycle==="active"), listQuery), listSort, { counts: kbCounts.live, last: lastMap });
   const editingSourceIds = new Set(drafts.filter(d=>d.pool_type==="edit").map(d=>d.source_series_id));
   const rows = active.map(s=>{
     const cnt = memberSeries.filter(m=>m.series_id===s.id && m.is_selected).length;
@@ -91,7 +111,7 @@ function renderAktiv(series, drafts, memberSeries){
         <button class="danger" data-act="unpublish" data-id="${s.id}">Publikálatlanná tétel</button>
       </div></div>`;
   }).join("");
-  return rows || `<p class="msub">Nincs aktív sorozat.</p>`;
+  return rows || `<p class="msub">${listQuery.trim() ? "Nincs a keresésnek megfelelő sorozat." : "Nincs aktív sorozat."}</p>`;
 }
 
 /* ---- Munka sorozatok (a pool, három alcsoportban) ---- */
