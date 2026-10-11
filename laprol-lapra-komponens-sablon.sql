@@ -55,6 +55,12 @@ alter table public.draft_components add column if not exists adatok jsonb not nu
 alter table public.series           add column if not exists component_template jsonb not null default '[]'::jsonb;
 alter table public.draft_series     add column if not exists component_template jsonb not null default '[]'::jsonb;
 
+-- Teljesítmény: a draft-lekérdezések (Kész-ellenőrzések, figyelmeztetések, publikálás) a
+-- draft Számain / komponensein szűrnek — index nélkül minden Számra teljes olvasás lenne.
+create index if not exists draft_components_draft_issue_idx on public.draft_components (draft_issue_id);
+create index if not exists draft_issues_draft_series_idx    on public.draft_issues (draft_series_id);
+create index if not exists draft_components_source_idx      on public.draft_components (source_component_id);
+
 -- ---------------------------------------------------------------------------
 -- Segédfüggvények
 -- ---------------------------------------------------------------------------
