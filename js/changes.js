@@ -12,6 +12,7 @@ const FIELD_LABELS = {
   kiado:"Kiadó", kategoria:"Kategória", megnevezes:"Megnevezés", megjelenites:"Megjelenítendő név", szin:"Szín", components:"Komponens-készlet",
   lapszam:"Lapszám", cim:"Cím", megjelenes:"Megjelenés dátuma", eredeti_ar:"Eredeti ár",
   azonosito_tipus:"Azonosító típusa", azonosito:"Azonosító", is_deleted:"Törölve", tipus:"Típus",
+  is_main:"Fő elem", component_template:"Komponens-sablon", adatok:"Egyéb adatok",
 };
 const fieldLabel = f => FIELD_LABELS[f] || f;
 const fieldValue = (f,v) => f==="tipus" ? esc(listName("komponens",v) || v || "—")

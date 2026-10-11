@@ -59,6 +59,13 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
   // egy dupla mentés így ugyanazzal az elsődleges kulccsal próbálkozik, és a
   // másodikat az adatbázis utasítja el — nem keletkezik két azonos tétel.
   const newIssueId = existing ? null : crypto.randomUUID();
+  // FŐ ELEM (★): egy Számon pontosan egy komponens. Kezdetben a jelölt (is_main), ennek
+  // hiányában a tartalék szabály: magazin, könyv, első (megegyezik a szerver-oldalival).
+  const pickMainKey = list => {
+    const m = list.find(c=>c.is_main) || list.find(c=>c.tipus==="magazin") || list.find(c=>c.tipus==="konyv") || list[0];
+    return m ? keyOf(m) : null;
+  };
+  let mainKey = pickMainKey(comps);
   let savedIssueId = existing ? existing.id : null;   // egy félbemaradt mentés újrapróbálásakor már nem beszúrás, hanem frissítés
   let master = { lapszam: existing?existing.lapszam:"", cim: existing?(existing.cim||""):"", megjelenes: existing?(existing.megjelenes||""):"",
     eredeti_ar: existing&&existing.eredeti_ar!=null?existing.eredeti_ar:"", deleted: existing?!!existing.deleted:false };
@@ -69,6 +76,8 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
       master.lapszam=v("di-n"); master.cim=v("di-name"); master.megjelenes=v("di-date"); master.eredeti_ar=v("di-eredeti");
       const delCk=document.getElementById("di-deleted"); if(delCk) master.deleted=delCk.checked;
     }
+    const mainRadio = document.querySelector('input[name="di-main"]:checked');
+    if(mainRadio) mainKey = mainRadio.value;
     comps.forEach(c=>{
       const k=keyOf(c);
       const nameEl=document.getElementById("di-name-"+k); if(nameEl) c.megnevezes=nameEl.value;
@@ -98,7 +107,15 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
             <div class="field"><label>Azonosító típusa</label><select id="di-ct-${k}"><option value="">—</option>${opts("azonosito",c.azonosito_tipus)}</select></div>
             <div class="field"><label>Azonosító</label><input id="di-cid-${k}" value="${esc(c.azonosito||"")}"></div>
           </div>
-          ${list.length>1?`<button type="button" class="btn ghost" data-removecomp="${k}">Ez a példány törlése</button>`:""}
+          ${comps.length>1
+            ? `<label class="ckrow" style="margin-top:6px"><input type="radio" name="di-main" value="${esc(k)}" ${k===mainKey?"checked":""}> ★ Fő elem <span style="color:var(--faint);font-weight:400">— a sorban az első helyen áll</span></label>`
+            : `<div class="unote" style="margin-top:6px">★ Ez a Szám egyetlen eleme, ezért ez a fő elem.</div>`}
+          ${list.length>1
+            ? (k===mainKey
+                ? `<button type="button" class="btn ghost" disabled title="Ez a fő elem. Előbb jelölj ki másikat fő elemnek.">Ez a példány törlése</button>
+                   <div class="unote">Ez a fő elem. Előbb jelölj ki másikat fő elemnek.</div>`
+                : `<button type="button" class="btn ghost" data-removecomp="${k}">Ez a példány törlése</button>`)
+            : ""}
         </div>`;
       }).join("");
       return blocks + `<button type="button" class="btn ghost" data-addcomp="${esc(t)}">+ Még egy ${esc(typeLabel(t))} hozzáadása</button>`;
@@ -130,6 +147,7 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
         syncFromDom();
         const k=b.dataset.removecomp, c=comps.find(x=>keyOf(x)===k);
         if(!c) return;
+        if(k===mainKey){ alert("Ez a fő elem. Előbb jelölj ki másikat fő elemnek."); return; }
         if(c.id){
           const liveComp = c.source_component_id
             ? "\n\nFIGYELEM: ez a példány az ÉLŐ sorozatban is létezik. A draftból való törlése az élő komponenst NEM törli — publikáláskor változatlanul megmarad (komponens törlése a sorozatból egyelőre nem támogatott)."
@@ -168,6 +186,16 @@ export function draftItemForm(draftSeriesId, existing, components, onDone){
             if(error) throw error;
             c.id = nc.id;
           }
+        }
+        // Fő elem: pontosan egy. A sorrend számít (halasztott megszorítás, de a kérések külön
+        // tranzakciók): előbb a többi lemondása, utána az új fő elem beállítása.
+        const mc = comps.find(x=>keyOf(x)===mainKey) || comps[0];
+        if(mc && mc.id){
+          const {error:e1}=await supabase.from("draft_components").update({is_main:false})
+            .eq("draft_issue_id",draftIssueId).neq("id",mc.id).eq("is_main",true);
+          if(e1) throw e1;
+          const {error:e2}=await supabase.from("draft_components").update({is_main:true}).eq("id",mc.id);
+          if(e2) throw e2;
         }
         // Ha egy átsorolás/új példány olyan típust hozott be, ami még nincs a
         // sorozat komponens-listáján, azt fel kell venni oda is — enélkül a
