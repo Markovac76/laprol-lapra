@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.23 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.24 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -310,6 +310,10 @@ A fő használat a bolhapiac, tűző napon. Ezért a lapszám-színek **erős h�
 20. **„Jelöletlen” szűrő** **[NYITOTT, javaslat]** Ma nincs: a megjelent, de jelöletlen Szám egyik státusz-szűrőbe sem esik (csak a „Mind”-ben látszik), ezért a szűrők számai nem adnak össze a „Mind”-del.
 21. **Gyors szerkesztés → Excel: komponens nélküli Szám csendes kihagyása** **[NYITOTT]** A Gyors Excel (`excel.js`) a komponens nélküli meglévő Számokat csendben kihagyja; jelzés kellene.
 22. **Komponens-szintű ár [LEZÁRVA, v1.23: NEM kell]** A Szám ára a magazin ára; a mellékletet külön nem árazzuk (5.5). Az összeg a Számokra és a beszerzési mennyiségre épül.
+23. **Az Excel-sablon a fő elemet nem viszi és nem módosítja [NYITOTT, megjegyzés]** Új sornál a tartalék szabály (magazin → könyv → első; a komponens-sablon fő típusa) dolgozik; a fő elem kijelölése a draft-szerkesztőben történik.
+24. **Új sorozat komponens-sablonja — adatbázis-szintű kikényszerítés [NYITOTT, későbbre]** A „kötelező megadni (fő elem)" a kliensben lesz kikényszerítve; a DB üres sablonnál az alapértelmezettet használja, hogy a régi propose-út ne törjön el.
+25. **A régi szerkesztő kompatibilitási ága [NYITOTT]** A sablon-szerkesztő megjelenése után a publikáló függvényben a „sablon igazodik a komponens-listához" ág kivehető, és a változásnaplóba kerül.
+26. **Alapértelmezett azonosító-típus [DÖNTVE]** Könyv → ISBN, lego → lego_kd; a magazinnál és a többinél nincs alapérték. A meglévő azonosító-típusokhoz nem nyúlunk (a magazinoknál 23 ISBN / 3 ISSN és a könyveknél 8 ISSN / 1 ISBN lehet szándékos is).
 
 ---
 
@@ -485,9 +489,21 @@ SQL-ek: `laprol-lapra-hibajavitas-1-5-szam-torles-sajat-adatlap.sql`, `-14-kompo
 
 SQL-ek: `laprol-lapra-draft-visszaadas.sql`, `-lego-sw-draft-helyreallitas.sql` (egyszeri adat-javítás, név alapján), `-draft-sablon-roundtrip.sql`, `-lista-egyedi-kulcs.sql`, `-lapszam-csendes.sql`.
 
+### 13.12 22. lépés / 1. kör — Áttekinthetőség: összecsukott Szám-sor, fő elem, darabszámok, keresés **[DÖNTVE, megvalósítva — v1.24]**
+- **Összecsukott Szám-sor:** három oszlop — szöveg (sorszám-jelvény, cím, dátum és kód, árak), elem-helyek, lenyitó. Az elem-helyek **legfeljebb 3** sort adnak egymás alatt: kis kép (28 px, `object-fit: contain`) és mellette a státuszgomb (az elem neve a gombon; az oszlopfejlécek megszűntek). Háromnál több elemnél a lenyitó gomb fölött „+N". A sor szélessége és a bal oldali státusz-csík változatlan; a kattintási viselkedés (körbeforgás, letiltás jövőbeli Számnál, darabszám-jelzés) változatlan; a lenyitott panel minden elemet mutat.
+- **Kis kép — lusta betöltés [DÖNTVE]:** a feltöltött kép **kicsinyített változata a Supabase Storage saját átméretezésével** (`/render/image/…?width=64`, kb. 2 KB a 170 KB helyett; `loading="lazy"`, `decoding="async"`, rögzített keret). NEM generálunk külön kis példányt. Hiba esetén az eredeti kép, utána a típus piktogramja. Típus-piktogramok: beágyazott SVG (`js/thumb.js`).
+- **Fő elem (★) [DÖNTVE]:** egy Számon legfeljebb egy komponens; a sorban mindig az első helyen áll. **Nem típus, hanem jelölés a komponensen** (`components.is_main`, `draft_components.is_main`; halasztott kizáró megszorítás: egy Számon legfeljebb egy). A Szám címe/borítója és a **színezés változatlan** — a fő elem csak a sorrendet és a ★ jelet adja. Meglévő adatoknál egyszeri kitöltés: ahol van magazin, a magazin; ahol nincs, a könyv; ahol az sincs, az első komponens (a sorozat komponens-listájának sorrendje, azon belül a létrehozás sorrendje) — 582 Szám → 582 fő elem. A váltás **csendes** (nincs verzióemelés / felkiáltójel), a `change_log` rögzíti (`is_main`). A **fő elem nem törölhető** (a felületen letiltva magyarázattal; a „Kész" is ellenőrzi: pontosan egy). Új Számnál a publikálás tartalék szabályt alkalmaz.
+- **Szám-darabszám és összefoglaló:** a „Publikálásra váró" és „Munkaanyag" listákon „N Szám" (szerkesztésnél „N Szám, élőben: M"); a publikálás előtti megerősítő ablakban „X új, Y módosult, Z törölt Szám" (a csak-lapszámos változás külön, csendesként) — a publikáló függvény szabályait tükrözi (`js/draft-diff.js`).
+- **Sorozat-lista keresés és rendezés [DÖNTVE]:** közös komponens (`js/series-list.js` + tiszta `js/series-sort.js`) a Karbantartás Aktív fülén és a Sorozataimban. Keresés névre, kis/nagybetű- és ékezetfüggetlenül; rendezés ABC (magyar), legutóbb módosított, Számok száma szerint; a választás megmarad (böngészőtároló, `try/catch`). „Legutóbb módosított" = a `change_log` legfrissebb bejegyzése a sorozatra / Számaira / komponenseire (azaz a legutóbbi, a sorozatot érintő publikálás), ennek hiányában a létrehozás ideje. A fejléc „Sorozatok (N)" legördülője változatlan.
+- **Lapozás:** a `fetchAllRows` mostantól egyedi kulcs szerint is rendez (`id` / összetett kulcs).
+- **Visszaellenőrzés:** `scripts/compare-before-after.js` — két kódállapot között az ÖSSZES sorozatra a Számok színe, a haladásjelzők és az Összeg-kártya értékei (a tényleges `issueState()`/`stats()` fut); minden körhöz kötelező.
+- **Átmeneti kompatibilitás [DÖNTVE]:** amíg a régi kliens a `components` listát szerkeszti, a sablon igazodik hozzá (publikáláskor); a sablon-szerkesztő megjelenése után ez a kompatibilitás kikerül, és a változásnaplóba kerül.
+SQL: `laprol-lapra-fo-elem.sql` (élesítve). Tesztek: `scripts/tests/` (slots, thumb, draft-diff, series-list, paging, dates, totals), `scripts/trial-22-komponensek.js`.
+
 ---
 
 *Napló:*
+- v1.24 — **22. lépés / 1. kör — Áttekinthetőség** (13.12): összecsukott Szám-sor (legfeljebb 3 elem egymás alatt, kis kép Storage-átméretezéssel + lusta betöltés vagy típus-piktogram, „+N"); **fő elem (★)** mint jelölés a komponensen (`is_main`, csendes váltás, nem törölhető; 582 Szám → 582 fő elem); „N Szám" a függő listákon és publikálás előtti összefoglaló; sorozat-lista keresés/rendezés közös komponenssel; stabil lapozás; `compare-before-after.js`. SQL: `fo-elem`.
 - v1.23 — **Az Összeg-kártya egységesítése** (5.5, C változat): a két nézet ugyanazokat a Számokat (≥1 komponens megvan) és ugyanazt a szorzót (beszerzési mennyiség) használja; közös, tesztelt számítás (`js/totals.js`, `scripts/tests/totals.test.mjs`); a kártyán a Szám-darabszám is látszik; a súgó „mit ér a gyűjteményed” leírása javítva. Komponens-szintű ár: nem kell (lezárt döntés). Nincs adatbázis-változás.
 - v1.22 — **Autós Legendák hibája és a javítások** (10. fejezet, 19. pont; 4.x dátumszabály): az `a457ed7` regresszió javítása (új draft-Számok komponens-alapja, „Kész” védelem, adatjavítás); a „ma” helyi dátum és a „mai dátumú Szám megjelent” egységesen (`isFutureDate`); a lapozás (`fetchAllRows`) egyedi kulcs szerint is rendez (id / összetett kulcs) — a `components` tábla 1000 sor fölé nőtt. SQL: `uj-szam-komponens-alap`, `kesz-komponens-vedelem`, `autos-legendak-komponens-javitas`. Tesztek: `scripts/tests/` (dates, paging), `scripts/trial-uj-szam-komponens.js`.
 - v1.21 — **„Szerkesztés indítása” atomi függvénye + egy szerkesztési draft egy sorozathoz** (10. fejezet, 18. pont): `start_edit_draft()` és a `draft_series_one_edit_per_series` részleges egyedi index; a Karbantartás és a Gyors szerkesztés → Excel is ezt hívja (teljes másolat, csak aktív sorozat); a `change_log` lekérdezés `order("id")` tie-breakkel (azonos verziójú lapszám-bejegyzések stabil sorrendje). Az átszámozás-próba (`scripts/trial-renumber.js`) és a függvény-próba (`scripts/trial-start-edit.js`) a repóban, mindkettő csak visszagörgetve, jóváhagyással futtatható. SQL: `start-edit-draft`.

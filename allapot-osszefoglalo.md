@@ -1,4 +1,4 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v11)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v12)
 
 **Frissítve:** 2026. október 10. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
@@ -41,6 +41,8 @@ laprol-lapra/
 │   ├── trial-renumber.js                  ← szintetikus átszámozás-próba, MINDIG visszagörget (csak jóváhagyással futtatható)
 │   ├── trial-start-edit.js                ← a start_edit_draft + index próbája, MINDIG visszagörget (csak jóváhagyással futtatható)
 │   ├── trial-uj-szam-komponens.js         ← új Szám komponens-alap / Kész-védelem / Autós adatjavítás próbája, MINDIG visszagörget
+│   ├── trial-22-komponensek.js            ← a 22. lépés SQL-csomagjának próbája (--publish: publikálási próbák is), MINDIG visszagörget
+│   ├── compare-before-after.js            ← olvasó visszaellenőrzés két kódállapot közt: színek / haladás / összeg
 │   └── tests/                             ← Node-tesztek: dates.test.mjs, paging.test.mjs
 ├── vercel.json
 ├── manifest.json + icons/
@@ -175,6 +177,8 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 - **Dátumkezelés (v1.22):** a „ma” helyi dátum (frissül); a mai dátumú Szám megjelent; a „Várható”, a piros dátum, a színezés és a „Következő megjelenés” egy szabályt (`isFutureDate`) használ.
 - **Lapozás (v1.22):** a `fetchAllRows` egyedi kulcs szerint is rendez; a `components` tábla már 1000 sor fölött van (1 025).
 - **Összeg-kártya (v1.23):** mindkét nézet azonos Számokat (≥1 komponens megvan) és a beszerzési mennyiséget használja; az ár a Szám (magazin) ára, komponens-szintű ár nem kell; a kártyán a Szám-darabszám látszik. Közös számítás: `js/totals.js` (tesztelve). A tulajdonosi fiókban csak a Lego Star Wars eredeti összege változott (10 495 → 78 961 Ft).
+- **22. lépés / 1. kör (v1.24):** összecsukott Szám-sor (legfeljebb 3 elem egymás alatt, kis kép + státuszgomb, „+N"); **fő elem (★)** a komponensen (`is_main`, csendes váltás, nem törölhető); „N Szám" a függő listákon + publikálás előtti összefoglaló (`draft-diff.js`); sorozat-lista keresés/rendezés közös komponenssel (`series-list.js`); stabil lapozás; `scripts/compare-before-after.js` (színek / haladás / összeg, minden sorozatra).
+- **A 2. kör SQL-csomagja (komponens-sablon + típusleírás + figyelmeztetések, más típusú elem, komponens-törlés)** megírva és visszagörgetve 28/28 próbával, de **még nincs élesítve** — a tulajdonos külön, függvényenkénti átnézésre vár (`laprol-lapra-komponens-sablon.sql`, `-tipus-hozzaadas.sql`, `-komponens-torles.sql`).
 
 ---
 
@@ -198,6 +202,9 @@ A hibajavítási kör 11. pontja (sablon-alapú tömeges feltöltés) a javaslat
 10. **A lapszám-csendesítés élő ellenőrzése** — **KÉSZ:** a visszagörgetett szintetikus próba (`scripts/trial-renumber.js`) igazolta: a puszta lapszám-változás nem emel verziót, a `change_log` rögzíti, a számlálók a ROLLBACK után azonosak.
 11. **„Jelöletlen” szűrő** — javaslat: ma a megjelent, de jelöletlen Szám egyik státusz-szűrőbe sem esik.
 12. **Gyors szerkesztés → Excel: komponens nélküli Szám csendes kihagyása** — jelzés kellene.
+13. **Az Excel-sablon a fő elemet nem viszi / nem módosítja** — új sornál tartalék szabály; a kijelölés a draft-szerkesztőben.
+14. **Új sorozat sablonja: DB-szintű kikényszerítés későbbre** — a kliens kényszeríti ki, üres sablonnál az alapértelmezett lép be.
+15. **A régi szerkesztő kompatibilitási ága** — a sablon-szerkesztő megjelenése után kivehető (+ változásnapló).
 
 ---
 
@@ -213,7 +220,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.23).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.24).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.
