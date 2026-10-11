@@ -362,7 +362,7 @@ async function publish(d){
       liveIssues = li||[];
       const ids = liveIssues.map(x=>x.id);
       if(ids.length){
-        const { data:lc, error:lce } = await fetchAllRows(()=>supabase.from("components").select("id,issue_id,tipus,azonosito_tipus,azonosito,megnevezes").in("issue_id", ids));
+        const { data:lc, error:lce } = await fetchAllRows(()=>supabase.from("components").select("id,issue_id,tipus,azonosito_tipus,azonosito,megnevezes,is_deleted").in("issue_id", ids));
         if(lce) throw lce;
         liveComps = lc||[];
       }

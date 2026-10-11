@@ -20,7 +20,7 @@ const same = (a, b) => (a == null ? null : String(a)) === (b == null ? null : St
 
 // draftItems: [{id, lapszam, cim, megjelenes, eredeti_ar, source_issue_id, deleted, comps:[{source_component_id, tipus, azonosito_tipus, azonosito, megnevezes}]}]
 // liveIssues: [{id, lapszam, cim, megjelenes, eredeti_ar, is_deleted}]
-// liveComps:  [{id, issue_id, tipus, azonosito_tipus, azonosito, megnevezes}]
+// liveComps:  [{id, issue_id, tipus, azonosito_tipus, azonosito, megnevezes, is_deleted}]
 export function diffDraft(draftItems, liveIssues = [], liveComps = []){
   const liveById = new Map(liveIssues.map(i => [i.id, i]));
   const compById = new Map(liveComps.map(c => [c.id, c]));
@@ -36,9 +36,12 @@ export function diffDraft(draftItems, liveIssues = [], liveComps = []){
       }
       let changed = !same(di.cim, live.cim) || !same(di.megjelenes, live.megjelenes) || !same(di.eredeti_ar, live.eredeti_ar);
       for(const dc of di.comps || []){
-        if(!dc.source_component_id){ changed = true; continue; }          // új komponens egy meglévő Számon
+        if(!dc.source_component_id){ if(!dc.deleted) changed = true; continue; }   // új komponens egy meglévő Számon (a törlésre jelölt, sosem publikált kimarad)
         const lc = compById.get(dc.source_component_id);
         if(!lc) continue;
+        // törölt-jelölés / visszaállítás (csendes, de tartalmi változás a Számon)
+        if(!!dc.deleted !== !!lc.is_deleted){ changed = true; continue; }
+        if(dc.deleted) continue;
         if(!same(dc.tipus, lc.tipus) || !same(dc.azonosito_tipus, lc.azonosito_tipus) ||
            !same(dc.azonosito, lc.azonosito) || !same(dc.megnevezes, lc.megnevezes)) changed = true;
       }

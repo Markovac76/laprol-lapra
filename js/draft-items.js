@@ -35,7 +35,7 @@ export function renderDraftItemsList(items){
   if(!items.length) return `<p class="msub">Még nincs szám a draftban.</p>`;
   return items.map(it=>{
     const compsTxt = (it.comps||[]).map(c=>
-      `${typeLabel(c.tipus)}${c.megnevezes?" — "+esc(c.megnevezes):""}${c.azonosito?": "+esc(c.azonosito):""}`
+      `${c.deleted?"<s>":""}${typeLabel(c.tipus)}${c.megnevezes?" — "+esc(c.megnevezes):""}${c.azonosito?": "+esc(c.azonosito):""}${c.deleted?" (törölve)</s>":""}`
     ).join(" · ");
     return `<div class="userrow"><div class="uinfo">
         <div class="uname">#${it.lapszam}${it.cim?" – "+esc(it.cim):""}</div>

@@ -28,14 +28,15 @@ export function draftFingerprint(items){
   const byId=(a,b)=> a.id<b.id ? -1 : a.id>b.id ? 1 : 0;
   const rows = items.slice().sort(byId).map(it=>[
     it.id, it.lapszam, it.cim||"", it.megjelenes||"", it.eredeti_ar==null?"":it.eredeti_ar, it.deleted?1:0, it.source_issue_id||"",
-    (it.comps||[]).slice().sort(byId).map(c=>[c.id, c.tipus, c.azonosito||"", c.azonosito_tipus||"", c.megnevezes||"", c.source_component_id||""]),
+    (it.comps||[]).slice().sort(byId).map(c=>[c.id, c.tipus, c.azonosito||"", c.azonosito_tipus||"", c.megnevezes||"", c.source_component_id||"", c.deleted?1:0]),
   ]);
   return cyrb53(JSON.stringify(rows));
 }
 
 // Egy típuson belül a komponensek determinisztikus sorrendje (példány-csoportok).
 export function compsOf(item, tipus){
-  return (item.comps||[]).filter(c=>c.tipus===tipus).sort((a,b)=>
+  // a törölt-jelölésű komponens nem szerepel a sablonban (a draft-szerkesztőben visszavonható)
+  return (item.comps||[]).filter(c=>c.tipus===tipus && !c.deleted).sort((a,b)=>
     String(a.megnevezes||"").localeCompare(String(b.megnevezes||""),"hu")
     || String(a.azonosito||"").localeCompare(String(b.azonosito||""))
     || (a.id<b.id ? -1 : a.id>b.id ? 1 : 0));
@@ -47,7 +48,7 @@ export function compsOf(item, tipus){
 // lévő legtöbb példány (legalább 1). Rejtett Szám-ID oszlop a végén.
 export function templateModel(items, components, labelOf){
   const types=[...components];
-  items.forEach(it=>(it.comps||[]).forEach(c=>{ if(!types.includes(c.tipus)) types.push(c.tipus); }));
+  items.forEach(it=>(it.comps||[]).forEach(c=>{ if(!c.deleted && !types.includes(c.tipus)) types.push(c.tipus); }));
   const sorted=items.slice().sort((a,b)=>(a.lapszam-b.lapszam)
     || String(a.cim||"").localeCompare(String(b.cim||""),"hu") || (a.id<b.id ? -1 : 1));
 

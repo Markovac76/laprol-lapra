@@ -51,4 +51,15 @@ const LC = [{ id: "ca", issue_id: "a", tipus: "konyv", azonosito_tipus: "isbn", 
   const r = diffDraft([di("b", 2, { megjelenes: null }), di("c", 3, { eredeti_ar: 1001 })], [live("b", 2, { megjelenes: null }), live("c", 3)], []);
   assert.equal(r.modosult, 1); assert.equal(r.valtozatlan, 1);
 }
-console.log("OK — a publikálás-összefoglaló tesztjei átmentek (6 csoport)");
+// 7) komponens törlése / visszaállítása: módosult (csendes), a törölt komponens egyéb mezői nem számítanak
+{
+  const LC2 = [{ id: "cx", issue_id: "b", tipus: "figura", azonosito_tipus: null, azonosito: null, megnevezes: null, is_deleted: false },
+               { id: "cy", issue_id: "c", tipus: "figura", azonosito_tipus: null, azonosito: null, megnevezes: null, is_deleted: true }];
+  let r = diffDraft([di("b", 2, { comps: [{ source_component_id: "cx", tipus: "figura", deleted: true }] })], L, LC2);
+  assert.equal(r.modosult, 1);
+  r = diffDraft([di("c", 3, { comps: [{ source_component_id: "cy", tipus: "figura", deleted: false }] })], L, LC2);
+  assert.equal(r.modosult, 1, "visszaállítás");
+  r = diffDraft([di("c", 3, { comps: [{ source_component_id: "cy", tipus: "figura", deleted: true, azonosito: "x" }] })], L, LC2);
+  assert.equal(r.modosult, 0, "már törölt komponens törölt-jelölése nem változás");
+}
+console.log("OK — a publikálás-összefoglaló tesztjei átmentek (7 csoport)");
