@@ -472,20 +472,40 @@ function renderEditDraft(d, color, tmpl, compList, items){
         return `<div class="grid2 sidrow">
           <select data-sid-t="${i}" aria-label="Azonosító típusa"><option value="">—</option>${SERIES_ID_TYPES.map(([v,l])=>`<option value="${v}"${v===e.tipus?" selected":""}>${l}</option>`).join("")}</select>
           <input data-sid-v="${i}" value="${esc(e.ertek||"")}" placeholder="pl. 1234-5678" aria-label="Azonosító értéke"></div>`; }).join("")}</div>
-      <div class="unote">Egyszer kell megadni, nem Számonként. A Számonként eltérő (egyedi) ISBN / ISSN továbbra is a Szám elemén adható meg. Az üres sor nem számít.</div></div>
+      <div class="fielderr" id="d-sid-err" hidden></div>
+      <div class="fieldnote">Egyszer kell megadni, nem Számonként. A Számonként eltérő (egyedi) ISBN / ISSN továbbra is a Szám elemén adható meg. Az üres sor nem számít.</div></div>
     <div class="field"><label>Komponens-sablon (miből áll egy szám)</label><div id="d-tmpl-wrap">${tmplEditorHtml(tmpl, compList)}</div></div>
     <div class="field"><label>Szín</label>
       <div id="d-sw">${PAL_FAMILIES.map(f=>`<div class="swfam"><span class="swfam-nev">${f.nev}</span>
         <div class="swatches">${f.szinek.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-pressed="${c===color}"></button>`).join("")}</div></div>`).join("")}</div></div>
     <div class="modrow"><button class="btn ghost" id="d-back">Vissza</button><button class="btn" id="d-save">Mezők mentése</button></div>
     <div class="msub" style="margin:16px 0 2px;color:var(--accent);filter:brightness(1.2);font-weight:600">Számok (${items.length})</div>
-    <div id="d-items">${renderDraftItemsList(items)}</div>
+    <div id="d-items">${renderDraftItemsList(items, comps)}</div>
     <div class="modrow"><button class="btn ghost" id="d-additem">+ Új szám</button>
       <button class="btn ghost" id="d-tmpl">⬇ Sablon</button>
       <button class="btn ghost" id="d-tmplup">⬆ Sablon feltöltése</button></div>`);
 
   const dEl=document.getElementById("d-display"), cEl=document.getElementById("d-count");
   dEl.addEventListener("input",()=>cEl.textContent=`${dEl.value.length}/${DISPLAY_MAX}`);
+
+  // --- Sorozat-azonosítók: azonnali ellenőrzés a mező elhagyásakor (ugyanaz a szabály és szöveg, mint a
+  // szerveren és mentéskor); a hibaüzenet javítás közben magától eltűnik. A mentéskori ellenőrzés marad.
+  const sidBox = document.getElementById("d-sids"), sidErr = document.getElementById("d-sid-err");
+  const sidRead = () => cleanSeriesIds([0,1].slice(0,SERIES_ID_MAX).map(i=>({
+    tipus:(sidBox.querySelector(`[data-sid-t="${i}"]`)||{}).value, ertek:(sidBox.querySelector(`[data-sid-v="${i}"]`)||{}).value })));
+  const sidCheck = () => {
+    const e = seriesIdsError(sidRead());
+    sidErr.textContent = e ? "⚠ "+e.charAt(0).toUpperCase()+e.slice(1)+"." : "";
+    sidErr.hidden = !e;
+    sidBox.querySelectorAll("input,select").forEach(el=>el.classList.toggle("typebad", !!e && (el.value||"").trim()!=="" ));
+  };
+  // az érték-mező elhagyásakor; típusválasztáskor csak ha a sor értéke már ki van töltve (különben a
+  // típus kiválasztása és az érték beírása között feleslegesen szólna)
+  sidBox.addEventListener("focusout", e=>{ if(e.target.matches("input")) sidCheck(); });
+  sidBox.addEventListener("change", e=>{ if(!e.target.matches("select")) return;
+    const v = sidBox.querySelector(`[data-sid-v="${e.target.dataset.sidT}"]`);
+    if(!sidErr.hidden || (v && v.value.trim()!=="")) sidCheck(); });
+  sidBox.addEventListener("input", ()=>{ if(!sidErr.hidden) sidCheck(); });    // javítás közben eltűnik
 
   // --- komponens-sablon szerkesztő (delegált kezelők, csak a szakasz rajzolódik újra) ---
   const wrap = document.getElementById("d-tmpl-wrap");

@@ -384,6 +384,14 @@ footer{color:var(--faint);font-size:11.5px;text-align:center;padding:8px 0 26px}
 .serids{margin-top:3px;font-size:11.5px;color:var(--faint);font-family:ui-monospace,monospace;letter-spacing:.01em}
 .reqmark{color:var(--amber);font-weight:700}
 .sidrow{margin-bottom:6px}
+/* Űrlap-megjegyzés, azonnali hibajelzés, a típusnak nem megfelelő tárolt adat, kötelező üres mező */
+.fieldnote{font-size:12px;line-height:1.4;color:var(--faint);margin-top:4px}
+.fielderr{font-size:12px;line-height:1.4;color:#f5a8a0;margin:2px 0 4px}
+.typewarn{font-size:12px;line-height:1.4;color:var(--amber);background:var(--amber-d);border:1px solid var(--amber);border-radius:8px;padding:6px 8px;margin:-4px 0 10px}
+.sheet select.typebad,.sheet input.typebad{border-color:var(--amber)}
+.sheet input.reqempty{border-style:dashed;border-color:color-mix(in srgb,var(--amber) 60%,var(--line));background:color-mix(in srgb,var(--amber) 7%,transparent)}
+.reqtag{font-size:10.5px;color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 50%,transparent);border-radius:6px;padding:0 5px;margin-left:4px;white-space:nowrap}
+.reqtag[hidden]{display:none}
 .cn-type{display:inline-flex;vertical-align:-4px;margin-right:4px;color:var(--muted)}
 
 /* Telefon (B változat): a szöveg felül, a nyíl a jobb felső sarokban, a csempék

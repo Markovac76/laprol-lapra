@@ -7,6 +7,9 @@
    ============================================================ */
 export const CHANGELOG = [
   { date:"2026-10-12",
+    text:"Karbantartóknak: a Szám szerkesztője megmutatja és javíthatóvá teszi azt az adatot, ami nem felel meg az elem típusának (pl. Kártyán más azonosító-típus, Figurán azonosító) — eddig az ilyen adat rejtve maradt. A kötelező, de még üres mezők halvány kiemelést kapnak („a „Kész”-hez kell”). A sorozat-azonosító hibájára a szerkesztő már a mező elhagyásakor szól. A munkaanyag Szám-listájában az elemek sorrendje állandó: a fő elem (★) elöl, utána a sablon sorrendje. A Saját adatlapon és az „Új szám” űrlapon minden típus a rendes nevén látszik."
+  },
+  { date:"2026-10-12",
     text:"A sorozat fejlécében, a név alatt megjelenhet a sorozat-azonosító (az egész sorozatra érvényes ISBN vagy ISSN, pl. „ISSN 3103-4152”). A lenyitott sorban és a Saját adatlapon a név nélküli modell neve a Szám címe. Karbantartóknak: a sorozat szerkesztőjében új „Sorozat-azonosítók” szakasz (legfeljebb két ISBN / ISSN, egyszer megadva; a változása nem ad felkiáltójelet). A Szám szerkesztőjében minden elem a típusa szerinti mezőket mutatja, a kötelezők * jelöléssel: a Kártyának hét mezője van (Gyártó, Gyűjtemény, Széria, Kiadás éve, Sorozatváltozat, Kód, Név), a Figuránál a név kötelező, a Legónál és a Kártyánál az azonosító-típus rögzített, a Magazinnál és a Könyvnél csak ISBN vagy ISSN választható. A „Kész” az új és a most módosított elemek hiányzó kötelező mezőinél áll meg; a régebbi elemek hiányáról csak figyelmeztetés jön. Az oda-vissza sablon kezeli a Kártya mezőit és a sorozat-azonosítót (külön lapon)."
   },
   { date:"2026-10-12",

@@ -29,7 +29,7 @@ export function myDataForm(it){
     const potolt = c.megnevezes ? null : fallbackName(typeDef(state.TYPEDEFS, t), c, it.name);
     const label = c.megnevezes ? esc(c.megnevezes)
       : potolt ? `${esc(potolt)} <span class="unote">· ${esc(typeLabel(t))}</span>`
-      : (typeCounts[t]>1 ? `${COMP_TYPES[t]||t} #${typeSeen[t]}` : (COMP_TYPES[t]||t));
+      : (typeCounts[t]>1 ? `${esc(typeLabel(t))} #${typeSeen[t]}` : esc(typeLabel(t)));
     return `<div class="compedit">
       <h4>${label}</h4>
       <div class="statrow" data-stat="${c.id}">

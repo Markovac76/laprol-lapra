@@ -48,6 +48,25 @@ assert.deepEqual(T.componentIssues(d("figura"), { megnevezes:" " }, name).map(x=
 assert.deepEqual(T.componentIssues(d("figura"), { megnevezes:"Chase", azonosito:"F1" }, name).map(x=>x.kod), ["azonosito_tipus"]);
 assert.deepEqual(T.componentIssues(null, { azonosito:"x" }, name), []);
 
+// --- a típusnak nem megfelelő TÁROLT azonosító / azonosító-típus (pl. a régi űrlappal felvitt adat)
+assert.equal(T.storedIdProblem(d("krtya"), { azonosito:"K05", azonosito_tipus:"egyeb" }, name).kod, "tipus_elter");
+assert.match(T.storedIdProblem(d("krtya"), { azonosito:"K05", azonosito_tipus:"egyeb" }, name).szoveg, /„egyeb”.*csak „Kártyakód” lehet/);
+assert.equal(T.storedIdProblem(d("krtya"), { azonosito:"K05", azonosito_tipus:"kartya_kod" }, name), null);
+assert.equal(T.storedIdProblem(d("krtya"), { azonosito:"K05", azonosito_tipus:null }, name), null);          // típus nélkül nincs mit jelezni (a „Kész” szól)
+assert.equal(T.storedIdProblem(d("figura"), { azonosito:"F05", azonosito_tipus:"vonalkod" }, name).kod, "nincs_azonosito");
+assert.equal(T.storedIdProblem(d("figura"), { azonosito:null, azonosito_tipus:null }, name), null);
+assert.equal(T.storedIdProblem(d("magazin"), { azonosito:"1", azonosito_tipus:"vonalkod" }, name).kod, "tipus_elter");
+assert.equal(T.storedIdProblem(d("magazin"), { azonosito:"1", azonosito_tipus:"issn" }, name), null);
+assert.equal(T.storedIdProblem(d("magazin"), { azonosito:"9999-0000", azonosito_tipus:null }, name).kod, "tipus_hianyzik");
+assert.equal(T.storedIdProblem(d("magazin"), { azonosito:null, azonosito_tipus:null }, name), null);
+assert.equal(T.storedIdProblem(null, { azonosito:"1", azonosito_tipus:"barmi" }, name), null);
+
+// --- az elemek sorrendje a munkaanyag Szám-listájában: fő elem elöl, utána a sablon sorrendje
+const ord = T.orderComponents([{ id:"1", tipus:"krtya" }, { id:"2", tipus:"egyeb" }, { id:"3", tipus:"magazin", is_main:true }, { id:"4", tipus:"lego", megnevezes:"B" },
+  { id:"5", tipus:"konyv" }, { id:"6", tipus:"lego", megnevezes:"A" }, { id:"7", tipus:"poszter" }], ["magazin", "konyv", "lego", "krtya", "figura", "modell", "egyeb"]);
+assert.deepEqual(ord.map(c => c.id), ["3", "5", "6", "4", "1", "2", "7"]);
+assert.deepEqual(T.orderComponents([{ id:"a", tipus:"modell", is_main:true }, { id:"b", tipus:"magazin" }], ["magazin", "modell"]).map(c => c.id), ["a", "b"]);   // a fő elem akkor is elöl, ha a sablonban hátrébb áll
+
 // --- a Modell neve: üres megnevezésnél a Szám címe
 assert.equal(T.fallbackName(d("modell"), { megnevezes:null }, "Dodge Charger R/T (1970)"), "Dodge Charger R/T (1970)");
 assert.equal(T.fallbackName(d("modell"), { megnevezes:"Saját név" }, "Cím"), "Saját név");

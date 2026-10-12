@@ -75,6 +75,37 @@ export function fallbackName(def, comp, issueTitle){
   return (f && f.potlas === "szam_cime" && str(issueTitle) !== "") ? str(issueTitle) : null;
 }
 
+// A tárolt azonosító / azonosító-típus megfelel-e a típus szabályának — a szerkesztő ebből jelzi a
+// korábban (a régi űrlappal) hibásan bekerült adatot. Visszaad: null (rendben) vagy
+// {kod:'tipus_elter'|'nincs_azonosito', szoveg}.
+export function storedIdProblem(def, comp, nameOf = x => x){
+  const { mode, types } = idMode(def);
+  const az = str(comp && comp.azonosito), at = str(comp && comp.azonosito_tipus);
+  if(mode === "nincs" && (az !== "" || at !== ""))
+    return { kod:"nincs_azonosito", szoveg:"Ennél a típusnál nincs külön azonosító (a név azonosít) — a tárolt azonosító nem felel meg a típusnak. Töröld a mezőből." };
+  if(mode === "fix" && at !== "" && at !== types[0])
+    return { kod:"tipus_elter", szoveg:`A tárolt azonosító-típus („${nameOf(at)}”) nem felel meg a típusnak — itt csak „${nameOf(types[0])}” lehet. Állítsd át.` };
+  if(mode === "valaszthato" && az !== "" && at === "")
+    return { kod:"tipus_hianyzik", szoveg:`Az azonosítóhoz nincs megadva azonosító-típus — válaszd ki: ${types.map(nameOf).join(" vagy ")}.` };
+  if(mode === "valaszthato" && at !== "" && !types.includes(at))
+    return { kod:"tipus_elter", szoveg:`A tárolt azonosító-típus („${nameOf(at)}”) nem felel meg a típusnak — itt csak ${types.map(nameOf).join(" vagy ")} lehet. Állítsd át.` };
+  return null;
+}
+
+// A munkaanyag Szám-listájában az elemek sorrendje: a fő elem (★) elöl, utána a sorozat
+// komponens-sablonjának típus-sorrendje, a sablonban nem szereplő típusok a végén (ABC);
+// típuson belül megnevezés, majd azonosító szerint — így a sorrend mindig ugyanaz.
+export function orderComponents(comps, typeOrder = []){
+  const pos = t => { const i = typeOrder.indexOf(t); return i < 0 ? typeOrder.length : i; };
+  return (comps || []).slice().sort((a, b) =>
+    (b.is_main ? 1 : 0) - (a.is_main ? 1 : 0)
+    || pos(a.tipus) - pos(b.tipus)
+    || String(a.tipus).localeCompare(String(b.tipus))
+    || str(a.megnevezes).localeCompare(str(b.megnevezes), "hu")
+    || str(a.azonosito).localeCompare(str(b.azonosito))
+    || String(a.id || "").localeCompare(String(b.id || "")));
+}
+
 // ---- Sorozat-szintű azonosítók (series.azonositok): [{tipus:'isbn'|'issn', ertek}] legfeljebb 2 ----
 export const SERIES_ID_TYPES = [["isbn", "ISBN"], ["issn", "ISSN"]];
 export const SERIES_ID_MAX = 2;

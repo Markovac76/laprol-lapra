@@ -5,7 +5,7 @@
     modulban: admin-users.js.)
    ============================================================ */
 import { supabase } from "./supabase.js";
-import { state, S, COMP_TYPES, esc, pad, opts, capFirst, slugify, sortEgyebLast } from "./state.js";
+import { state, S, esc, pad, opts, capFirst, slugify, sortEgyebLast, typeLabel } from "./state.js";
 import { openModal, closeModal, err, sheet, guarded } from "./modal.js";
 import { reload } from "./data.js";
 import { upsertMyStatus, upsertMyIssueData } from "./personal.js";
@@ -52,9 +52,9 @@ export function itemForm(){
       const blocks=list.map((inst,idx)=>{
         ci++;
         return `<div class="compedit">
-          <h4>${COMP_TYPES[t]||t}${list.length>1?` #${idx+1}`:""}</h4>
+          <h4>${esc(typeLabel(t))}${list.length>1?` #${idx+1}`:""}</h4>
           <div class="kod">${scode}-${pad(master.n||nextN,4)}-${pad(ci,2)}</div>
-          <div class="field"><label>Megnevezés (opcionális) <span style="color:var(--faint);font-weight:400">— ha üres, "${COMP_TYPES[t]||t}${list.length>1?" #N":""}" jelenik meg</span></label>
+          <div class="field"><label>Megnevezés (opcionális) <span style="color:var(--faint);font-weight:400">— ha üres, "${esc(typeLabel(t))}${list.length>1?" #N":""}" jelenik meg</span></label>
             <input id="cname-${inst.key}" value="${esc(inst.megnevezes||"")}" placeholder="pl. Star Wars minifigura-csomag"></div>
           <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Státusz</label>
           <div class="statrow" data-stat="${inst.key}">
@@ -73,7 +73,7 @@ export function itemForm(){
           ${list.length>1?`<button type="button" class="btn ghost" data-removeinst="${inst.key}">Ez a példány törlése</button>`:""}
         </div>`;
       }).join("");
-      return blocks + `<button type="button" class="btn ghost" data-addinst="${esc(t)}">+ Még egy ${esc(COMP_TYPES[t]||t)} hozzáadása</button>`;
+      return blocks + `<button type="button" class="btn ghost" data-addinst="${esc(t)}">+ Még egy ${esc(typeLabel(t))} hozzáadása</button>`;
     }).join("");
 
     openModal(`<h2>Új szám</h2>

@@ -12,7 +12,7 @@ import { supabase, fetchAllRows } from "./supabase.js";
 import { state, COMP_TYPES, esc, fmtDate, listName } from "./state.js";
 import { openModal, sheet, err, guarded } from "./modal.js";
 import { initialComponents } from "./component-template.js";
-import { typeDef, idMode, masterFields, extraFields, isRequired, defaultIdType } from "./type-defs.js";
+import { typeDef, idMode, masterFields, extraFields, isRequired, defaultIdType, storedIdProblem, orderComponents } from "./type-defs.js";
 
 const typeLabel = t => listName("komponens", t) || COMP_TYPES[t] || t;
 
@@ -32,11 +32,13 @@ export async function fetchDraftItems(draftSeriesId){
   return (issues||[]).map(it=>({...it, comps: comps.filter(c=>c.draft_issue_id===it.id)}));
 }
 
-export function renderDraftItemsList(items){
+// typeOrder: a sorozat komponens-sablonjának típus-sorrendje — az elemek mindig ugyanabban a
+// sorrendben látszanak: a fő elem (★) elöl, utána a sablon sorrendje.
+export function renderDraftItemsList(items, typeOrder = []){
   if(!items.length) return `<p class="msub">Még nincs szám a draftban.</p>`;
   return items.map(it=>{
-    const compsTxt = (it.comps||[]).map(c=>
-      `${c.deleted?"<s>":""}${typeLabel(c.tipus)}${c.megnevezes?" — "+esc(c.megnevezes):""}${c.azonosito?": "+esc(c.azonosito):""}${c.deleted?" (törölve)</s>":""}`
+    const compsTxt = orderComponents(it.comps||[], typeOrder).map(c=>
+      `${c.deleted?"<s>":""}${c.is_main&&!c.deleted?"★ ":""}${esc(typeLabel(c.tipus))}${c.megnevezes?" — "+esc(c.megnevezes):""}${c.azonosito?": "+esc(c.azonosito):""}${c.deleted?" (törölve)</s>":""}`
     ).join(" · ");
     return `<div class="userrow"><div class="uinfo">
         <div class="uname">#${it.lapszam}${it.cim?" – "+esc(it.cim):""}</div>
@@ -62,39 +64,56 @@ function typeFieldsHtml(c, k, t, multi){
   const def = typeDef(state.TYPEDEFS, t);
   const { mode, types } = idMode(def);
   const fields = masterFields(def);
+  // A tárolt azonosító / azonosító-típus eltérése a típus szabályától (pl. a régi űrlappal felvitt
+  // adat): NEM rejtjük el — látszik, jelzéssel, és itt javítható.
+  const prob = storedIdProblem(def, c, idTypeName);
+  const probNote = prob ? `<div class="typewarn">⚠ ${esc(prob.szoveg)}</div>` : "";
+  // Kötelező, de még üres mező: halvány kiemelés + „a Kész-hez kell” (a mentést nem blokkolja).
+  const reqA = (f, val) => isRequired(f) ? ` data-req="1"${String(val??"").trim()===""?' class="reqempty"':""}` : "";
+  const reqT = (f, val) => isRequired(f) ? ` <span class="reqtag"${String(val??"").trim()===""?"":" hidden"}>a „Kész”-hez kell</span>` : "";
   const html = fields.map(f=>{
     const req = isRequired(f) ? " "+REQ : "";
     if(f.key==="megnevezes"){
       const hint = isRequired(f) ? ""
         : (f.potlas==="szam_cime" ? `— ha üres, a Szám címe számít névnek`
                                   : `— ha üres, "${esc(typeLabel(t))}${multi?" #N":""}" jelenik meg`);
-      return `<div class="field"><label>${esc(f.label)}${req}${isRequired(f)?"":" (opcionális)"} <span style="color:var(--faint);font-weight:400">${hint}</span></label>
-        <input id="di-name-${k}" value="${esc(c.megnevezes||"")}"${f.potlas==="szam_cime"?"":' placeholder="pl. Star Wars minifigura-csomag"'}></div>`;
+      return `<div class="field"><label>${esc(f.label)}${req}${isRequired(f)?"":" (opcionális)"}${reqT(f, c.megnevezes)} <span style="color:var(--faint);font-weight:400">${hint}</span></label>
+        <input id="di-name-${k}"${reqA(f, c.megnevezes)} value="${esc(c.megnevezes||"")}"${f.potlas==="szam_cime"?"":' placeholder="pl. Star Wars minifigura-csomag"'}></div>`;
     }
     if(f.key==="azonosito"){
       if(mode==="nincs") return "";
+      const cur = c.azonosito_tipus||"";
       let typeCell;
-      if(mode==="fix"){
+      if(mode==="fix" && (!cur || cur===types[0])){
         typeCell = `<div class="field"><label>Azonosító típusa</label><input value="${esc(idTypeName(types[0]))}" disabled title="Ennél a típusnál rögzített"></div>`;
+      } else if(mode==="fix"){
+        // a tárolt típus eltér a rögzítettől: látszik, és átállítható a helyesre
+        typeCell = `<div class="field"><label>Azonosító típusa</label><select id="di-ct-${k}" class="typebad">
+          <option value="${esc(cur)}" selected>${esc(idTypeName(cur))} (nem felel meg a típusnak)</option>
+          <option value="${esc(types[0])}">${esc(idTypeName(types[0]))}</option></select></div>`;
       } else {
         const allowed = mode==="valaszthato" ? (state.LISTS.azonosito||[]).filter(o=>types.includes(o.ertek)) : (state.LISTS.azonosito||[]);
-        const cur = c.azonosito_tipus||"";
-        const stray = cur && !allowed.some(o=>o.ertek===cur) ? `<option value="${esc(cur)}" selected>${esc(idTypeName(cur))} (itt nem megengedett)</option>` : "";
-        typeCell = `<div class="field"><label>Azonosító típusa</label><select id="di-ct-${k}" data-deftype="${esc(mode==="valaszthato"?(def.default_azonosito_tipus||""):"")}">
+        const strayOn = cur && !allowed.some(o=>o.ertek===cur);
+        const stray = strayOn ? `<option value="${esc(cur)}" selected>${esc(idTypeName(cur))} (nem felel meg a típusnak)</option>` : "";
+        typeCell = `<div class="field"><label>Azonosító típusa</label><select id="di-ct-${k}"${strayOn?' class="typebad"':""} data-deftype="${esc(mode==="valaszthato"?(def.default_azonosito_tipus||""):"")}">
           <option value="">${mode==="valaszthato"?"— válassz —":"—"}</option>${stray}${allowed.map(o=>`<option value="${esc(o.ertek)}"${o.ertek===cur?" selected":""}>${esc(o.nev)}</option>`).join("")}</select></div>`;
       }
       return `<div class="grid2">${typeCell}
-        <div class="field"><label>${esc(f.label)}${req}</label><input id="di-cid-${k}" data-ct="di-ct-${k}" value="${esc(c.azonosito||"")}"></div></div>`;
+        <div class="field"><label>${esc(f.label)}${req}${reqT(f, c.azonosito)}</label><input id="di-cid-${k}" data-ct="di-ct-${k}"${reqA(f, c.azonosito)} value="${esc(c.azonosito||"")}"></div></div>${probNote}`;
     }
     const v = c.adatok && c.adatok[f.key]!=null ? c.adatok[f.key] : "";
-    return `<!--x--><div class="field"><label>${esc(f.label)}${req}</label><input id="di-x-${esc(f.key)}-${k}"${f.kind==="egesz"?' type="number"':""} value="${esc(v)}"></div>`;
+    return `<!--x--><div class="field"><label>${esc(f.label)}${req}${reqT(f, v)}</label><input id="di-x-${esc(f.key)}-${k}"${f.kind==="egesz"?' type="number"':""}${reqA(f, v)} value="${esc(v)}"></div>`;
   }).reduce((acc, h)=>{     // a típus saját mezői kettesével egy sorba
     if(h.startsWith("<!--x-->")){ const last=acc[acc.length-1]; if(last && last.x && last.items.length<2) last.items.push(h); else acc.push({x:true, items:[h]}); }
     else acc.push({x:false, items:[h]});
     return acc;
   }, []).map(g=>g.x ? `<div class="grid2">${g.items.join("")}</div>` : g.items[0]).join("");
+  // „Nincs azonosító” szabályú típus (Figura, Modell), amelyen mégis van tárolt azonosító: látszik,
+  // jelzéssel, és törölhető (a mező kiürítésével a tárolt azonosító-típus is törlődik).
+  const strayId = (mode==="nincs" && prob) ? `<div class="field"><label>Tárolt azonosító${c.azonosito_tipus?` <span style="color:var(--faint);font-weight:400">— típusa: ${esc(idTypeName(c.azonosito_tipus))}</span>`:""}</label>
+      <input id="di-cid-${k}" class="typebad" data-clear-type="1" value="${esc(c.azonosito||"")}"></div>${probNote}` : "";
   const anyReq = fields.some(isRequired);
-  return html + (anyReq ? `<div class="unote">${REQ} kötelező mező — új vagy módosított elemnél nélküle a „Kész” megáll.</div>` : "");
+  return html + strayId + (anyReq ? `<div class="fieldnote">${REQ} kötelező mező — a mentést nem akadályozza, de új vagy módosított elemnél nélküle a „Kész” megáll.</div>` : "");
 }
 
 export function draftItemForm(draftSeriesId, existing, components, onDone, template = null){
@@ -224,6 +243,14 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
       comps.push({tipus:t, azonosito_tipus:def, azonosito:"", megnevezes:(te&&te.default_megnevezes)||"", adatok:{}, _tmpKey:"tmp"+(tmpSeq++)});
       draw();
     };
+    // A kötelező, üres mező kiemelése gépelés közben frissül (kitöltve eltűnik).
+    sheet.querySelectorAll("input[data-req]").forEach(inp=>{
+      inp.addEventListener("input",()=>{
+        const empty = inp.value.trim()==="";
+        inp.classList.toggle("reqempty", empty);
+        const tag = inp.closest(".field").querySelector(".reqtag"); if(tag) tag.hidden = !empty;
+      });
+    });
     // Utólagos átsorolásnál a mezők az új típus szerint rajzolódnak újra.
     sheet.querySelectorAll('select[id^="di-type-"]').forEach(s=>{ s.onchange=()=>{ syncFromDom(); draw(); }; });
     // Könyvnél (ahol a típusnak van alap azonosító-típusa) az azonosító beírásakor az ISBN előre megjelenik.
@@ -281,8 +308,10 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
       for(const c of comps){
         if(c.deleted) continue;
         const az=(c.azonosito||"").trim(), at=(c.azonosito_tipus||"").trim();
-        if(!az || (c._orig && c._orig.az===az && c._orig.at===at)) continue;
         const def=typeDef(state.TYPEDEFS, c.tipus), { mode, types }=idMode(def);
+        // „nincs azonosító” szabályú típusnál a kiürített (hibásan tárolt) azonosítóval a típusa is törlődik
+        if(mode==="nincs" && !az && at){ c.azonosito_tipus=null; continue; }
+        if(!az || (c._orig && c._orig.az===az && c._orig.at===at)) continue;
         if(mode==="fix") c.azonosito_tipus=types[0];
         else if(mode==="valaszthato" && !types.includes(at)){
           if(!at && def.default_azonosito_tipus) c.azonosito_tipus=def.default_azonosito_tipus;
