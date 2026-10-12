@@ -19,7 +19,7 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.19** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.25** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 - **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
