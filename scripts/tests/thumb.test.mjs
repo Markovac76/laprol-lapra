@@ -7,6 +7,8 @@ const base = "https://x.supabase.co/storage/v1/object/public/component-images/co
 assert.equal(thumbUrl(base + "?v=123", 64),
   "https://x.supabase.co/storage/v1/render/image/public/component-images/components/abc/live.jpg?v=123&width=64&height=64&resize=contain&quality=70");
 assert.equal(thumbUrl(base, 56), "https://x.supabase.co/storage/v1/render/image/public/component-images/components/abc/live.jpg?width=56&height=56&resize=contain&quality=70");
+// téglalap alakú doboz (a Szám-sáv csempéje, 2× felbontás)
+assert.equal(thumbUrl(base, 168, 144), "https://x.supabase.co/storage/v1/render/image/public/component-images/components/abc/live.jpg?width=168&height=144&resize=contain&quality=70");
 // nem Supabase-cím és üres érték változatlan
 assert.equal(thumbUrl("https://example.com/a.jpg"), "https://example.com/a.jpg");
 assert.equal(thumbUrl(""), ""); assert.equal(thumbUrl(null), "");

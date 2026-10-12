@@ -6,6 +6,9 @@
    Legújabb elöl. Szándékosan elválasztva a UI-tól (changelog.js).
    ============================================================ */
 export const CHANGELOG = [
+  { date:"2026-10-12",
+    text:"Új a Szám sora: az elemek (magazin, könyv, figura, lego, kártya…) csempékben, egymás mellett látszanak, legfeljebb három, az első a „fő elem” (★). Egy csempén felül a státusz-gomb az elem nevével (✓ megvan, ✕ hiányzik, – nem kell, üres kör = jelöletlen), alatta nagyobb kép (ha nincs, „kép” felirat), mellette a típus jele és a darabszám — a darabszám mostantól mindig látszik. Ha háromnál több elem van, a lenyitó nyílnál „+N” jelzi a többit. Telefonon a csempék a szöveg alá kerülnek, egy sorba. A képek élesebbek lettek, de továbbra is kicsinyítve töltődnek. A sor színe, a haladásjelzők, az összegek és a gombok működése nem változott."
+  },
   { date:"2026-10-11",
     text:"Karbantartóknak: a sorozatnak mostantól komponens-sablonja van (a sorozat-szerkesztőben): típusonként állítható a sorrend, a fő elem (★), hogy kötelező-e, az azonosító-szabály (kötelező / ajánlott / nincs), az alapértelmezett azonosító-típus és hogy számít-e a Szám színébe. Az új Számok a sablonból indulnak; a meglévőket a sablon nem módosítja. Egy Számhoz bármilyen más típusú elem is hozzáadható („+ Elem hozzáadása”, pl. egy Limited Edition kártya) — az csak az adott Számra vonatkozik. A „Kész” előtt figyelmeztetés jelenik meg az ajánlott azonosító hiányáról és a duplikált azonosítókról („Mégis Kész”). Az átmeneti kompatibilitás a régi szerkesztővel (amely csak a komponens-listát módosította) megszűnt: a publikálásnál a sorozat sablonja az irányadó."
   },

@@ -2,7 +2,7 @@
    Megjelenítés: fülek, hero, szűrők, lista, tapadó fejléc.
    ============================================================ */
 import { state, S, COMP_TYPES, isFutureDate, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus, issueSlots, typeLabel } from "./state.js";
-import { thumbUrl, typeIcon } from "./thumb.js";
+import { thumbUrl, typeIcon, TILE_W, TILE_H } from "./thumb.js";
 import { stats } from "./data.js";
 import { showSeriesChangePopup, showIssueChangePopup, showCollectedChanges } from "./changes.js";
 import { isStaff } from "./permissions.js";
@@ -122,16 +122,16 @@ function matches(it){ const s=S();
   return true;
 }
 
-// A kis kép a Supabase Storage saját átméretezésével jön (≈2 KB a teljes kép helyett);
-// ha a végpont nem elérhető, az eredeti képre, ha az sem, a típus-piktogramra esünk vissza.
+// A csempe képe a Supabase Storage saját átméretezésével jön (≈4 KB a teljes kép helyett);
+// ha a végpont nem elérhető, az eredeti képre, ha az sem, a „kép” feliratos üres keretre esünk vissza.
 let thumbBroken = false;
-const thumbSrc = url => thumbBroken ? url : thumbUrl(url, 64);
+const thumbSrc = url => thumbBroken ? url : thumbUrl(url, TILE_W, TILE_H);
 document.addEventListener("error", e=>{
   const im = e.target;
   if(!im || im.tagName!=="IMG" || !im.classList.contains("sl-img")) return;
   const orig = im.dataset.orig;
   if(orig && im.getAttribute("src")!==orig){ thumbBroken = true; im.setAttribute("src", orig); return; }
-  const box = im.parentElement; im.remove(); if(box) box.classList.remove("photo");
+  const box = im.parentElement; im.remove(); if(box) box.classList.remove("photo");   // marad a „kép” feliratos üres keret
 }, true);
 const MLAB={megvan:"megvan",hianyzik:"hiány",nemkell:"nem kell"};
 const CHEV='<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
@@ -200,22 +200,26 @@ export function renderList(){
     const eredetiLine = `<span class="money">eredeti ár ${it.eredeti_ar!=null?fmtFt(it.eredeti_ar):"nem ismert"}</span>`;
     const fizetveLine = hasOwnedComponent(it,s) ? `<span class="money">fizetve ${it.fizetett_ar!=null?fmtFt(it.fizetett_ar):"nem ismert"}</span>` : "";
     const moneyBlock = `<div class="imoney">${eredetiLine}${fizetveLine}</div>`;
-    // Összecsukott sor (1. kör / A): szöveg | elem-helyek (legfeljebb 3, egymás alatt) | lenyitó.
-    // Minden elem-hely: kis kép (vagy típus-piktogram) + státuszgomb. A fő elem (★) az
-    // első; több elemnél a lenyitó gomb fölött "+N" jelzi a többit.
+    // Összecsukott sor (Szám-sáv): szöveg | csempék (legfeljebb 3, egymás mellett, jobbra
+    // igazítva) | lenyitó. Csempénként felül a státuszgomb (ikon + név), alatta balra a kép
+    // (vagy „kép” feliratos üres keret), mellette felül a típus-ikon, alul a darabszám
+    // (mindig látszik, akkor is, ha 1). A fő elem (★) az első; háromnál több elemnél a
+    // lenyitó gomb fölött "+N" jelzi a többit. Telefonon a csempék a szöveg alá kerülnek.
     const sl = issueSlots(it, s);
     const ST_IC = { megvan:"✓", hianyzik:"✕", nemkell:"–" };
     const slotHtml = sl.shown.map(({t,c,label,isMain})=>{
       const cdb=(c.db==null?1:c.db);
-      const showCnt = c.status==="megvan" && cdb>1;
-      const title = `${label}${c.status?": "+MLAB[c.status]:": jelöletlen"}${showCnt?" · "+cdb+" db":""}${isMain?" (fő elem)":""}`;
+      const stTxt = c.status?MLAB[c.status]:"jelöletlen";
+      const title = `${label}: ${stTxt} · ${cdb} db${isMain?" (fő elem)":""}`;
       const img = c.kep_url
-        ? `<img class="sl-img" src="${esc(thumbSrc(c.kep_url))}" data-orig="${esc(c.kep_url)}" alt="" width="28" height="28" loading="lazy" decoding="async">`
+        ? `<img class="sl-img" src="${esc(thumbSrc(c.kep_url))}" data-orig="${esc(c.kep_url)}" alt="" width="84" height="72" loading="lazy" decoding="async">`
         : "";
-      return `<div class="sl-slot"><div class="sl-thumb${c.kep_url?" photo":""}${isMain?" main":""}">${typeIcon(t)}${img}</div>
+      return `<div class="sl-tile">
         <button class="mark sl-btn${c.status?" m-"+c.status:""}" data-n="${it.n}" data-t="${esc(t)}" data-cid="${c.id||""}" ${future?"disabled":""}
-          title="${esc(title)}" aria-label="${esc(label)}${c.status?": "+MLAB[c.status]:": jelöletlen"}">
-          <i class="sl-ic">${c.status?ST_IC[c.status]:"·"}</i><span class="sl-nm">${esc(label)}</span>${showCnt?`<b class="sl-cnt">${cdb}</b>`:""}</button></div>`;
+          title="${esc(title)}" aria-label="${esc(label)}: ${stTxt}">
+          <i class="sl-ic">${c.status?ST_IC[c.status]:""}</i><span class="sl-nm">${esc(label)}</span></button>
+        <div class="sl-low"><div class="sl-thumb${c.kep_url?" photo":""}${isMain?" main":""}"${isMain?' title="Fő elem"':""}><span class="sl-noimg">kép</span>${img}</div>
+          <div class="sl-side"><div class="sl-type" title="${esc(typeLabel(t))}">${typeIcon(t)}</div><div class="sl-cnt" title="${cdb} db">${cdb}</div></div></div></div>`;
     }).join("");
     const open = state.openIssue===it.n;
     // A panel a Számon TÉNYLEGESEN meglévő komponens-PÉLDÁNYOKAT listázza (nem a
@@ -237,7 +241,7 @@ export function renderList(){
         const statusBtn = !future ? `<button class="mark block${c.status?" m-"+c.status:""}" data-n="${it.n}" data-cid="${c.id}" aria-label="Státusz">
           <span class="mlab">${c.status?MLAB[c.status]:"jelöletlen"}</span></button>` : "";
         return `<div class="imgcard"><div class="${boxClass}">${img}</div>
-          <div class="imgcap"><div class="cn">${isMain?'<span class="mainstar" title="Fő elem">★</span> ':""}${esc(label)}</div>
+          <div class="imgcap"><div class="cn"><span class="cn-type" title="${esc(typeLabel(t))}">${typeIcon(t)}</span>${isMain?'<span class="mainstar" title="Fő elem">★</span> ':""}${esc(label)}</div>
           <div class="cc">${scode}-${pad(it.n,4)}-${pad(legacyIdx,2)}</div></div>${pstep}${statusBtn}
           ${c.id?imageControlsHtml("component",c,c.id):""}</div>`;
       }).join("") + `</div>
@@ -253,7 +257,7 @@ export function renderList(){
         ${moneyBlock}
       </div>
       <div class="sl-slots">${slotHtml}</div>
-      <div class="sl-chev">${sl.extra>0?`<span class="sl-more" title="${sl.extra} további elem — nyisd le">+${sl.extra}</span>`:""}
+      <div class="sl-chev"><div class="sl-mslot">${sl.extra>0?`<span class="sl-more" title="Még ${sl.extra} elem — nyisd le">+${sl.extra}</span>`:""}</div>
         <button class="expander" data-exp="${it.n}" aria-expanded="${open}" aria-label="Elemek">${CHEV}${hasPendingImg?'<span class="chgdot img" title="Függő képjavaslat">📷</span>':""}</button></div>
     </div>${panel}</div>`;
   }).join("");

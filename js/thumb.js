@@ -4,7 +4,7 @@
 
    thumbUrl(): a feltöltött komponens-kép KICSINYÍTETT változatának címe a
    Supabase Storage saját átméretezésével (/render/image/…?width=…). Ez NEM
-   külön fájl: a kicsinyítést a Storage végzi kéréskor (≈2 KB egy 170 KB-os
+   külön fájl: a kicsinyítést a Storage végzi kéréskor (≈4 KB egy 170 KB-os
    kép helyett). Ha a végpont nem elérhető, a hívó (render.js) az eredeti
    képre esik vissza.
    ============================================================ */
@@ -12,16 +12,21 @@
 const OBJ = "/storage/v1/object/public/";
 const REN = "/storage/v1/render/image/public/";
 
-// px: a kért (négyzetes) doboz; a kép nem vágódik (contain). Az átméretezés
-// csak a Supabase public-bucket címekre megy; minden más cím változatlan.
-export function thumbUrl(url, px = 64){
+// A Szám-sáv csempéjének képe: a 84 × 72 px-es keret 2× felbontásban (éles
+// nagy pixelsűrűségű kijelzőn is); a telefon 62 × 58 px-es kerete ugyanezt a
+// címet használja (egy kép, egy gyorsítótár-bejegyzés). Mérve: ≈3,7 KB / kép.
+export const TILE_W = 168, TILE_H = 144;
+
+// w × h: a kért doboz (h nélkül négyzetes); a kép nem vágódik (contain). Az
+// átméretezés csak a Supabase public-bucket címekre megy; minden más cím változatlan.
+export function thumbUrl(url, w = 64, h = w){
   if(!url || typeof url !== "string") return url || "";
   const i = url.indexOf(OBJ);
   if(i < 0) return url;
   const head = url.slice(0, i), rest = url.slice(i + OBJ.length);
   const [path, query = ""] = rest.split("?");
   const keep = query ? query + "&" : "";
-  return `${head}${REN}${path}?${keep}width=${px}&height=${px}&resize=contain&quality=70`;
+  return `${head}${REN}${path}?${keep}width=${w}&height=${h}&resize=contain&quality=70`;
 }
 
 // ---- piktogramok (beágyazott SVG, külső függőség nélkül) -------------------

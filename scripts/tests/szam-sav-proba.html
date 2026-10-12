@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Szám-sáv — látványpróba (tesztadat)</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../styles.css">
+</head>
+<body>
+<!-- A Szám-sáv látványpróbája KITALÁLT tesztadaton (nem élő adat, nincs bejelentkezés,
+     nincs mentés): az app saját megjelenítő kódja (js/render.js) rajzol. Megnyitás a
+     helyi kiszolgálóról: /scripts/tests/szam-sav-proba.html — laptop és 390 px szélességben. -->
+<main class="wrap" style="padding-top:14px">
+  <p style="color:var(--muted);font-size:13px;margin:0 0 10px">Szám-sáv látványpróba — kitalált tesztadat, a gombok itt nem mentenek.</p>
+  <div class="listhead" id="listhead"></div>
+  <div class="list" id="list"></div>
+</main>
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>   <!-- az app moduljai betöltéskor keresik -->
+<script type="module">
+import { state } from "../../js/state.js";
+import { renderList } from "../../js/render.js";
+
+const svg = (bg, txt) => "data:image/svg+xml;utf8," + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="170"><rect width="120" height="170" fill="${bg}"/><text x="60" y="92" font-size="20" font-family="sans-serif" fill="#fff" text-anchor="middle">${txt}</text></svg>`);
+const wide = svg("#2a6", "kép").replace('width%3D%22120%22%20height%3D%22170%22', 'width%3D%22220%22%20height%3D%22110%22');
+let seq = 0;
+const c = (tipus, status, o = {}) => ({ id: "t" + (++seq), tipus, status, db: 1, megnevezes: null, kep_url: null, is_main: false, created_at: String(seq).padStart(4, "0"), ...o });
+const item = (n, name, date, comps, o = {}) => {
+  const by = {}; comps.forEach(x => (by[x.tipus] = by[x.tipus] || []).push(x));
+  return { id: "i" + n, n, name, date, eredeti_ar: 1999, fizetett_ar: 1999, besz_menny: 1, comps: by, ...o };
+};
+
+state.LISTS = { komponens: ["magazin:Magazin", "modell:Modell", "konyv:Könyv", "figura:Figura", "lego:Lego", "krtya:Kártya", "egyeb:Egyéb"].map(x => { const [ertek, nev] = x.split(":"); return { ertek, nev }; }) };
+state.SERIES = [{
+  id: "s1", sorozat: "Tesztsorozat", display: "Teszt", accent: "#22a041", kodSzam: 11, components: ["magazin", "lego"], template: [], items: [
+    item(29, "2025. 5.szám", "2025-08-01", [c("magazin", "megvan", { is_main: true, kep_url: svg("#b33", "LEGO") }), c("lego", "hianyzik", { megnevezes: "The Mandalorian" }), c("krtya", null, { megnevezes: "Bo-Katan Kryze" })]),
+    item(1, "Chase a mentőakcióban", "2025-03-04", [c("konyv", "megvan", { is_main: true, kep_url: svg("#36c", "könyv") }), c("figura", "megvan", { megnevezes: "Chase", db: 2, kep_url: wide })]),
+    item(2, "Jaguar E-Type", "2024-11-12", [c("konyv", null, { is_main: true })], { fizetett_ar: null }),
+    item(3, "Négy elemes Szám", "2025-01-10", [c("magazin", "megvan", { is_main: true, kep_url: svg("#a50", "4") }), c("lego", "nemkell"), c("krtya", "megvan", { megnevezes: "Darth Vader" }), c("egyeb", "hianyzik", { megnevezes: "Poszter" })]),
+    item(4, "Öt elemes Szám nagyon hosszú címmel, ami több sorba is áttörhet a keskeny hasábban", "2025-02-10", [c("magazin", "hianyzik", { is_main: true, db: 0 }), c("lego", null), c("lego", null), c("krtya", null), c("figura", null)], { fizetett_ar: null }),
+    item(5, "Hibás képcím (tartalék: „kép” felirat)", "2025-04-10", [c("magazin", "megvan", { is_main: true, kep_url: "https://invalid.invalid/nincs.jpg" }), c("modell", "megvan", { db: 3 })]),
+    item(6, null, "2099-01-01", [c("magazin", null, { is_main: true }), c("lego", null)], { eredeti_ar: null, fizetett_ar: null }),
+  ],
+}];
+state.activeIdx = 0;
+
+// ?adat=<json-cím>&s=<sorszám>: helyben kimentett (nem commitolt) adat kirajzolása
+// ugyanazzal a modell-építővel, mint az appban — fejlesztői ellenőrzéshez.
+const prm = new URLSearchParams(location.search);
+if (prm.get("adat")) {
+  const { buildSeriesModel } = await import("../../js/model.js");
+  const d = await (await fetch(prm.get("adat"))).json();
+  const myStatus = {}; d.ms.forEach(r => { myStatus[r.component_id] = { status: r.status, db: r.db == null ? 1 : r.db, jegyzet: r.jegyzet }; });
+  const myIssue = {}; d.mi.forEach(r => { myIssue[r.issue_id] = { fizetett_ar: r.fizetett_ar, besz_menny: r.beszerzesi_mennyiseg == null ? 1 : r.beszerzesi_mennyiseg }; });
+  state.LISTS = { komponens: d.lists.map(l => ({ ertek: l.ertek, nev: l.megjelenites })) };
+  state.SERIES = buildSeriesModel({ series: d.series, issues: d.issues, comps: d.comps, myStatus, myIssue, selectedIds: new Set(d.series.map(s => s.id)) });
+  state.activeIdx = Math.min(+prm.get("s") || 0, state.SERIES.length - 1);
+}
+renderList();
+document.getElementById("list").addEventListener("click", e => {
+  const exp = e.target.closest(".expander"); if (!exp) return;
+  const n = +exp.dataset.exp; state.openIssue = state.openIssue === n ? null : n; renderList();
+});
+</script>
+</body>
+</html>
