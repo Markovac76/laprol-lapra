@@ -8,7 +8,8 @@
    itemForm meglévő-tétel-szerkesztési útját — kizárólag a member_status/
    member_issue_data saját sorait írja, a törzsadatot SOHA.
    ============================================================ */
-import { state, S, COMP_TYPES, esc, opts, compsOfType } from "./state.js";
+import { state, S, COMP_TYPES, esc, opts, compsOfType, typeLabel } from "./state.js";
+import { typeDef, fallbackName } from "./type-defs.js";
 import { openModal, closeModal, err, sheet, guarded } from "./modal.js";
 import { reload } from "./data.js";
 import { upsertMyStatus, upsertMyIssueData } from "./personal.js";
@@ -24,7 +25,11 @@ export function myDataForm(it){
   const compBlocks = flat.map(({t,c})=>{
     const st = c.status||null;
     typeSeen[t]=(typeSeen[t]||0)+1;
-    const label = c.megnevezes ? esc(c.megnevezes) : (typeCounts[t]>1 ? `${COMP_TYPES[t]||t} #${typeSeen[t]}` : (COMP_TYPES[t]||t));
+    // Név nélküli Modellnél a Szám címe a név (a típusleírás „potlas” szabálya); mellette a típus.
+    const potolt = c.megnevezes ? null : fallbackName(typeDef(state.TYPEDEFS, t), c, it.name);
+    const label = c.megnevezes ? esc(c.megnevezes)
+      : potolt ? `${esc(potolt)} <span class="unote">· ${esc(typeLabel(t))}</span>`
+      : (typeCounts[t]>1 ? `${COMP_TYPES[t]||t} #${typeSeen[t]}` : (COMP_TYPES[t]||t));
     return `<div class="compedit">
       <h4>${label}</h4>
       <div class="statrow" data-stat="${c.id}">

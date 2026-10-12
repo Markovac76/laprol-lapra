@@ -9,9 +9,10 @@
    típusonkénti map), soha nem dedupelünk típus szerint.
    ============================================================ */
 import { supabase, fetchAllRows } from "./supabase.js";
-import { state, COMP_TYPES, esc, fmtDate, opts, listName } from "./state.js";
-import { openModal, err, guarded } from "./modal.js";
+import { state, COMP_TYPES, esc, fmtDate, listName } from "./state.js";
+import { openModal, sheet, err, guarded } from "./modal.js";
 import { initialComponents } from "./component-template.js";
+import { typeDef, idMode, masterFields, extraFields, isRequired, defaultIdType } from "./type-defs.js";
 
 const typeLabel = t => listName("komponens", t) || COMP_TYPES[t] || t;
 
@@ -50,6 +51,51 @@ export function renderDraftItemsList(items){
 
 let tmpSeq=0;
 const keyOf = c => c.id || c._tmpKey;
+const idTypeName = v => listName("azonosito", v) || v;
+const REQ = `<span class="reqmark" title="Kötelező">*</span>`;
+
+// Egy komponens mezői a TÍPUSLEÍRÁS szerint (component_type_defs): a típus saját mezői
+// (pl. Kártya: Gyártó, Gyűjtemény…), a név / megnevezés, és az azonosító a típus szabálya
+// szerinti azonosító-típussal — fix típusnál nem szerkeszthető, a kiadvány családnál
+// (Magazin, Könyv) ISBN / ISSN választó, „nincs” szabálynál (Figura, Modell) nincs azonosító.
+function typeFieldsHtml(c, k, t, multi){
+  const def = typeDef(state.TYPEDEFS, t);
+  const { mode, types } = idMode(def);
+  const fields = masterFields(def);
+  const html = fields.map(f=>{
+    const req = isRequired(f) ? " "+REQ : "";
+    if(f.key==="megnevezes"){
+      const hint = isRequired(f) ? ""
+        : (f.potlas==="szam_cime" ? `— ha üres, a Szám címe számít névnek`
+                                  : `— ha üres, "${esc(typeLabel(t))}${multi?" #N":""}" jelenik meg`);
+      return `<div class="field"><label>${esc(f.label)}${req}${isRequired(f)?"":" (opcionális)"} <span style="color:var(--faint);font-weight:400">${hint}</span></label>
+        <input id="di-name-${k}" value="${esc(c.megnevezes||"")}"${f.potlas==="szam_cime"?"":' placeholder="pl. Star Wars minifigura-csomag"'}></div>`;
+    }
+    if(f.key==="azonosito"){
+      if(mode==="nincs") return "";
+      let typeCell;
+      if(mode==="fix"){
+        typeCell = `<div class="field"><label>Azonosító típusa</label><input value="${esc(idTypeName(types[0]))}" disabled title="Ennél a típusnál rögzített"></div>`;
+      } else {
+        const allowed = mode==="valaszthato" ? (state.LISTS.azonosito||[]).filter(o=>types.includes(o.ertek)) : (state.LISTS.azonosito||[]);
+        const cur = c.azonosito_tipus||"";
+        const stray = cur && !allowed.some(o=>o.ertek===cur) ? `<option value="${esc(cur)}" selected>${esc(idTypeName(cur))} (itt nem megengedett)</option>` : "";
+        typeCell = `<div class="field"><label>Azonosító típusa</label><select id="di-ct-${k}" data-deftype="${esc(mode==="valaszthato"?(def.default_azonosito_tipus||""):"")}">
+          <option value="">${mode==="valaszthato"?"— válassz —":"—"}</option>${stray}${allowed.map(o=>`<option value="${esc(o.ertek)}"${o.ertek===cur?" selected":""}>${esc(o.nev)}</option>`).join("")}</select></div>`;
+      }
+      return `<div class="grid2">${typeCell}
+        <div class="field"><label>${esc(f.label)}${req}</label><input id="di-cid-${k}" data-ct="di-ct-${k}" value="${esc(c.azonosito||"")}"></div></div>`;
+    }
+    const v = c.adatok && c.adatok[f.key]!=null ? c.adatok[f.key] : "";
+    return `<!--x--><div class="field"><label>${esc(f.label)}${req}</label><input id="di-x-${esc(f.key)}-${k}"${f.kind==="egesz"?' type="number"':""} value="${esc(v)}"></div>`;
+  }).reduce((acc, h)=>{     // a típus saját mezői kettesével egy sorba
+    if(h.startsWith("<!--x-->")){ const last=acc[acc.length-1]; if(last && last.x && last.items.length<2) last.items.push(h); else acc.push({x:true, items:[h]}); }
+    else acc.push({x:false, items:[h]});
+    return acc;
+  }, []).map(g=>g.x ? `<div class="grid2">${g.items.join("")}</div>` : g.items[0]).join("");
+  const anyReq = fields.some(isRequired);
+  return html + (anyReq ? `<div class="unote">${REQ} kötelező mező — új vagy módosított elemnél nélküle a „Kész” megáll.</div>` : "");
+}
 
 export function draftItemForm(draftSeriesId, existing, components, onDone, template = null){
   // Munka-másolat: a `comps` itt egy FLAT tömb (session-only, még nem mentett
@@ -64,6 +110,10 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
   // egy dupla mentés így ugyanazzal az elsődleges kulccsal próbálkozik, és a
   // másodikat az adatbázis utasítja el — nem keletkezik két azonos tétel.
   const newIssueId = existing ? null : crypto.randomUUID();
+  // A megnyitáskori azonosító / azonosító-típus: a típus szerinti szabályt (fix típus, ISBN / ISSN
+  // választás) csak az ÚJ és az itt MÓDOSÍTOTT azonosítóra alkalmazzuk — a változatlan meglévő
+  // komponenshez nem nyúlunk (különben a puszta mentés is módosítaná, és felkiáltójelet adna).
+  comps.forEach(c=>{ if(c.id) c._orig = { az:(c.azonosito||"").trim(), at:(c.azonosito_tipus||"").trim() }; });
   // FŐ ELEM (★): egy Számon pontosan egy komponens. Kezdetben a jelölt (is_main), ennek
   // hiányában a tartalék szabály: magazin, könyv, első (megegyezik a szerver-oldalival).
   const pickMainKey = list0 => {
@@ -89,6 +139,14 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
       const nameEl=document.getElementById("di-name-"+k); if(nameEl) c.megnevezes=nameEl.value;
       const idtEl=document.getElementById("di-ct-"+k); if(idtEl) c.azonosito_tipus=idtEl.value;
       const idEl=document.getElementById("di-cid-"+k); if(idEl) c.azonosito=idEl.value;
+      // a típus saját mezői (az `adatok`-ba): az üres érték kulcsa kimarad
+      extraFields(typeDef(state.TYPEDEFS, c.tipus)).forEach(f=>{
+        const el=document.getElementById(`di-x-${f.key}-${k}`); if(!el) return;
+        const raw=el.value.trim(); const a={...(c.adatok||{})};
+        if(raw==="") delete a[f.key];
+        else a[f.key] = f.kind==="egesz" && /^-?\d+$/.test(raw) ? parseInt(raw,10) : raw;
+        c.adatok=a;
+      });
       const typeEl=document.getElementById("di-type-"+k); if(typeEl) c.tipus=typeEl.value;
     });
   }
@@ -115,12 +173,7 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
         return `<div class="compedit">
           <h4>${esc(typeLabel(t))}${activeInType.length>1?` #${idx+1}`:""}</h4>
           ${canRetype?`<div class="field"><label>Típus (utólagos átsorolás)</label><select id="di-type-${k}">${typeOpts}</select></div>`:""}
-          <div class="field"><label>Megnevezés (opcionális) <span style="color:var(--faint);font-weight:400">— ha üres, "${esc(typeLabel(t))}${list.length>1?" #N":""}" jelenik meg</span></label>
-            <input id="di-name-${k}" value="${esc(c.megnevezes||"")}" placeholder="pl. Star Wars minifigura-csomag"></div>
-          <div class="grid2">
-            <div class="field"><label>Azonosító típusa</label><select id="di-ct-${k}"><option value="">—</option>${opts("azonosito",c.azonosito_tipus)}</select></div>
-            <div class="field"><label>Azonosító</label><input id="di-cid-${k}" value="${esc(c.azonosito||"")}"></div>
-          </div>
+          ${typeFieldsHtml(c, k, t, list.length>1)}
           ${comps.filter(x=>!x.deleted).length>1
             ? `<label class="ckrow" style="margin-top:6px"><input type="radio" name="di-main" value="${esc(k)}" ${k===mainKey?"checked":""}> ★ Fő elem <span style="color:var(--faint);font-weight:400">— a sorban az első helyen áll</span></label>`
             : `<div class="unote" style="margin-top:6px">★ Ez a Szám egyetlen eleme, ezért ez a fő elem.</div>`}
@@ -167,10 +220,19 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
       const t = document.getElementById("di-addtype").value;
       // alapértelmezett azonosító-típus: a sablon eleméé, ennek hiányában a típusleíráson (component_type_defs)
       const te = (Array.isArray(template)?template:[]).find(e=>e.tipus===t);
-      const def = (te && te.default_azonosito_tipus) || ((state.TYPEDEFS||{})[t]||{}).default_azonosito_tipus || null;
-      comps.push({tipus:t, azonosito_tipus:def, azonosito:"", megnevezes:(te&&te.default_megnevezes)||"", _tmpKey:"tmp"+(tmpSeq++)});
+      const def = defaultIdType(typeDef(state.TYPEDEFS, t), te);
+      comps.push({tipus:t, azonosito_tipus:def, azonosito:"", megnevezes:(te&&te.default_megnevezes)||"", adatok:{}, _tmpKey:"tmp"+(tmpSeq++)});
       draw();
     };
+    // Utólagos átsorolásnál a mezők az új típus szerint rajzolódnak újra.
+    sheet.querySelectorAll('select[id^="di-type-"]').forEach(s=>{ s.onchange=()=>{ syncFromDom(); draw(); }; });
+    // Könyvnél (ahol a típusnak van alap azonosító-típusa) az azonosító beírásakor az ISBN előre megjelenik.
+    sheet.querySelectorAll("input[data-ct]").forEach(inp=>{
+      inp.addEventListener("input",()=>{
+        const sel=document.getElementById(inp.dataset.ct);
+        if(sel && !sel.value && sel.dataset.deftype && inp.value.trim()) sel.value=sel.dataset.deftype;
+      });
+    });
     document.querySelectorAll("[data-removecomp]").forEach(b=>{
       b.onclick=guarded(async ()=>{
         syncFromDom();
@@ -214,6 +276,19 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
       const n=parseInt(master.lapszam); if(isNaN(n)){alert("A lapszám kötelező.");return;}
       const masterPayload={ draft_series_id:draftSeriesId, lapszam:n, cim:(master.cim||"").trim()||null, megjelenes:master.megjelenes||null,
         eredeti_ar:master.eredeti_ar?parseInt(master.eredeti_ar):null, deleted: !!master.deleted };
+      // Azonosító-típus a típus szabálya szerint — csak az új és az itt módosított azonosítóra:
+      // fix típusnál a rögzített; Könyvnél üresen az alap (ISBN); Magazinnál választani kell.
+      for(const c of comps){
+        if(c.deleted) continue;
+        const az=(c.azonosito||"").trim(), at=(c.azonosito_tipus||"").trim();
+        if(!az || (c._orig && c._orig.az===az && c._orig.at===at)) continue;
+        const def=typeDef(state.TYPEDEFS, c.tipus), { mode, types }=idMode(def);
+        if(mode==="fix") c.azonosito_tipus=types[0];
+        else if(mode==="valaszthato" && !types.includes(at)){
+          if(!at && def.default_azonosito_tipus) c.azonosito_tipus=def.default_azonosito_tipus;
+          else { alert(`${typeLabel(c.tipus)}: az azonosítóhoz válaszd ki az azonosító típusát — ${types.map(idTypeName).join(" vagy ")}.`); return; }
+        }
+      }
       try{
         let draftIssueId = savedIssueId;
         if(savedIssueId){ const {error}=await supabase.from("draft_issues").update(masterPayload).eq("id",savedIssueId); if(error) throw error; }
@@ -224,7 +299,7 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
         }
 
         for(const c of comps){
-          const cpayload={ tipus:c.tipus, azonosito_tipus:(c.azonosito_tipus||"").trim()||null, azonosito:(c.azonosito||"").trim()||null, megnevezes:(c.megnevezes||"").trim()||null };
+          const cpayload={ tipus:c.tipus, azonosito_tipus:(c.azonosito_tipus||"").trim()||null, azonosito:(c.azonosito||"").trim()||null, megnevezes:(c.megnevezes||"").trim()||null, adatok:c.adatok||{} };
           if(c.id){ const {error}=await supabase.from("draft_components").update(cpayload).eq("id",c.id); if(error) throw error; }
           else {
             // Az új sor azonosítóját megjegyezzük: ha a mentés később elakad és

@@ -7,6 +7,9 @@
    ============================================================ */
 export const CHANGELOG = [
   { date:"2026-10-12",
+    text:"A sorozat fejlécében, a név alatt megjelenhet a sorozat-azonosító (az egész sorozatra érvényes ISBN vagy ISSN, pl. „ISSN 3103-4152”). A lenyitott sorban és a Saját adatlapon a név nélküli modell neve a Szám címe. Karbantartóknak: a sorozat szerkesztőjében új „Sorozat-azonosítók” szakasz (legfeljebb két ISBN / ISSN, egyszer megadva; a változása nem ad felkiáltójelet). A Szám szerkesztőjében minden elem a típusa szerinti mezőket mutatja, a kötelezők * jelöléssel: a Kártyának hét mezője van (Gyártó, Gyűjtemény, Széria, Kiadás éve, Sorozatváltozat, Kód, Név), a Figuránál a név kötelező, a Legónál és a Kártyánál az azonosító-típus rögzített, a Magazinnál és a Könyvnél csak ISBN vagy ISSN választható. A „Kész” az új és a most módosított elemek hiányzó kötelező mezőinél áll meg; a régebbi elemek hiányáról csak figyelmeztetés jön. Az oda-vissza sablon kezeli a Kártya mezőit és a sorozat-azonosítót (külön lapon)."
+  },
+  { date:"2026-10-12",
     text:"Új a Szám sora: az elemek (magazin, könyv, figura, lego, kártya…) csempékben, egymás mellett látszanak, legfeljebb három, az első a „fő elem” (★). Egy csempén felül a státusz-gomb az elem nevével (✓ megvan, ✕ hiányzik, – nem kell, üres kör = jelöletlen), alatta nagyobb kép (ha nincs, „kép” felirat), mellette a típus jele és a darabszám — a darabszám mostantól mindig látszik. Ha háromnál több elem van, a lenyitó nyílnál „+N” jelzi a többit. Telefonon a csempék a szöveg alá kerülnek, egy sorba. A képek élesebbek lettek, de továbbra is kicsinyítve töltődnek. A sor színe, a haladásjelzők, az összegek és a gombok működése nem változott."
   },
   { date:"2026-10-11",

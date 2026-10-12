@@ -45,6 +45,33 @@ state.SERIES = [{
 }];
 state.activeIdx = 0;
 
+// Típusleírás (a component_type_defs tartalmának megfelelő tesztadat) — a panel Modell-neve
+// és a „Szám-szerkesztő próba” gomb ebből dolgozik.
+const KOZOS = [{ key:"kep", kind:"kep", label:"Kép" }, { key:"db", kind:"egesz", label:"Darabszám", szemelyes:true }, { key:"jegyzet", kind:"szoveg", label:"Jegyzet", szemelyes:true }];
+const F = (key, label, szint = "opcionalis", o = {}) => ({ key, label, kind:"szoveg", szint, ...o });
+const KIADVANY = [F("azonosito_tipus", "Azonosító típusa", "opcionalis", { kind:"lista" }), F("azonosito", "Azonosító"), F("megnevezes", "Megnevezés"), ...KOZOS];
+state.TYPEDEFS = {
+  magazin: { tipus:"magazin", csalad:"kiadvany", azonosito_mod:"valaszthato", azonosito_tipusok:["isbn","issn"], default_azonosito_tipus:null, fields:KIADVANY },
+  konyv: { tipus:"konyv", csalad:"kiadvany", azonosito_mod:"valaszthato", azonosito_tipusok:["isbn","issn"], default_azonosito_tipus:"isbn", fields:KIADVANY },
+  lego: { tipus:"lego", azonosito_mod:"fix", azonosito_tipusok:["lego_kd"], default_azonosito_tipus:"lego_kd", fields:[F("azonosito", "Lego-kód"), F("megnevezes", "Megnevezés"), ...KOZOS] },
+  krtya: { tipus:"krtya", azonosito_mod:"fix", azonosito_tipusok:["kartya_kod"], default_azonosito_tipus:"kartya_kod",
+    fields:[F("gyarto", "Gyártó"), F("gyujtemeny", "Gyűjtemény", "kotelezo"), F("szeria", "Széria"), F("kiadas_eve", "Kiadás éve", "opcionalis", { kind:"egesz" }), F("sorozatvaltozat", "Sorozatváltozat"), F("azonosito", "Kód", "kotelezo"), F("megnevezes", "Név", "kotelezo"), ...KOZOS] },
+  figura: { tipus:"figura", azonosito_mod:"nincs", azonosito_tipusok:[], fields:[F("megnevezes", "Név", "kotelezo"), ...KOZOS] },
+  modell: { tipus:"modell", azonosito_mod:"nincs", azonosito_tipusok:[], fields:[F("megnevezes", "Név", "opcionalis", { potlas:"szam_cime" }), ...KOZOS] },
+  egyeb: { tipus:"egyeb", azonosito_mod:"szabad", azonosito_tipusok:[], fields:KIADVANY },
+};
+state.LISTS.azonosito = ["isbn:ISBN", "issn:ISSN", "vonalkod:Vonalkód", "lego_kd:Lego Kód", "kartya_kod:Kártyakód", "egyeb:Egyéb"].map(x => { const [ertek, nev] = x.split(":"); return { ertek, nev }; });
+
+// Szám-szerkesztő próba (a draft-szerkesztő űrlapja kitalált adattal; a Mentés itt nem használható).
+if (new URLSearchParams(location.search).get("szerk")) {
+  const { draftItemForm } = await import("../../js/draft-items.js");
+  const dc = (id, tipus, o = {}) => ({ id, tipus, azonosito_tipus:null, azonosito:null, megnevezes:null, adatok:{}, is_main:false, deleted:false, source_component_id:"elo-" + id, ...o });
+  draftItemForm("proba-draft", { id:"proba-szam", lapszam:29, cim:"2025. 5.szám", megjelenes:"2025-08-01", eredeti_ar:1999, source_issue_id:"elo-szam", comps:[
+    dc("c1", "magazin", { is_main:true, azonosito:"2568-2474" }), dc("c2", "konyv"), dc("c3", "lego", { megnevezes:"The Mandalorian" }),
+    dc("c4", "krtya", { azonosito:"LE19", azonosito_tipus:"egyeb", megnevezes:"Bo-Katan Kryze" }), dc("c5", "figura"), dc("c6", "modell"), dc("c7", "egyeb", { azonosito:"X1", azonosito_tipus:"vonalkod" })] },
+    ["magazin", "lego"], () => document.getElementById("modal").classList.remove("open"), null);
+}
+
 // ?adat=<json-cím>&s=<sorszám>: helyben kimentett (nem commitolt) adat kirajzolása
 // ugyanazzal a modell-építővel, mint az appban — fejlesztői ellenőrzéshez.
 const prm = new URLSearchParams(location.search);

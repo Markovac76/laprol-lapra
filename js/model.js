@@ -13,7 +13,7 @@ import { PAL_FALLBACK, allComps } from "./state.js";
 export function buildSeriesModel({ series, issues, comps, myStatus = {}, myIssue = {}, selectedIds, seenOf = () => 0, pendingByComp = {}, pendingBySeries = {} }){
   const byS={}, byI={};
   // A fülsáv csak a SAJÁT, bepipált sorozatokból épül (member_series.is_selected) — nem az összesből.
-  const out = series.filter(r=>selectedIds.has(r.id)).map(r=>{ const o={id:r.id,kiado:r.kiado,kategoria:r.kategoria||null,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],template:Array.isArray(r.component_template)?r.component_template:[],kodSzam:r.kod_szam||null,version:r.version||1,changed:(r.version||1)>seenOf("series",r.id),
+  const out = series.filter(r=>selectedIds.has(r.id)).map(r=>{ const o={id:r.id,kiado:r.kiado,kategoria:r.kategoria||null,sorozat:r.megnevezes,display:r.megjelenites,accent:r.szin||PAL_FALLBACK,components:r.components||[],template:Array.isArray(r.component_template)?r.component_template:[],azonositok:Array.isArray(r.azonositok)?r.azonositok:[],kodSzam:r.kod_szam||null,version:r.version||1,changed:(r.version||1)>seenOf("series",r.id),
       borito_url:r.borito_url||null, borito_upload_enabled:!!r.borito_upload_enabled, pendingBorito:pendingBySeries[r.id]||null,
       fdRequestedAt:r.force_delete_requested_at||null, fdGraceEnd:r.force_delete_grace_end||null, items:[]}; byS[r.id]=o; return o; });
   issues.forEach(r=>{ const mi=myIssue[r.id]||{}; const o={id:r.id,n:r.lapszam,name:r.cim,date:r.megjelenes,

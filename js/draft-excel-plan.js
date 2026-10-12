@@ -28,7 +28,13 @@ export function draftFingerprint(items){
   const byId=(a,b)=> a.id<b.id ? -1 : a.id>b.id ? 1 : 0;
   const rows = items.slice().sort(byId).map(it=>[
     it.id, it.lapszam, it.cim||"", it.megjelenes||"", it.eredeti_ar==null?"":it.eredeti_ar, it.deleted?1:0, it.source_issue_id||"",
-    (it.comps||[]).slice().sort(byId).map(c=>[c.id, c.tipus, c.azonosito||"", c.azonosito_tipus||"", c.megnevezes||"", c.source_component_id||"", c.deleted?1:0]),
+    (it.comps||[]).slice().sort(byId).map(c=>{
+      const row=[c.id, c.tipus, c.azonosito||"", c.azonosito_tipus||"", c.megnevezes||"", c.source_component_id||"", c.deleted?1:0];
+      // a típus saját mezői (adatok) — csak ha van bennük érték, így a korábban letöltött sablonok ujjlenyomata érvényes marad
+      const ak=Object.keys(c.adatok||{}).sort();
+      if(ak.length) row.push(ak.map(k=>[k, c.adatok[k]]));
+      return row;
+    }),
   ]);
   return cyrb53(JSON.stringify(rows));
 }
@@ -46,7 +52,10 @@ export function compsOf(item, tipus){
 // Egy lap, típusonként "példány-csoportokkal": csoportonként azonosító,
 // megnevezés + rejtett komponens-ID. A csoportok száma típusonként a draftban
 // lévő legtöbb példány (legalább 1). Rejtett Szám-ID oszlop a végén.
-export function templateModel(items, components, labelOf){
+// infoOf(tipus) → {noId, extra:[{key,label,kind}]}: a típusleírás szerint — „noId” típusnál (Figura,
+// Modell) nincs azonosító-oszlop; az `extra` a típus saját mezői (pl. Kártya: Gyűjtemény), ezek a
+// megnevezés után kapnak oszlopot, és a komponens `adatok` mezőjébe kerülnek.
+export function templateModel(items, components, labelOf, infoOf = () => ({ noId:false, extra:[] })){
   const types=[...components];
   items.forEach(it=>(it.comps||[]).forEach(c=>{ if(!c.deleted && !types.includes(c.tipus)) types.push(c.tipus); }));
   const sorted=items.slice().sort((a,b)=>(a.lapszam-b.lapszam)
@@ -64,16 +73,17 @@ export function templateModel(items, components, labelOf){
   push("törlésre jelölve (igen)","torolt");
   types.forEach(t=>{
     for(let k=1;k<=groups[t];k++){
-      const L=labelOf(t);
-      push(`${L} #${k} azonosító`,"azonosito",{t,k});
+      const L=labelOf(t), info=infoOf(t)||{};
+      if(!info.noId) push(`${L} #${k} azonosító`,"azonosito",{t,k});
       push(`${L} #${k} megnevezés`,"megnevezes",{t,k});
+      (info.extra||[]).forEach(f=>push(`${L} #${k} ${f.label}`,"adat",{t,k,key:f.key,kind:f.kind}));
       push(`${L} #${k} komponens-ID (ne módosítsd)`,"komp_id",{t,k});
     }
   });
   push("Szám-ID (ne módosítsd)","szam_id");
   const hiddenCols=colmap.filter(c=>c.m==="komp_id"||c.m==="szam_id").map(c=>c.i);
 
-  const colIdx=(m,t,k)=>colmap.find(c=>c.m===m && (t===undefined || (c.t===t && c.k===k))).i;
+  const colIdx=(m,t,k)=>{ const c=colmap.find(c=>c.m===m && (t===undefined || (c.t===t && c.k===k))); return c ? c.i : -1; };
   const rows=sorted.map(it=>{
     const r=new Array(header.length).fill("");
     r[colIdx("lapszam")]=it.lapszam; r[colIdx("cim")]=it.cim||""; r[colIdx("datum")]=it.megjelenes||"";
@@ -81,7 +91,9 @@ export function templateModel(items, components, labelOf){
     r[colIdx("szam_id")]=it.id;
     types.forEach(t=>compsOf(it,t).forEach((c,idx)=>{
       const k=idx+1;
-      r[colIdx("azonosito",t,k)]=c.azonosito||""; r[colIdx("megnevezes",t,k)]=c.megnevezes||""; r[colIdx("komp_id",t,k)]=c.id;
+      const ai=colIdx("azonosito",t,k); if(ai>=0) r[ai]=c.azonosito||"";
+      r[colIdx("megnevezes",t,k)]=c.megnevezes||""; r[colIdx("komp_id",t,k)]=c.id;
+      colmap.filter(x=>x.m==="adat" && x.t===t && x.k===k).forEach(x=>{ const v=(c.adatok||{})[x.key]; r[x.i]= v==null ? "" : v; });
     }));
     return r;
   });
@@ -124,8 +136,15 @@ export function rowsFromAoa(aoa, cols, parsers){
     const comps=[];
     groupKeys.forEach(({t,k})=>{
       const id=str(cell(r,"komp_id",t,k)), az=str(cell(r,"azonosito",t,k)), nev=str(cell(r,"megnevezes",t,k));
-      if(!id && !az && !nev) return;
-      comps.push({tipus:t, k, id: (id && UUID.test(id)) ? id : null, badId: !!id && !UUID.test(id), azonosito:az||null, megnevezes:nev||null});
+      // a típus saját mezői (adatok): csak a nem üres cellák; egész típusnál szám, ha annak olvasható
+      const adatok={};
+      cols.filter(c=>c.m==="adat" && c.t===t && c.k===k).forEach(c=>{
+        const v=str(r[c.idx]); if(v==="") return;
+        adatok[c.key] = c.kind==="egesz" && /^-?\d+$/.test(v) ? parseInt(v,10) : v;
+      });
+      const hasAdat=Object.keys(adatok).length>0;
+      if(!id && !az && !nev && !hasAdat) return;
+      comps.push({tipus:t, k, id: (id && UUID.test(id)) ? id : null, badId: !!id && !UUID.test(id), azonosito:az||null, megnevezes:nev||null, adatok: hasAdat ? adatok : null});
     });
     rows.push({
       rowNo, lapszam:n, cim:str(cell(r,"cim"))||null, megjelenes, eredeti_ar:parsers.number(cell(r,"ar")),
@@ -225,9 +244,14 @@ export function planUpload({rows, items, confirmSuggest=new Set(), deleteMissing
         const cp={};
         if(g.azonosito!=null && g.azonosito!==(comp.azonosito||null)) cp.azonosito=g.azonosito;
         if(g.megnevezes!=null && g.megnevezes!==(comp.megnevezes||null)) cp.megnevezes=g.megnevezes;
+        if(g.adatok){   // csak az eltérő, nem üres kulcsok (üres cella nem töröl)
+          const ch={}; Object.keys(g.adatok).forEach(key=>{ if(String(g.adatok[key])!==String((comp.adatok||{})[key]??"")) ch[key]=g.adatok[key]; });
+          if(Object.keys(ch).length) cp.adatok=ch;
+        }
         if(Object.keys(cp).length) compOps.push({id:comp.id, tipus:comp.tipus, k:g.k, from:comp, patch:cp});
-      } else if(g.azonosito!=null || g.megnevezes!=null){
-        compOps.push({id:null, tipus:g.tipus, k:g.k, patch:{azonosito:g.azonosito, megnevezes:g.megnevezes}, isNew:true});
+      } else if(g.azonosito!=null || g.megnevezes!=null || g.adatok){
+        const np={azonosito:g.azonosito, megnevezes:g.megnevezes}; if(g.adatok) np.adatok=g.adatok;
+        compOps.push({id:null, tipus:g.tipus, k:g.k, patch:np, isNew:true});
       }
     });
     const lapszamChange = patch.lapszam!==undefined;
@@ -241,7 +265,7 @@ export function planUpload({rows, items, confirmSuggest=new Set(), deleteMissing
     if(row.torolt){ warnings.newMarkedDeleted.push(row); return; }
     creates.push({
       row, ambiguous, newId:newIds.get(row.rowNo)||null,
-      comps: row.comps.filter(g=>g.azonosito!=null||g.megnevezes!=null).map(g=>({tipus:g.tipus, azonosito:g.azonosito, megnevezes:g.megnevezes})),
+      comps: row.comps.filter(g=>g.azonosito!=null||g.megnevezes!=null||g.adatok).map(g=>({tipus:g.tipus, azonosito:g.azonosito, megnevezes:g.megnevezes, ...(g.adatok?{adatok:g.adatok}:{})})),
     });
   });
 
@@ -286,6 +310,25 @@ export function planUpload({rows, items, confirmSuggest=new Set(), deleteMissing
   };
   const blocked = errors.dupSzam.length>0 || errors.dupComp.length>0 || errors.foreignComp.length>0;
   return {ops, creates, suggestions, missing, deleteIds, warnings, errors, blocked, changes, stats, matchedIds:[...used]};
+}
+
+// Azonosítót kapó komponensek, amelyeknek a feltöltés UTÁN sem lesz a típusuknak megfelelő
+// azonosító-típusa (jellemzően Magazin: ISBN vagy ISSN — nincs alapérték, választani kell).
+// idTypeOf(tipus, jelenlegi) → a feltöltés utáni azonosító-típus (a szerver szabálya szerint);
+// allowedOf(tipus) → a megengedett típusok listája vagy null (nincs megkötés).
+export function idTypeGaps(plan, idTypeOf, allowedOf){
+  const out=[];
+  const check=(lapszam, tipus, k, cur)=>{
+    const allowed=allowedOf(tipus); if(!allowed) return;
+    const after=idTypeOf(tipus, cur||null);
+    if(!allowed.includes(after||"")) out.push({lapszam, tipus, k});
+  };
+  plan.ops.forEach(o=>o.compOps.forEach(c=>{
+    if(c.patch.azonosito==null) return;
+    check(o.patch.lapszam!==undefined ? o.patch.lapszam : o.item.lapszam, c.tipus, c.k, c.isNew ? null : c.from.azonosito_tipus);
+  }));
+  plan.creates.forEach(cr=>{ const seen={}; cr.comps.forEach(c=>{ seen[c.tipus]=(seen[c.tipus]||0)+1; if(c.azonosito!=null) check(cr.row.lapszam, c.tipus, seen[c.tipus], null); }); });
+  return out;
 }
 
 // A tranzakciós SQL-függvény (apply_draft_upload) bemenete.

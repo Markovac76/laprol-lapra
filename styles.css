@@ -381,6 +381,9 @@ footer{color:var(--faint);font-size:11.5px;text-align:center;padding:8px 0 26px}
 .sl-more{font-size:10.5px;font-weight:700;line-height:16px;color:var(--amber);background:var(--amber-d);border:1px solid var(--amber);
   border-radius:8px;padding:0 6px;white-space:nowrap}
 .mainstar{color:#fbbf24}
+.serids{margin-top:3px;font-size:11.5px;color:var(--faint);font-family:ui-monospace,monospace;letter-spacing:.01em}
+.reqmark{color:var(--amber);font-weight:700}
+.sidrow{margin-bottom:6px}
 .cn-type{display:inline-flex;vertical-align:-4px;margin-right:4px;color:var(--muted)}
 
 /* Telefon (B változat): a szöveg felül, a nyíl a jobb felső sarokban, a csempék

@@ -3,6 +3,7 @@
    ============================================================ */
 import { state, S, COMP_TYPES, isFutureDate, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus, issueSlots, typeLabel } from "./state.js";
 import { thumbUrl, typeIcon, TILE_W, TILE_H } from "./thumb.js";
+import { typeDef, fallbackName, formatSeriesIds } from "./type-defs.js";
 import { stats } from "./data.js";
 import { showSeriesChangePopup, showIssueChangePopup, showCollectedChanges } from "./changes.js";
 import { isStaff } from "./permissions.js";
@@ -86,6 +87,7 @@ export function renderHero(){
       <div class="herotext">
         <div class="kiado">${esc(s.kiado?listName("kiado",s.kiado):"")}${s.changed?`<button class="chgbtn" id="heroChgBtn" title="Mi változott?">!</button>`:""}</div>
         <div class="name display">${esc(s.sorozat)}${closed}</div>
+        ${formatSeriesIds(s.azonositok)?`<div class="serids" title="Sorozat-azonosító">${esc(formatSeriesIds(s.azonositok))}</div>`:""}
       </div>
     </div>
     ${bars}
@@ -227,7 +229,9 @@ export function renderList(){
     // (típus-sorrendi) pozícióból számolódik, hogy a fő elem előre vétele ne változtassa.
     const panel = open ? `<div class="imgpanel">` + sl.all.map(({t,c,label,isMain,legacyIdx})=>{
         const cdb=(c.db==null?1:c.db);
-        const img=c.kep_url?`<img src="${esc(c.kep_url)}" alt="${esc(label)}">`:`nincs adat`;
+        // Név nélküli Modellnél a panelben a Szám címe a név (a csempén marad a típus neve).
+        const pname = c.megnevezes ? label : (fallbackName(typeDef(state.TYPEDEFS, t), c, it.name) || label);
+        const img=c.kep_url?`<img src="${esc(c.kep_url)}" alt="${esc(pname)}">`:`nincs adat`;
         // Magazin/Könyv szinte mindig álló (portré) borító — ezeknél a doboz
         // magasabb/keskenyebb, hogy a teljes borító (cím, kiadói logó is)
         // beleférjen levágás nélkül. A többi típusnál a doboz alakja marad.
@@ -241,7 +245,7 @@ export function renderList(){
         const statusBtn = !future ? `<button class="mark block${c.status?" m-"+c.status:""}" data-n="${it.n}" data-cid="${c.id}" aria-label="Státusz">
           <span class="mlab">${c.status?MLAB[c.status]:"jelöletlen"}</span></button>` : "";
         return `<div class="imgcard"><div class="${boxClass}">${img}</div>
-          <div class="imgcap"><div class="cn"><span class="cn-type" title="${esc(typeLabel(t))}">${typeIcon(t)}</span>${isMain?'<span class="mainstar" title="Fő elem">★</span> ':""}${esc(label)}</div>
+          <div class="imgcap"><div class="cn"><span class="cn-type" title="${esc(typeLabel(t))}">${typeIcon(t)}</span>${isMain?'<span class="mainstar" title="Fő elem">★</span> ':""}${esc(pname)}</div>
           <div class="cc">${scode}-${pad(it.n,4)}-${pad(legacyIdx,2)}</div></div>${pstep}${statusBtn}
           ${c.id?imageControlsHtml("component",c,c.id):""}</div>`;
       }).join("") + `</div>

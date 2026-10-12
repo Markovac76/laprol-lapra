@@ -15,6 +15,7 @@ import { fetchDraftItems, renderDraftItemsList, draftItemForm } from "./draft-it
 import { downloadDraftTemplate, pickDraftExcelFile, confirmDraftUpload } from "./draft-excel.js";
 import { diffDraft, diffSummaryText } from "./draft-diff.js";
 import { controlsHtml, wireControls, filterSeries, sortSeries, loadSort, loadLastChanged } from "./series-list.js";
+import { SERIES_ID_TYPES, SERIES_ID_MAX, cleanSeriesIds, seriesIdsError } from "./type-defs.js";
 import { defaultTemplate, hasTemplate, templateError, templateTypes, ID_RULES, TEMPLATE_SOFT_MAX, addType, removeType, setMain, move, setField } from "./component-template.js";
 
 let currentTab = "aktiv";
@@ -466,6 +467,12 @@ function renderEditDraft(d, color, tmpl, compList, items){
     <div class="field"><label>Megnevezés (teljes név)</label><input id="d-name" value="${esc(d.megnevezes||"")}"></div>
     <div class="field"><label>Megjelenítendő név a fülön (max ${DISPLAY_MAX}) — <span id="d-count">${(d.megjelenites||"").length}/${DISPLAY_MAX}</span></label>
       <input id="d-display" maxlength="${DISPLAY_MAX}" value="${esc(d.megjelenites||"")}"></div>
+    <div class="field"><label>Sorozat-azonosítók <span style="color:var(--faint);font-weight:400">— az egész sorozatra érvényes ISBN / ISSN, legfeljebb ${SERIES_ID_MAX}</span></label>
+      <div id="d-sids">${[0,1].slice(0,SERIES_ID_MAX).map(i=>{ const e=(Array.isArray(d.azonositok)?d.azonositok:[])[i]||{};
+        return `<div class="grid2 sidrow">
+          <select data-sid-t="${i}" aria-label="Azonosító típusa"><option value="">—</option>${SERIES_ID_TYPES.map(([v,l])=>`<option value="${v}"${v===e.tipus?" selected":""}>${l}</option>`).join("")}</select>
+          <input data-sid-v="${i}" value="${esc(e.ertek||"")}" placeholder="pl. 1234-5678" aria-label="Azonosító értéke"></div>`; }).join("")}</div>
+      <div class="unote">Egyszer kell megadni, nem Számonként. A Számonként eltérő (egyedi) ISBN / ISSN továbbra is a Szám elemén adható meg. Az üres sor nem számít.</div></div>
     <div class="field"><label>Komponens-sablon (miből áll egy szám)</label><div id="d-tmpl-wrap">${tmplEditorHtml(tmpl, compList)}</div></div>
     <div class="field"><label>Szín</label>
       <div id="d-sw">${PAL_FAMILIES.map(f=>`<div class="swfam"><span class="swfam-nev">${f.nev}</span>
@@ -511,16 +518,21 @@ function renderEditDraft(d, color, tmpl, compList, items){
     const terr = templateError(tmpl);
     if(terr){ alert("A komponens-sablon nem menthető: "+terr+"."); return; }
     comps = templateTypes(tmpl);
+    // Sorozat-azonosítók: az üres sorok kimaradnak; a szabályok a szerverével azonosak (ISBN / ISSN, forma).
+    const sids = cleanSeriesIds([0,1].slice(0,SERIES_ID_MAX).map(i=>({
+      tipus:(sheet.querySelector(`[data-sid-t="${i}"]`)||{}).value, ertek:(sheet.querySelector(`[data-sid-v="${i}"]`)||{}).value })));
+    const serr = seriesIdsError(sids);
+    if(serr){ alert("A sorozat-azonosítók nem menthetők: "+serr+"."); return; }
     const disp=(dEl.value.trim()||nm).slice(0,DISPLAY_MAX);
     try{
       const { error } = await supabase.from("draft_series").update({
         kiado: document.getElementById("d-kiado").value||null,
         kategoria: document.getElementById("d-kategoria").value||null,
-        megnevezes: nm, megjelenites: disp, szin: color, components: comps, component_template: tmpl,
+        megnevezes: nm, megjelenites: disp, szin: color, components: comps, component_template: tmpl, azonositok: sids,
       }).eq("id", d.id);
       if(error) throw error;
     }catch(e){ err(e); return; }
-    d = {...d, kiado:document.getElementById("d-kiado").value||null, kategoria:document.getElementById("d-kategoria").value||null, megnevezes:nm, megjelenites:disp, szin:color, components:comps, component_template:tmpl};
+    d = {...d, kiado:document.getElementById("d-kiado").value||null, kategoria:document.getElementById("d-kategoria").value||null, megnevezes:nm, megjelenites:disp, szin:color, components:comps, component_template:tmpl, azonositok:sids};
     await editDraftForm(d);
   });
   // Egy komponens-átsorolás / új típus a draft komponens-listáját érintheti (draft-items.js) —
@@ -537,7 +549,7 @@ function renderEditDraft(d, color, tmpl, compList, items){
     if(!comps.length){ alert("Előbb adj hozzá legalább egy komponens-típust a sablonhoz."); return; }
     // Oda-vissza sablon: a draft AKTUÁLIS állapotát tölti le (rejtett azonosítókkal).
     fetchDraftItems(d.id)
-      .then(items=>downloadDraftTemplate(comps, d.megnevezes, { draftSeriesId:d.id, items }))
+      .then(items=>downloadDraftTemplate(comps, d.megnevezes, { draftSeriesId:d.id, items, seriesIds:d.azonositok||[] }))
       .catch(err);
   };
   document.getElementById("d-tmplup").onclick=()=>{

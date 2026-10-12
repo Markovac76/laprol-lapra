@@ -22,13 +22,20 @@
      hordozza; ha a draft azóta változott, megerősítést kérünk.
    ============================================================ */
 import { supabase } from "./supabase.js";
-import { COMP_TYPES, esc, listName } from "./state.js";
+import { state, COMP_TYPES, esc, listName } from "./state.js";
 import { loadXlsx, coerceDate, parseHuNumber } from "./excel.js";
 import { guarded, sheet } from "./modal.js";
 import { fetchDraftItems } from "./draft-items.js";
-import { templateModel, resolveColumns, rowsFromAoa, planUpload, buildPayload, draftFingerprint } from "./draft-excel-plan.js";
+import { templateModel, resolveColumns, rowsFromAoa, planUpload, buildPayload, draftFingerprint, idTypeGaps } from "./draft-excel-plan.js";
+import { typeDef, idMode, extraFields, fieldOf, defaultIdType, cleanSeriesIds, seriesIdsError, formatSeriesIds, SERIES_ID_TYPES } from "./type-defs.js";
 
 const typeLabel = t => listName("komponens", t) || COMP_TYPES[t] || t;
+const idTypeName = v => listName("azonosito", v) || v;
+// A típusleírás szerinti oszlopok: „nincs” azonosító-szabálynál (Figura, Modell) nincs azonosító-oszlop;
+// a típus saját mezői (pl. Kártya: Gyűjtemény, Széria…) külön oszlopot kapnak.
+const typeInfo = t => { const def=typeDef(state.TYPEDEFS, t);
+  return { noId: idMode(def).mode==="nincs", extra: extraFields(def).map(f=>({key:f.key, label:f.label, kind:f.kind})) }; };
+const SID_SHEET = "Sorozat-azonosítók";
 
 // A rejtett #draftUpl file-inputot nyitja meg — közös mindkét hívó helynek.
 export function pickDraftExcelFile(onFile){
@@ -43,7 +50,7 @@ export function pickDraftExcelFile(onFile){
 export async function downloadDraftTemplate(components, seriesName, opts={}){
   const X=await loadXlsx();
   const items=opts.items||[];
-  const M=templateModel(items, components, typeLabel);
+  const M=templateModel(items, components, typeLabel, typeInfo);
   const ci=m=>M.colmap.find(c=>c.m===m).i;
   const toDate=s=>{ const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||""); return m ? new Date(+m[1], +m[2]-1, +m[3]) : ""; };
 
@@ -70,8 +77,15 @@ export async function downloadDraftTemplate(components, seriesName, opts={}){
   const wm=X.utils.aoa_to_sheet(meta);
   const wb=X.utils.book_new();
   X.utils.book_append_sheet(wb,ws,"Sorozat");
-  X.utils.book_append_sheet(wb,wm,"Meta");
-  wb.Workbook={Sheets:[{Hidden:0},{Hidden:1}]};   // a Meta lap rejtett (a véletlen szerkesztés ellen)
+  const hidden=[{Hidden:0}];
+  if(opts.draftSeriesId){
+    // Sorozat-szintű azonosítók (az egész sorozatra érvényes ISBN / ISSN, legfeljebb 2) — külön lapon.
+    const sid=[["típus (ISBN vagy ISSN)","érték"], ...(opts.seriesIds||[]).map(e=>[String(e.tipus||"").toUpperCase(), e.ertek||""])];
+    const wsid=X.utils.aoa_to_sheet(sid); wsid["!cols"]=[{wch:24},{wch:26}];
+    X.utils.book_append_sheet(wb,wsid,SID_SHEET); hidden.push({Hidden:0});
+  }
+  X.utils.book_append_sheet(wb,wm,"Meta"); hidden.push({Hidden:1});
+  wb.Workbook={Sheets:hidden};   // a Meta lap rejtett (a véletlen szerkesztés ellen)
   X.writeFile(wb,`laprol-lapra-sablon-${(seriesName||"sorozat").replace(/\s+/g,"-")}.xlsx`);
 }
 
@@ -87,7 +101,13 @@ function legacyColmap(components){
 export async function parseDraftExcel(file, components){
   const X=await loadXlsx();
   const wb=X.read(await file.arrayBuffer(),{cellDates:true});
-  const main=wb.SheetNames.find(n=>n!=="Meta") || wb.SheetNames[0];
+  const main=wb.SheetNames.find(n=>n!=="Meta" && n!==SID_SHEET) || wb.SheetNames[0];
+  // Sorozat-azonosítók lap (ha van): az üres lap / üres sorok nem változtatnak semmit.
+  let seriesIds=null;
+  if(wb.Sheets[SID_SHEET]){
+    seriesIds=cleanSeriesIds(X.utils.sheet_to_json(wb.Sheets[SID_SHEET],{header:1,raw:false,defval:""}).slice(1)
+      .map(r=>({ tipus:String(r[0]==null?"":r[0]).trim().toLowerCase(), ertek:r[1] })));
+  }
   const aoa=X.utils.sheet_to_json(wb.Sheets[main],{header:1,raw:false,defval:""});
   const meta={};
   if(wb.Sheets["Meta"]){
@@ -99,7 +119,7 @@ export async function parseDraftExcel(file, components){
   if(legacy) colmap=legacyColmap(components);
   const cols=resolveColumns(aoa[0]||[], colmap);
   const r=rowsFromAoa(aoa, cols, {date:coerceDate, number:parseHuNumber});
-  return {...r, meta, legacy};
+  return {...r, meta, legacy, seriesIds};
 }
 
 /* ---------------- a beküldő útja (staff átvétel előtt, RPC) ---------------- */
@@ -111,7 +131,7 @@ export async function bulkInsertDraftItemsAsProposer(draftSeriesId, rows){
   const { data, error } = await supabase.rpc("propose_bulk_issues", {
     p_draft_id: draftSeriesId,
     p_rows: rows.map(r=>({ lapszam:r.lapszam, cim:r.cim, megjelenes:r.megjelenes, eredeti_ar:r.eredeti_ar,
-      comps:(r.comps||[]).map(c=>({tipus:c.tipus, azonosito:c.azonosito, megnevezes:c.megnevezes})) })),
+      comps:(r.comps||[]).map(c=>({tipus:c.tipus, azonosito:c.azonosito, megnevezes:c.megnevezes, ...(c.adatok?{adatok:c.adatok}:{})})) })),
   });
   if(error) throw error;
   return { inserted: data.inserted, skipped: data.skipped };
@@ -156,11 +176,14 @@ function diffText(o){
   if(p.deleted===true) bits.push(`törlésre jelölve`);
   if(p.deleted===false) bits.push(`törlés-jelölés visszavonva`);
   o.compOps.forEach(c=>{
-    if(c.isNew) bits.push(`új komponens: ${typeName(c.tipus,c.k)}${c.patch.azonosito?` (${esc(c.patch.azonosito)})`:""}${c.patch.megnevezes?` „${esc(c.patch.megnevezes)}”`:""}`);
+    const fl=key=>esc((fieldOf(typeDef(state.TYPEDEFS, c.tipus), key)||{}).label || key);
+    const adat=Object.keys(c.patch.adatok||{});
+    if(c.isNew) bits.push(`új komponens: ${typeName(c.tipus,c.k)}${c.patch.azonosito?` (${esc(c.patch.azonosito)})`:""}${c.patch.megnevezes?` „${esc(c.patch.megnevezes)}”`:""}${adat.length?` [${adat.map(k=>`${fl(k)}: ${esc(c.patch.adatok[k])}`).join(", ")}]`:""}`);
     else{
       const f=[];
       if(c.patch.azonosito!==undefined) f.push(`azonosító: ${esc(c.from.azonosito||"—")} → ${esc(c.patch.azonosito)}`);
       if(c.patch.megnevezes!==undefined) f.push(`megnevezés: ${esc(c.from.megnevezes||"—")} → ${esc(c.patch.megnevezes)}`);
+      adat.forEach(k=>f.push(`${fl(k)}: ${esc((c.from.adatok||{})[k]??"—")} → ${esc(c.patch.adatok[k])}`));
       bits.push(`${typeName(c.tipus,c.k)}: ${f.join(", ")}`);
     }
   });
@@ -176,6 +199,18 @@ async function confirmStaffUpload(openModal, err, file, draftId, components, onD
   if(!parsed.rows.length){ alert("Nem találtam feldolgozható sort a fájlban."); return; }
 
   const items=await fetchDraftItems(draftId);
+  // A draft sorozat-azonosítói és sablonja: a „Sorozat-azonosítók” lap összevetéséhez és az
+  // azonosító-típus előrejelzéséhez (a szerver szabálya: type_azonosito_tipus).
+  const { data:drow } = await supabase.from("draft_series").select("azonositok, component_template").eq("id", draftId).single();
+  const curSids = cleanSeriesIds((drow && drow.azonositok) || []);
+  const tmplNow = (drow && Array.isArray(drow.component_template)) ? drow.component_template : [];
+  const newSids = parsed.seriesIds && parsed.seriesIds.length ? parsed.seriesIds : null;     // üres lap = nincs változás
+  const sidErr = newSids ? seriesIdsError(newSids) : null;
+  const sidChange = !!newSids && !sidErr && JSON.stringify(newSids)!==JSON.stringify(curSids);
+  const idTypeOf = (t, cur) => cur || defaultIdType(typeDef(state.TYPEDEFS, t), tmplNow.find(e=>e.tipus===t));
+  const allowedOf = t => { const { mode, types } = idMode(typeDef(state.TYPEDEFS, t)); return (mode==="fix"||mode==="valaszthato") ? types : null; };
+  const gapText = gaps => { const by={}; gaps.forEach(g=>{ (by[g.tipus]=by[g.tipus]||[]).push(g.lapszam); });
+    return Object.keys(by).map(t=>`${typeLabel(t)}: ${by[t].length} azonosítóhoz nincs megadva az azonosító típusa (${allowedOf(t).map(idTypeName).join(" vagy ")}) — #${by[t].slice(0,10).join(", #")}${by[t].length>10?"…":""}`).join("; "); };
   const fpNow=draftFingerprint(items);
   const otherDraft=!!parsed.meta.draft_id && parsed.meta.draft_id!==draftId;
   const stale = otherDraft || !parsed.meta.ujjlenyomat || parsed.meta.ujjlenyomat!==fpNow;
@@ -229,6 +264,8 @@ async function confirmStaffUpload(openModal, err, file, draftId, components, onD
     if(w.newMarkedDeleted.length) warnBits.push(`<div>${w.newMarkedDeleted.length} új sor „törlésre jelölve” — kihagyva (nem hozom létre).</div>`);
     if(parsed.skipped.length) warnBits.push(`<div>${parsed.skipped.length} sor kihagyva: ${parsed.skipped.slice(0,5).map(x=>`${x.rowNo}. sor — ${x.ok}`).join("; ")}${parsed.skipped.length>5?"…":""}</div>`);
     if(parsed.dateWarnings.length) warnBits.push(`<div>${parsed.dateWarnings.length} sor dátuma nem felismerhető (#${parsed.dateWarnings.slice(0,8).join(", #")}) — ezeknél a dátum nem változik.</div>`);
+    const gaps=idTypeGaps(plan, idTypeOf, allowedOf);
+    if(gaps.length) warnBits.push(`<div>${esc(gapText(gaps))}. A feltöltés után nyisd meg ezeket a Számokat a szerkesztőben, és válaszd ki az azonosító típusát — enélkül a „Kész” megáll náluk.</div>`);
     w.sameName.forEach(x=>warnBits.push(`<div>Azonos nevű tételek: „${esc(x.cim)}” — lapszám: ${x.lapszamok.join(", ")}. <i>(csak figyelmeztetés — a kiadó adhat ki azonos nevű számokat)</i></div>`));
 
     const renum=plan.ops.filter(o=>o.lapszamChange);
@@ -237,12 +274,15 @@ async function confirmStaffUpload(openModal, err, file, draftId, components, onD
     const suggBody=plan.suggestions.map(sg=>`<label class="ckrow" style="display:block;margin:4px 0"><input type="checkbox" data-sugg="${sg.row.rowNo}"${sel.confirm.has(sg.row.rowNo)?" checked":""}> A fájl <b>${sg.row.rowNo}. sora</b> (#${sg.row.lapszam} „${esc(sg.row.cim||"")}”) ugyanaz, mint a draft <b>#${sg.item.lapszam} „${esc(sg.item.cim||"")}”</b> tétele → frissítés (különben új tétel jön létre)</label>`).join("");
     const missBody=plan.missing.map(it=>`<label class="ckrow" style="display:block;margin:4px 0"><input type="checkbox" data-miss="${it.id}"${sel.del.has(it.id)?" checked":""}> ${fmtItem(it)} — <i>${it.source_issue_id?"élő Szám: publikáláskor törölt lesz":"új, még nem publikált tétel: törlődik a draftból"}</i></label>`).join("");
 
-    const canGo = !plan.blocked && !conflictErr && !conflicts.length && (!stale || sel.staleAck)
-      && (s.frissul + s.uj + s.torlesreJelolt) > 0;
+    const sidBlock = sidErr
+      ? `<div class="example" style="border-color:#f3b6b6;color:#f3b6b6;white-space:normal"><b>⛔ A „${SID_SHEET}” lap hibás — a feltöltés le van tiltva.</b> ${esc(sidErr)}. Javítsd a lapon (típus: ISBN vagy ISSN; legfeljebb két sor), vagy hagyd üresen, ha nem akarsz változtatni.</div>`
+      : sidChange ? `<div class="example" style="white-space:normal;font-size:12.5px;margin-top:8px"><b>Sorozat-azonosítók:</b> ${esc(formatSeriesIds(curSids)||"—")} → <b>${esc(formatSeriesIds(newSids))}</b></div>` : "";
+    const canGo = !plan.blocked && !sidErr && !conflictErr && !conflicts.length && (!stale || sel.staleAck)
+      && ((s.frissul + s.uj + s.torlesreJelolt) > 0 || sidChange);
 
     openModal(`<h2>Sablon feltöltésének előnézete</h2>
       <p class="msub">${parsed.rows.length} sor a fájlból. <b>Üres cella nem töröl semmit</b>, és a fájlból hiányzó tétel nem törlődik magától.</p>
-      ${errBlock}${staleBlock}${conflictBlock}${summary}
+      ${errBlock}${staleBlock}${conflictBlock}${sidBlock}${summary}
       ${warnBits.length ? `<div class="example" style="white-space:normal;font-size:12.5px;margin-top:8px"><b>Figyelmeztetések</b>${warnBits.join("")}</div>` : ""}
       ${sec("Párosítási javaslatok — megerősítést kérnek",plan.suggestions.length,suggBody,true)}
       ${sec("Fájlból hiányzó tételek — alapból MARADNAK",plan.missing.length,
@@ -267,9 +307,12 @@ async function confirmStaffUpload(openModal, err, file, draftId, components, onD
       await recompute(); render(true); }; });
     document.getElementById("du-confirm").onclick=guarded(async ()=>{
       try{
-        const { data, error } = await supabase.rpc("apply_draft_upload", { p_draft_id:draftId, p_payload:buildPayload(plan) });
+        const payload={ ...buildPayload(plan), ...(sidChange ? { sorozat_azonositok:newSids } : {}) };
+        const { data, error } = await supabase.rpc("apply_draft_upload", { p_draft_id:draftId, p_payload:payload });
         if(error) throw error;
-        alert(`Feltöltve: ${data.uj} új tétel, ${data.frissitett} frissített tétel, ${data.uj_komponens} új és ${data.frissitett_komponens} frissített komponens${data.torolt?`, ${data.torolt} tétel törlésre jelölve/törölve`:""}.`);
+        const gapsAfter=idTypeGaps(plan, idTypeOf, allowedOf);
+        alert(`Feltöltve: ${data.uj} új tétel, ${data.frissitett} frissített tétel, ${data.uj_komponens} új és ${data.frissitett_komponens} frissített komponens${data.torolt?`, ${data.torolt} tétel törlésre jelölve/törölve`:""}${data.sorozat_azonositok?", a sorozat-azonosítók frissültek":""}.`
+          + (gapsAfter.length ? `\n\nTeendő a „Kész” előtt: ${gapText(gapsAfter)}. Nyisd meg ezeket a Számokat a szerkesztőben, és válaszd ki az azonosító típusát.` : ""));
       }catch(e){ err(e); }
       onDone();
     });
