@@ -9,6 +9,8 @@ db-backups/
 # A teszt-felhasználó belépési adatai (scripts/ui-test/) — SOSEM kerülhet git-be.
 # Minta: .env.test.example
 .env.test
+# A felületi próbák képernyőképei — nem kerülnek a repóba.
+scripts/ui-test/kepek/
 scripts/node_modules/
 
 # Rendszer- és szerkesztő-fájlok
