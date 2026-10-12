@@ -5,6 +5,10 @@ config.js
 # SOSEM kerülhet git-be. Lásd README.md "Migrációk" szakasza.
 db.local.js
 db-backups/
+
+# A teszt-felhasználó belépési adatai (scripts/ui-test/) — SOSEM kerülhet git-be.
+# Minta: .env.test.example
+.env.test
 scripts/node_modules/
 
 # Rendszer- és szerkesztő-fájlok
