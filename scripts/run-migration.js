@@ -44,6 +44,7 @@ async function main() {
 
     console.log(`Migráció futtatása: ${sqlPath}`);
     await client.query("BEGIN");
+    await client.query("SET LOCAL lock_timeout = '3s'");
     try {
       await client.query(sql);
       await client.query("COMMIT");
