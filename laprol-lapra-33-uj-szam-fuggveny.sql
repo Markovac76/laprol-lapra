@@ -16,8 +16,8 @@
 --   • azonosító-típus a típus szabálya szerint (fix / választható / nincs / szabad);
 --   • a sorozat sablonjának kötelező típusai mind szerepelnek;
 --   • pontosan egy fő elem (★): a megadott, ennek hiányában a szokásos szabály (pick_main_component);
---   • a mostani mellékhatások változatlanul: a létrehozó személyes sorai (member_issue_data,
---     member_status) és a feliratkozók „látott” sorai (seed_issue_seen_for_subscribers).
+--   • a feliratkozók „látott” sorai, mint ma (seed_issue_seen_for_subscribers); a létrehozó személyes
+--     sorai (member_status, member_issue_data) CSAK akkor, ha ténylegesen megadott valamit.
 -- A szabályok ugyanazok, mint a munkaanyagoknál a „Kész” előtt (draft_type_field_issues).
 --
 -- Bemenet:
@@ -27,7 +27,7 @@
 --                             "megnevezes": "…", "adatok": {"gyujtemeny": "…"}, "is_main": false,
 --                             "status": null, "db": 1, "jegyzet": null}, … ]}
 --                A komponens "status" / "db" / "jegyzet" kulcsa a LÉTREHOZÓ személyes adata: ha
---                bármelyik kulcs szerepel, member_status sor készül (ahogy ma az űrlapnál).
+--                bármelyik kulcs szerepel, member_status sor készül; ha egyik sem, nem készül.
 --   p_personal   a létrehozó beszerzési adata: {"fizetett_ar", "beszerzesi_mennyiseg",
 --                "beszerzes_datuma", "forras"} — vagy NULL (ekkor nem készül member_issue_data sor).
 -- Kimenet: {"issue_id": …, "component_ids": […], "main_component_id": …}
