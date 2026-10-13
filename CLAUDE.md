@@ -21,6 +21,7 @@ Nyelv: magyar. Tömör válaszok. A kérdéseket egyszerre, egyben, szövegben f
 - Titkos adatot (kapcsolati szöveg, kulcs, jelszó) ne írj ki, ne commitolj. A `db.local.js`, a `config.js` és a `.env.test` nem kerülhet git-be. A felhasználók e-mail-címét jelentésbe ne írd ki.
 - A jóváhagyott SQL szövegén ne változtass. Az `.sql` fájlok sorvége LF (`.gitattributes`); futtatás előtt a próba által mért függvény-hash egyezzen a jóváhagyott csomagéval.
 - Futtatás: `node scripts/run-migration.js <fájl> <címke>` (mentés, egy tranzakció, 3 mp-es `lock_timeout`). Hibánál ne próbáld újra; a visszaúthoz új jóváhagyás kell.
+- Minden új függvény mellé kötelező a hívási jog kifejezett megadása ugyanabban a migrációban: belső segédnél `revoke execute … from public, anon, authenticated`; kliensből hívottnál `revoke execute … from public, anon`, és ha kell, `grant execute … to authenticated` (a `create_live_issue` mintájára). A jogosultsági modell: specifikáció 13.14.9.
 - Nagyobb migráció előtt átnézendő csomag készül (`NN-lepes-atnezesre.md`: teljes SQL, mellékhatások, számlálók, próbák, futtatási terv, visszaút). Ez a fájl nem kerül a repóba.
 
 ## Felületi próba
