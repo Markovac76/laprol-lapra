@@ -5,6 +5,7 @@
    az egész kikapcsol: nem kérdez, nem jelez, nem tilt.
    KÉNYELMI réteg: a valódi zár a szerver-oldali jogszűkítés (specifikáció 13.14.9–13.14.10).
    Tiszta részei (judge, isBlocked, a listák) Node-ban tesztelve: scripts/tests/version.test.mjs.
+   Élesben kipróbálva 2026-10-13-án (46. lépés): egy újabb telepítés után a nyitva hagyott fül szól.
    ============================================================ */
 const CURRENT = (typeof window !== "undefined" && window.APP_VERSION) || "";
 const MIN_GAP = 60000;                 // legfeljebb percenként egy lekérdezés
