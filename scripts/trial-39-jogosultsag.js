@@ -266,12 +266,15 @@ async function state(c, label) {
     let same = 0, okSteps = 0; const names = Object.keys(pre);
     for (const n of names) {
       const eq = pre[n] === post[n]; if (eq) same++;
-      const mustFail = MUST_FAIL.some(p => n.startsWith(p)), good = mustFail ? /^HIBA/.test(post[n] || "") : /^OK/.test(post[n] || "");
+      // 43. lépés: a 19. lépés (sima felhasználó közvetlen törzsadat-írása) a (C3) írási-jog szűkítés ELŐTT „0 sor módosult”
+      // (a sorszintű szabály fogta meg), UTÁNA „permission denied” (a táblajog hiánya). Mindkettő azt jelenti: nem írt.
+      const nemIr = n.startsWith("19 ");
+      const mustFail = MUST_FAIL.some(p => n.startsWith(p)), good = nemIr ? /^OK: 0 sor módosult$|^HIBA: permission denied for table issues/.test(post[n] || "") : mustFail ? /^HIBA/.test(post[n] || "") : /^OK/.test(post[n] || "");
       if (good) okSteps++;
       console.log(`    ${eq && good ? "✔" : "✘"} ${n}\n        ${eq ? post[n] : `ELŐTTE: ${pre[n]}  |  UTÁNA: ${post[n]}`}`);
     }
     report(`F1 a forgatókönyv ${names.length} lépése a szigorítás előtt és után betűre ugyanazt adja`, same === names.length && names.length === Object.keys(post).length && names.length === 34, `${same}/${names.length}`);
-    report("F2 a 28 működő lépés sikeres, a 6 védelmi lépés (hibás adat, jogosulatlan hívás) hibát ad — előtte és utána is", okSteps === names.length, `${okSteps}/${names.length}`);
+    report("F2 a 27 működő lépés sikeres, a 6 védelmi lépés (hibás adat, jogosulatlan hívás) hibát ad, a 19. lépés (közvetlen törzsadat-írás) nem ír — előtte és utána is", okSteps === names.length, `${okSteps}/${names.length}`);
     const end = (await c.query(FNS)).rows;
     report("F3 a forgatókönyv után az ACL-ek a szigorított állapotban maradtak, a definíciók változatlanok", end.every((f, i) => f.acl === mid[i].acl && f.h === mid[i].h));
   } catch (e) {

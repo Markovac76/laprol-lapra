@@ -68,6 +68,9 @@ async function state(c, label) {
   let before;
   try {
     before = await state(c, "ELŐTTE (commitolt állapot):");
+    // Él-e már a szűkítés? (az authenticated-nek az issues táblán már nincs táblaszintű UPDATE joga)
+    const ELES = !(await c.query("select has_table_privilege('authenticated', 'public.issues', 'UPDATE') x")).rows[0].x;
+    console.log(ELES ? "\nA szűkítés a futás elején MÁR ÉL — a próba az éles állapotot ellenőrzi (az „előtte” oldal is szűkített)." : "\nA szűkítés a futás elején még NEM él — a próba az előtte / utána különbséget ellenőrzi.");
     const owner = (await c.query(`select user_id from public.members where role='owner' limit 1`)).rows[0].user_id;
     await c.query("BEGIN");
     await c.query("SET LOCAL lock_timeout = '3s'");
@@ -331,7 +334,8 @@ async function state(c, label) {
     console.log("\n  KÖZVETLEN ÍRÁSOK staff (tulajdonos) nevében — TILTOTT lesz (ELŐTTE → UTÁNA):");
     TK.forEach(k => console.log(`    ${den(postD["staff/" + k]) ? "✔" : "✘"} ${k} ${DL[k]}\n        ${preD["staff/" + k]}  →  ${postD["staff/" + k]}`));
     report(`D1 staff nevében a ${TK.length} tiltott közvetlen írás mind „permission denied” (Szám / komponens / sorozat beszúrása és törlése, tiltott oszlopok, változásnapló, sorszámláló, Listák törlése)`, TK.every(k => den(postD["staff/" + k])), `${TK.filter(k => den(postD["staff/" + k])).length}/${TK.length}`);
-    report("D2 ugyanezek ELŐTTE egyike sem volt „permission denied” (ez volt a rés: a staff közvetlenül írhatott)", TK.every(k => !den(preD["staff/" + k])), `ebből ténylegesen írt volna: ${TK.filter(k => wrote(preD["staff/" + k])).length}`);
+    if (ELES) report("D2 (éles állapot) a tiltás a futás elején is élt: mind a 36 már „előtte” is „permission denied”", TK.every(k => den(preD["staff/" + k])), `${TK.filter(k => den(preD["staff/" + k])).length}/${TK.length}`);
+    else report("D2 ugyanezek ELŐTTE egyike sem volt „permission denied” (ez volt a rés: a staff közvetlenül írhatott)", TK.every(k => !den(preD["staff/" + k])), `ebből ténylegesen írt volna: ${TK.filter(k => wrote(preD["staff/" + k])).length}`);
     console.log("\n  A KLIENS MAI KÖZVETLEN ÍRÁSAI staff nevében — MŰKÖDNEK (ELŐTTE = UTÁNA):");
     EK.forEach(k => console.log(`    ${wrote(postD["staff/" + k]) && preD["staff/" + k] === postD["staff/" + k] ? "✔" : "✘"} ${k} ${DL[k]}\n        ${postD["staff/" + k]}`));
     report(`D3 staff nevében a kliens ${EK.length} mai közvetlen írása működik, és betűre ugyanazt adja, mint előtte (kép, feltöltés engedélyezése, borító, lifecycle, Listák + és ✎; a PostgREST-alakú utasítások is)`,
@@ -357,7 +361,7 @@ async function state(c, label) {
       console.log(`    ${(eq || ve) && good ? "✔" : "✘"} ${n}\n        ${eq ? post[n] : `ELŐTTE: ${pre[n]}  →  UTÁNA: ${post[n]}${ve ? "   (várt szigorodás)" : ""}`}`);
     }
     report(`F1 a 39. lépés forgatókönyvének 34 lépéséből 33 a szűkítés előtt és után betűre ugyanazt adja; a 19. lépés (sima felhasználó közvetlen törzsadat-írása) várt módon szigorodik: „0 sor módosult” → „permission denied”`,
-      names.length === 34 && Object.keys(post).length === 34 && same === 33 && vart === 1, `azonos: ${same}/34, várt változás: ${vart}`);
+      names.length === 34 && Object.keys(post).length === 34 && (ELES ? same === 34 : (same === 33 && vart === 1)), `azonos: ${same}/34, várt változás: ${vart}${ELES ? " (éles állapot: a 19. lépés már előtte is „permission denied”, ezért mind a 34 azonos)" : ""}`);
     report("F2 a 27 működő lépés sikeres (javaslat, sablon-feltöltés, „Kész”, publikálás, új Szám, szerkesztés indítása, Saját adatlap, képjavaslat, törlés indítása és véglegesítése), a 7 védelmi lépés hibát ad", okSteps === names.length, `${okSteps}/${names.length}`);
     const end = (await c.query(FNS)).rows;
     report("F3 a próbák után a függvények definíciója és hívási joga változatlan", end.every((f, i) => f.acl === mid[i].acl && f.h === mid[i].h));
