@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.25 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.26 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -504,17 +504,102 @@ SQL-ek: `laprol-lapra-draft-visszaadas.sql`, `-lego-sw-draft-helyreallitas.sql` 
 SQL: `laprol-lapra-fo-elem.sql` (élesítve). Tesztek: `scripts/tests/` (slots, thumb, draft-diff, series-list, paging, dates, totals), `scripts/trial-22-komponensek.js`.
 
 ### 13.13 22. lépés / 2. kör — Komponensek: sablon, típusleírás, más típusú elem, figyelmeztetések, komponens-törlés **[DÖNTVE, megvalósítva — v1.25]**
-- **Típusleírás (`component_type_defs`) [DÖNTVE]:** típus-szintű, közös: milyen mezői vannak a típusnak (az első változatban a mostaniak: azonosító-típus, azonosító, megnevezés, kép, darabszám, jegyzet; **árat soha nem tartalmaz** — CHECK). Csak migrációval állítjuk, az appban nincs szerkesztője. Az alapértelmezett azonosító-típus: könyv → ISBN, lego → lego_kd (a magazinnál és a többinél nincs; a meglévő azonosító-típusokhoz nem nyúlunk). Jövőbeli mező: új elem a leírásban + érték a komponens `adatok jsonb` mezőjében — oszlop-módosítás nélkül; a mostani oszlopok változatlanok.
+- **Típusleírás (`component_type_defs`) [DÖNTVE]:** *(v1.26: a típusleírás szabályokkal bővült — lásd 13.14.1.)* típus-szintű, közös: milyen mezői vannak a típusnak (az első változatban a mostaniak: azonosító-típus, azonosító, megnevezés, kép, darabszám, jegyzet; **árat soha nem tartalmaz** — CHECK). Csak migrációval állítjuk, az appban nincs szerkesztője. Az alapértelmezett azonosító-típus: könyv → ISBN, lego → lego_kd (a magazinnál és a többinél nincs; a meglévő azonosító-típusokhoz nem nyúlunk). Jövőbeli mező: új elem a leírásban + érték a komponens `adatok jsonb` mezőjében — oszlop-módosítás nélkül; a mostani oszlopok változatlanok.
 - **Komponens-sablon (`series.component_template`, `draft_series.component_template`, jsonb) [DÖNTVE]:** az új Számok kiindulása, a draft/publikálás körben él (`start_edit_draft`, `apply_draft_upload`, `publish_draft_series`, `mark_draft_ready`). Elemei: típus, ★ fő, kötelező, azonosító-szabály (kotelezo / ajanlott / nincs), alapértelmezett azonosító-típus, számít a színnél, alapértelmezett megnevezés; sorrend = a tömb sorrendje; pontosan egy fő; legalább 1 típus (3 fölött csak figyelmeztetés). A `series.components` a sablon típusaival szinkronban marad. A sablon változása csendes (nincs verzióemelés), a `change_log` rögzíti. Meglévő sorozatoknál egyszeri feltöltés = a mostani viselkedés. Az új Számok komponensei a sablon KÖTELEZŐ típusaiból jönnek létre (a beküldői út, a `propose_bulk_issues` változatlan). **Új sorozatnál a sablon megadása kötelező — a kliens kényszeríti ki**; üres sablonnál az alapértelmezett lép be (DB-szintű kikényszerítés későbbre, 24. pont).
 - **Más típusú elem egy Számhoz [DÖNTVE]:** a draft-szerkesztő „+ Elem hozzáadása” típusválasztója az ÖSSZES komponens-típust kínálja a Listákból; az elem csak az adott Számra vonatkozik, NEM kerül a sablonba / `series.components`-be (az Excel-feltöltés sem teszi a listára). Haladásjelző minden típusnál; a nevező azoknak a Számoknak a száma, amelyeken van legalább egy ilyen típusú, nem törölt komponens.
-- **„Kész” figyelmeztetések (`draft_ready_warnings`) [DÖNTVE]:** nem blokkoló, megerősítő ablakban („Mégis Kész”): ajánlott azonosító hiánya (darabszám), a meglévő komponensek kötelező azonosítójának hiánya, duplikált azonosító (azonos típus + azonosító, kis/nagybetű- és szóközfüggetlen, a publikálás utáni állapotra, legfeljebb 10 pár). **Blokkoló** (kivétel): érvénytelen sablon; az ÚJ Számok / ebben a draftban hozzáadott komponensek hiányzó KÖTELEZŐ azonosítója; komponens nélküli új Szám; minden komponens törölve egy Számon; fő elem nem pontosan egy.
+- **„Kész” figyelmeztetések (`draft_ready_warnings`) [DÖNTVE]:** *(v1.26: a típus kötelező mezői és a sorozat-azonosító kivétele — lásd 13.14.1–13.14.2.)* nem blokkoló, megerősítő ablakban („Mégis Kész”): ajánlott azonosító hiánya (darabszám), a meglévő komponensek kötelező azonosítójának hiánya, duplikált azonosító (azonos típus + azonosító, kis/nagybetű- és szóközfüggetlen, a publikálás utáni állapotra, legfeljebb 10 pár). **Blokkoló** (kivétel): érvénytelen sablon; az ÚJ Számok / ebben a draftban hozzáadott komponensek hiányzó KÖTELEZŐ azonosítója; komponens nélküli új Szám; minden komponens törölve egy Számon; fő elem nem pontosan egy.
 - **Komponens törlése [DÖNTVE]:** `components.is_deleted`, `draft_components.deleted` (a Számok soft-delete mintája). A személyes adatok (`member_status`, jegyzet, darabszám) megmaradnak, a komponens visszaállítható; a törlés/visszaállítás CSENDES (`change_log` `is_deleted`, verzióemelés és felkiáltójel nélkül). **A fő elem nem törölhető** (UI + szerver + CHECK); egy Számnak mindig marad legalább egy nem törölt komponense. A kliensben a törölt komponens egyetlen szűrési ponton (`js/model.js`) kiszűrődik → sehol nem jelenik meg. Visszaellenőrzés: `scripts/test-deleted-component.js`.
 - **Visszaellenőrzés minden kör végén:** `compare-before-after.js` (a Számok színe, a haladásjelzők, az Összeg-kártya — az összes sorozatra) — a 2. kör SQL-jei és kliens-részei után is **0 eltérés**.
 SQL: `komponens-sablon`, `tipus-hozzaadas`, `komponens-torles`. Tesztek: `scripts/tests/` (component-template, progress, model, draft-diff …), `scripts/trial-22-komponensek.js` (28/28).
 
+### 13.14 27–37. lépés — Típusszabályok, sorozat-azonosítók, közvetlen új Szám, adatrendezés **[DÖNTVE, megvalósítva — v1.26]**
+
+#### 13.14.1 A típusleírás szabályai (`component_type_defs`)
+A 13.13 típusleírása szabályokkal bővült; a tábla továbbra is csak migrációval állítható (az app szerepköre nem írhatja, az appban nincs szerkesztője), árat soha nem tartalmaz (CHECK).
+- **Oszlopok:** `tipus`, `csalad` (ma egy érték: `kiadvany` = Magazin, Könyv), `azonosito_mod`, `azonosito_tipusok` (a megengedett azonosító-típusok), `default_azonosito_tipus`, `fields` (a mezők sorrendben: `key`, `label`, `szint` = kotelezo / opcionalis, opcionálisan `kind` = pl. egesz, `potlas`).
+- **Azonosító-mód:** `fix` (egyetlen, rögzített azonosító-típus), `valaszthato` (a felsoroltak egyike), `nincs` (a típusnak nincs külön azonosítója, a név azonosít), `szabad` (bármi). CHECK: `fix` módnál kötelező megadni az azonosító-típust.
+- **A hét típus ma:**
+
+| Típus | Azonosító-mód | Megengedett azonosító-típus | Kötelező mező | Megjegyzés |
+|---|---|---|---|---|
+| Magazin | választható | ISBN, ISSN | – | alapérték nincs, a sablon adhat |
+| Könyv | választható | ISBN, ISSN | – | alapérték: ISBN |
+| Lego | fix | Lego Kód | – | |
+| Kártya (`krtya`) | fix | Kártyakód (`kartya_kod`) | Gyűjtemény, Kód, Név | hét mező: Gyártó, Gyűjtemény, Széria, Kiadás éve, Sorozatváltozat, Kód (= azonosító), Név (= megnevezés) |
+| Figura | nincs | – | Név | |
+| Modell | nincs | – | – | üres névnél a megjelenített név a Szám címe (`potlas: szam_cime`) |
+| Egyéb | szabad | bármi | – | |
+
+- A típus saját mezői (a Kártya Gyártó, Gyűjtemény, Széria, Kiadás éve, Sorozatváltozat mezője) a komponens `adatok jsonb` mezőjében élnek; a Kód és a Név a meglévő `azonosito` / `megnevezes` oszlop.
+- **Egy szabály, három hely:** ugyanazt a szabályt alkalmazza a munkaanyag „Kész” ellenőrzése (`draft_type_field_issues`), a közvetlen új Szám (`create_live_issue`) és a kliens (`js/type-defs.js`, tiszta, tesztelt modul). A szerver a mérvadó; a kliens csak előre jelez.
+- **Meglévő adat nem ragad be:** a „Kész” csak az ÚJ és az ebben a munkaanyagban MÓDOSÍTOTT komponensen blokkol; a régebbi, nem módosított komponens hiánya figyelmeztetés. A szerkesztő a típusnak nem megfelelő tárolt adatot megmutatja és javíthatóvá teszi.
+- **Megjelenített név, ha a megnevezés üres:** a csempén a típus neve (több azonosnál „Típus #N”); Modellnél a lenyitott Számon és a Saját adatlapon a Szám címe; a többi típusnál a típus neve (pl. „Figura”).
+
+#### 13.14.2 Sorozat-azonosítók (`series.azonositok`, `draft_series.azonositok`)
+- Az egész sorozatra érvényes ISBN / ISSN, `jsonb` lista: `[{tipus: 'isbn' | 'issn', ertek}]`, **legfeljebb kettő**. Ellenőrzés a táblán (CHECK → `series_azonositok_error`): csak ISBN / ISSN, az ISSN 8 jegyű, az ISBN 10 vagy 13 jegyű, ugyanaz kétszer nem szerepelhet.
+- A munkaanyag-körben él: a `start_edit_draft` átmásolja, a sorozat szerkesztőjének „Sorozat-azonosítók” szakasza és az oda-vissza sablon külön lapja írja, a `publish_draft_series` élesíti. A változása **csendes** (nincs verzióemelés, nincs felkiáltójel), a `change_log` rögzíti.
+- Megjelenik a sorozat fejlécében, a név alatt (pl. „ISSN 3103-4152”).
+- A sorozat-azonosítóval egyező komponens-azonosító a „Kész” előtti ellenőrzésben nem duplikáció. **Más kivétel nincs:** a 27. lépés átmeneti szabálya (a kiadvány-családban a 3 vagy több komponensen azonos érték nem duplikáció) a 37. lépésben kikerült a `draft_ready_warnings` függvényből.
+- Elv: ami az egész sorozaté, az a sorozat törzsében áll, nem Számonként ismételve. A Számonként eltérő, egyedi ISBN / ISSN továbbra is a komponensen van.
+
+#### 13.14.3 Közvetlen új Szám: `create_live_issue(p_series_id, p_issue, p_personal)`
+Egy már élő (aktív) sorozatra vadonatúj Számot vesz fel, egyetlen tranzakcióban. SECURITY DEFINER, rögzített `search_path`; csak bejelentkezett hívó futtathatja, belül staff + aktív ellenőrzés.
+- **Ellenőriz:** a sorozat aktív, és nincs törlésre jelölve; a lapszám egész szám; a lapszám nem foglalt sem élő, nem törölt Számon, sem a sorozat nyitott szerkesztési munkaanyagának új Számán (ilyenkor megnevezi a munkaanyagot); legalább egy elem van; elemenként a típusleírás szabályai (kötelező mezők, azonosító-mód és -típus), ismert típus, ismert azonosító-típus, érvényes státusz és darabszám; a sablon minden KÖTELEZŐ típusa szerepel; legfeljebb egy fő elem. A hibákat összegyűjti, és **egyszerre** sorolja fel; hibánál semmi nem kerül mentésre.
+- **Ír:** az `issues` sort (1-es verzió); a `components` sorokat (az azonosító-típus a típus szabálya szerint, a típus mezői az `adatok`-ba, az ismeretlen kulcs kimarad); a fő elemet (a megadott, különben a szokásos szabály: a sablon fő típusa → magazin → könyv → első); a feliratkozók „látott” sorait (`seed_issue_seen_for_subscribers`); a LÉTREHOZÓ személyes sorait, de csak ha megadott adatot (`member_status` elemenként, `member_issue_data` a Számra, `ar_auto = false`).
+- **Nem ír:** `change_log` bejegyzést és verzióemelést (új Szám, nincs mit jelezni); más felhasználó személyes adatát; meglévő Számot vagy komponenst; a sorozat sablonját; munkaanyagot.
+- **Hívói:** a 🔧 Gyors szerkesztés „+ Új tétel” űrlapja (típus szerinti mezők, kötelezők jelölve, ★ fő elem, hibalista az űrlap tetején, a beírt adat megmarad; a saját jelölés és beszerzési adat nem kötelező) és a Gyors Excel (⬆ Excel) ÚJ lapszámú sorai, Számonként külön hívással: a hibás sor kimarad, a többi feltöltődik, a végén Számonként látszik a hiba.
+- **Ismert korlát:** a Gyors Excel sablonjában típusonként csak státusz / azonosító / megnevezés oszlop van, a típus saját mezőinek (pl. a Kártya Gyűjteménye) és az azonosító-típusnak nincs oszlopa. Olyan sorozatnál, amelynek a sablonjában Kártya van, új Szám ezen az úton nem vehető fel (ma nincs ilyen élő sorozat); Magazin azonosítója csak akkor megy át, ha a sablon ad alap azonosító-típust.
+
+#### 13.14.4 A két útvonal határa
+| | Közvetlen útvonal | Munkaanyag-útvonal |
+|---|---|---|
+| Mire | vadonatúj Szám élő sorozatra | minden más törzsadat-változás: meglévő Szám és komponens módosítása, törlése, sorozat-adatok, sablon, sorozat-azonosítók, új sorozat |
+| Hol | „+ Új tétel”, Gyors Excel új sorai | Karbantartás (szerkesztő, oda-vissza sablon), Gyors Excel meglévő sorai |
+| Mikor él | azonnal | publikáláskor |
+| Értesítés | nincs (a feliratkozók alapvonalat kapnak) | verzióemelés + felkiáltójel (a csendes mezők kivételével) |
+| Szabály | `create_live_issue` | `mark_draft_ready` + `draft_type_field_issues` + `draft_ready_warnings`, majd `publish_draft_series` |
+
+A személyes adat (státusz, darabszám, jegyzet, fizetett ár, beszerzés) egyik útvonalon sem törzsadat: a Saját adatlap közvetlenül írja, csak a sajátot.
+A kliens közvetlenül (függvény nélkül) ma is tudna írni az élő táblákba a staff RLS-szabályai szerint; ennek szerver-oldali lezárása (védő trigger) nyitott — lásd 13.14.8.
+
+#### 13.14.5 Az S2 adatrendezés eredménye (2026-10-13)
+Egyetlen tranzakció, minden lépése csendes (nincs verzióemelés, nincs felkiáltójel), 280 `change_log` bejegyzéssel; a személyes adatok, a színek, a haladás és az összegek nem változtak.
+- **Öt sorozat megkapta a sorozat-azonosítóját,** és 155 komponensről lekerült a Számonként ismételt érték: Disney — ISSN 3103-4152 (8 könyv); Volkswagen model — ISBN 978-88-334-2749-2 (23 magazin); Disney Hangos — ISBN 978-88-334-2840-6 (81 könyv; az #1 Szám eltérő ISBN-je, 978-88-334-2839-0, a komponensén maradt); Lego Star Wars — ISSN 2568-2474 (42 magazin); Lego Marvel — ISSN 3053-5611 (1 magazin).
+- **Disney Hangos:** a 82 „modell” komponens „figura” lett (a sorozat komponens-listája és sablonja is). A figurák neve üres; új Számnál a név kötelező.
+- **Lego Star Wars #29 kártya** (LE19, Bo-Katan Kryze): az azonosító-típusa Kártyakód.
+- **Listák:** a `krtya` típus megjelenített neve „Kártya”.
+- **`draft_ready_warnings`:** az átmeneti duplikáció-szabály kikerült (a 37 függvényből ez az egy változott).
+
+#### 13.14.6 Tesztelési mód
+- **Csak olvasás:** `scripts/ro.js` (`BEGIN READ ONLY`, időkorlátok, a végén mindig ROLLBACK) — minden olvasó ellenőrzés ezen megy.
+- **Visszagörgetett próbák élő adaton:** egyetlen tranzakció, a végén mindig ROLLBACK, `lock_timeout` beállítva, a számlálók és a függvények hash-e előtte és utána egyezik. Csak a tulajdonos jóváhagyásával futtathatók. A kör próbái: `scripts/trial-27-tipusok-azonositok.js` (60 ellenőrzés; az S2 előtti állapotra íródott, az S2 után már nem futtatható változatlanul), `scripts/trial-33-uj-szam.js` (19 ellenőrzés; az S2 után is zöld).
+- **Tiszta logika Node-tesztekkel:** `scripts/tests/` (`type-defs.test.mjs` és társai).
+- **Felületi próba:** külön teszt-felhasználóval (staff szerepkör, saját feliratkozásokkal), a hitelesítő adatai a git-ből kizárt `.env.test` fájlban; a jelszót a tulajdonos írja be, és a próba után kiveszi a fájlból. A próba egy erre létrehozott TESZT sorozaton fut, amelyet a tulajdonos a végén töröl. A képernyőképek a `scripts/ui-test/kepek/` mappába kerülnek (git-ből kizárva). Bejelentkezés nélküli látványpróba: `scripts/tests/szam-sav-proba.html`.
+- **Migráció:** az SQL megmutatása → jóváhagyás → `node scripts/run-migration.js <fájl> <címke>` (mentés a `db-backups/` mappába, egy tranzakció, 3 mp-es `lock_timeout`) → számlálók és hash-ek előtte / utána. Az `.sql` fájlok sorvége mindig LF (`.gitattributes`), hogy a függvények hash-e ne függjön a sorvégtől.
+
+#### 13.14.7 A `public` séma 37 függvénye
+- **Jogosultság-segédek:** `is_staff`, `is_active`, `my_role`.
+- **Trigger-függvények:** `handle_new_user`, `protect_members`, `protect_member_series`, `check_pool_limit`, `block_edit_during_force_delete`.
+- **Munkaanyag és publikálás:** `start_edit_draft`, `apply_draft_upload`, `propose_bulk_issues`, `mark_draft_ready`, `return_draft_to_edit`, `publish_draft_series`, `draft_ready_warnings`, `draft_type_field_issues`, `draft_lapszam_conflicts`, `draft_conflicts_text`, `ensure_draft_main`, `pick_main_draft_component`.
+- **Közvetlen új Szám:** `create_live_issue`, `pick_main_component`.
+- **Sablon és típusszabály:** `default_component_template`, `sync_template_with_components`, `template_main_type`, `component_template_error`, `component_type_fields_error`, `type_azonosito_tipus`, `series_azonositok_error`.
+- **Verziókövetés:** `log_field_change`, `seed_member_seen`, `seed_issue_seen_for_subscribers`.
+- **Képjavaslat:** `can_propose_image`, `can_propose_series_image`.
+- **Sorozat-kód és törlés:** `next_series_no`, `start_force_delete`, `finalize_delete_series`.
+
+#### 13.14.8 Nyitott a körből
+- **Jogosultság-szigorítás:** a 37 függvényből 36-ot a bejelentkezés nélküli hívó is meghívhat (az alapértelmezett jog megmaradt rajtuk; kivétel a `create_live_issue`). A legtöbb belül ellenőriz vagy csak számol, de három belső segéd ellenőrzés nélkül ír: `log_field_change` (a változásnaplóba), `next_series_no` (a sorozat-sorszámlálót lépteti), `seed_issue_seen_for_subscribers` („látott” sorokat vesz fel); az `ensure_draft_main` munkaanyagban jelöl fő elemet. Teendő: a hívási jog megvonása a `PUBLIC` és az `anon` szerepkörtől, a belső segédeknél az `authenticated` szerepkörtől is.
+- **Védő trigger (C):** az élő törzsadat-táblák közvetlen (függvényen kívüli) írásának lezárása.
+- **Verzióellenőrző sáv:** a régi, újra nem töltött böngészőfül ne írhasson a régi kóddal.
+- **„Szám adatainak szerkesztése” gomb** a Szám sorából; **a Karbantartás és a szerkesztés összevonása.**
+- **A Gyors Excel és a sablonok átdolgozása** (a típus saját mezői, azonosító-típus, azonosító-alapú párosítás).
+- **A javaslat-beküldő értesítése; a Mancs Őrjárat sorozat-azonosítója; a Disney Hangos #1 eltérő ISBN-jének ellenőrzése; a Lego Star Wars #29 kártya Gyűjteménye.**
+SQL: `27-s1-szerkezet`, `33-uj-szam-fuggveny`, `27-s2-adatrendezes`.
+
 ---
 
 *Napló:*
+- v1.26 — **27–37. lépés — Típusszabályok, sorozat-azonosítók, közvetlen új Szám, adatrendezés** (13.14): a típusleírás szabályai (azonosító-mód, megengedett azonosító-típusok, kötelező mezők; a Kártya hét mezője, a Figura kötelező neve); sorozat-azonosítók a sorozat törzsében (legfeljebb két ISBN / ISSN, csendes, a fejlécben látszik); új Szám-sáv csempékkel; a szerkesztők egysége (a típusnak nem megfelelő tárolt adat látszik és javítható); `create_live_issue` — a „+ Új tétel” és a Gyors Excel új sorai egy tranzakcióban, a munkaanyaggal azonos szabályokkal; S2 adatrendezés (öt sorozat azonosítója, 155 komponens, Disney Hangos 82 figura, Kártyakód, „Kártya”); az átmeneti duplikáció-szabály kivétele; tesztelési mód (teszt-felhasználó, visszagörgetett próbák, `scripts/ro.js`); a 37 függvény listája és a jogosultság-felmérés nyitott pontjai. SQL: `27-s1-szerkezet`, `33-uj-szam-fuggveny`, `27-s2-adatrendezes`.
 - v1.25 — **22. lépés / 2. kör — Komponensek** (13.13): komponens-sablon + típusleírás (`component_type_defs`, `adatok jsonb`), sablon szerinti színezés (0 eltérés), más típusú elem egy Számhoz (típusválasztó, külön haladásjelző), „Kész” figyelmeztetések, **komponens valódi törlése** (soft-delete, csendes; a fő elem nem törölhető), `model.js` egyetlen szűrési pont, publikálás-összefoglaló a komponens-törlésre. SQL: `komponens-sablon`, `tipus-hozzaadas`, `komponens-torles`; indexek a draft-táblákon.
 - v1.24 — **22. lépés / 1. kör — Áttekinthetőség** (13.12): összecsukott Szám-sor (legfeljebb 3 elem egymás alatt, kis kép Storage-átméretezéssel + lusta betöltés vagy típus-piktogram, „+N"); **fő elem (★)** mint jelölés a komponensen (`is_main`, csendes váltás, nem törölhető; 582 Szám → 582 fő elem); „N Szám" a függő listákon és publikálás előtti összefoglaló; sorozat-lista keresés/rendezés közös komponenssel; stabil lapozás; `compare-before-after.js`. SQL: `fo-elem`.
 - v1.23 — **Az Összeg-kártya egységesítése** (5.5, C változat): a két nézet ugyanazokat a Számokat (≥1 komponens megvan) és ugyanazt a szorzót (beszerzési mennyiség) használja; közös, tesztelt számítás (`js/totals.js`, `scripts/tests/totals.test.mjs`); a kártyán a Szám-darabszám is látszik; a súgó „mit ér a gyűjteményed” leírása javítva. Komponens-szintű ár: nem kell (lezárt döntés). Nincs adatbázis-változás.

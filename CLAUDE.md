@@ -18,7 +18,15 @@ Nyelv: magyar. Tömör válaszok. A kérdéseket egyszerre, egyben, szövegben f
 - Olvasáshoz használd a `scripts/ro.js` segédet (csak olvasás).
 - Minden lekérdezésnél lapozz (PostgREST 1000 sor csendes levágás), stabil rendezéssel (`fetchAllRows`).
 - A tulajdonos személyes státuszgombjait ne kattintsd, személyes adatot ne módosíts.
-- Titkos adatot (kapcsolati szöveg, kulcs) ne írj ki, ne commitolj. A `db.local.js` és a `config.js` nem kerülhet git-be.
+- Titkos adatot (kapcsolati szöveg, kulcs, jelszó) ne írj ki, ne commitolj. A `db.local.js`, a `config.js` és a `.env.test` nem kerülhet git-be. A felhasználók e-mail-címét jelentésbe ne írd ki.
+- A jóváhagyott SQL szövegén ne változtass. Az `.sql` fájlok sorvége LF (`.gitattributes`); futtatás előtt a próba által mért függvény-hash egyezzen a jóváhagyott csomagéval.
+- Futtatás: `node scripts/run-migration.js <fájl> <címke>` (mentés, egy tranzakció, 3 mp-es `lock_timeout`). Hibánál ne próbáld újra; a visszaúthoz új jóváhagyás kell.
+- Nagyobb migráció előtt átnézendő csomag készül (`NN-lepes-atnezesre.md`: teljes SQL, mellékhatások, számlálók, próbák, futtatási terv, visszaút). Ez a fájl nem kerül a repóba.
+
+## Felületi próba
+- Csak a teszt-felhasználóval, erre létrehozott próbasorozaton. A jelszót a tulajdonos írja be a böngészőben; te soha nem írod ki és nem gépeled be. Kijelentkezni nem kell.
+- Éles sorozatot ne nyiss szerkesztésre, munkaanyagot ne hozz létre rajta, mások munkaanyagához ne nyúlj.
+- A képernyőképek a `scripts/ui-test/kepek/` mappába kerülnek (git-ből kizárva).
 
 ## Kliens
 - Natív ES modulok, build-eszköz nélkül. Nincs service worker; a deploy után az appot újra kell tölteni a böngészőben.

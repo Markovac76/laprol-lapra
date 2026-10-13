@@ -1,6 +1,6 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v13)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v14)
 
-**Frissítve:** 2026. október 10. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
+**Frissítve:** 2026. október 13. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
 > Told fel ezt a fájlt a Claude projektbe (cseréld le a régi verziót). Új beszélgetés elején hivatkozz rá: "olvasd el az állapot-összefoglalót, onnan tudod, hol tartunk."
 
@@ -8,7 +8,7 @@
 
 ## 1. A nagy kép
 
-**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított, legutóbb a feltöltés-átalakítási kör zárva (v1.20): azonosító-alapú oda-vissza sablon, lapszám-ütközés-védelem, Visszaadás szerkesztésre, Listák átnevezése.9). **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
+**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított. Legutóbb a 27–37. lépés köre zárult (v1.26): típusszabályok (a Kártya hét mezője, a Figura neve, rögzített / választható azonosító-típusok), sorozat-azonosítók a sorozat törzsében, új Szám-sáv csempékkel, a „+ Új tétel” és a Gyors Excel új sorai egyetlen szerver-oldali függvényen át (`create_live_issue`), és az S2 adatrendezés (öt sorozat azonosítója, Disney Hangos figurák). **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
 
 ---
 
@@ -19,7 +19,7 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.25** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.26** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 - **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
@@ -27,48 +27,64 @@
 laprol-lapra/
 ├── index.html          ← csak markup + script betöltés
 ├── styles.css
-├── README.md             ← ÚJ (v1.8): projekt-belépő dokumentum
+├── README.md             ← projekt-belépő dokumentum
+├── CLAUDE.md             ← a Claude Code munkaszabályai (minden munkamenet elején ezt olvassa)
+├── .gitattributes        ← az .sql fájlok sorvége mindig LF (a függvény-hash ne függjön a sorvégtől)
 ├── config.js            ← NINCS git-ben, Vercel generálja env változóból
 ├── config.example.js
-├── db.local.js            ← ÚJ (v1.8): Postgres connection string a migrációkhoz — NINCS git-ben
-├── db.local.example.js     ← ÚJ (v1.8): minta db.local.js-hez
-├── db-backups/               ← ÚJ (v1.8): migráció előtti JSON-pillanatképek — NINCS git-ben
-├── scripts/                   ← ÚJ (v1.8): migrációs eszközök, saját package.json + node_modules (utóbbi NINCS git-ben)
-│   ├── package.json, package-lock.json
-│   ├── backup-db.js
-│   ├── run-migration.js
-│   ├── trial-publish.js                   ← egy draft publikálásának próbája, MINDIG visszagörget
-│   ├── trial-renumber.js                  ← szintetikus átszámozás-próba, MINDIG visszagörget (csak jóváhagyással futtatható)
-│   ├── trial-start-edit.js                ← a start_edit_draft + index próbája, MINDIG visszagörget (csak jóváhagyással futtatható)
-│   ├── trial-uj-szam-komponens.js         ← új Szám komponens-alap / Kész-védelem / Autós adatjavítás próbája, MINDIG visszagörget
-│   ├── trial-22-komponensek.js            ← a 22. lépés SQL-csomagjának próbája (--publish: publikálási próbák is), MINDIG visszagörget
+├── db.local.js            ← Postgres kapcsolati szöveg a migrációkhoz — NINCS git-ben
+├── db.local.example.js     ← minta db.local.js-hez
+├── .env.test               ← a teszt-felhasználó adatai a felületi próbához — NINCS git-ben; a jelszó csak a próba idejére van benne
+├── db-backups/               ← migráció előtti JSON-pillanatképek — NINCS git-ben
+├── laprol-lapra-*.sql         ← a migrációk, időrendben (a legutóbbiak: 27-s1-szerkezet, 33-uj-szam-fuggveny, 27-s2-adatrendezes)
+├── scripts/                   ← helyi fejlesztői eszközök, saját package.json + node_modules (utóbbi NINCS git-ben)
+│   ├── ro.js                              ← CSAK OLVASÓ lekérdezés (READ ONLY tranzakció, a végén mindig ROLLBACK)
+│   ├── backup-db.js, run-migration.js     ← mentés + migráció egy tranzakcióban, 3 mp-es lock_timeout
+│   ├── trial-*.js                         ← visszagörgetett próbák élő adaton, MINDIG ROLLBACK, csak jóváhagyással:
+│   │                                         publish, renumber, start-edit, uj-szam-komponens, 22-komponensek,
+│   │                                         27-tipusok-azonositok (az S2 előtti állapotra íródott), 33-uj-szam
 │   ├── compare-before-after.js            ← olvasó visszaellenőrzés két kódállapot közt: színek / haladás / összeg
-│   └── tests/                             ← Node-tesztek: dates.test.mjs, paging.test.mjs
+│   ├── test-deleted-component.js
+│   ├── tests/                             ← Node-tesztek a tiszta modulokra + szam-sav-proba.html (látványpróba bejelentkezés nélkül)
+│   └── ui-test/kepek/                     ← a felületi próbák képernyőképei — NINCS git-ben
 ├── vercel.json
 ├── manifest.json + icons/
 └── js/
-    ├── supabase.js, state.js, modal.js, auth.js, permissions.js
-    ├── data.js, render.js, personal.js
-    ├── admin-forms.js, admin-users.js
-    ├── excel.js, main.js
-    ├── my-series.js, series-proposal.js       ← sorozat-választás/javaslás
-    ├── karbantartas.js, draft-items.js         ← életciklus, draft-szerkesztés
-    ├── changes.js                              ← verziókövetés/felkiáltójel
-    ├── component-images.js, image-resize.js    ← képfeltöltés/-javaslat
-    ├── my-data.js                               ← „Saját adatlap", leváltotta a price-edit.js-t
-    ├── draft-excel.js                           ← oda-vissza sablon: letöltés/beolvasás/előnézet/alkalmazás (v1.20)
-    ├── draft-excel-plan.js                      ← ugyanennek a TISZTA logikája (párosítás, osztályozás, ujjlenyomat) — Node-ban tesztelhető
-    └── help.js, help-content.js                 ← beépített súgó
+    ├── supabase.js, state.js, modal.js, auth.js, permissions.js, main.js
+    ├── data.js, model.js, totals.js            ← adatbetöltés, a sorozat-modell (tiszta), az Összeg-kártya számítása (tiszta)
+    ├── render.js, thumb.js                      ← megjelenítés, a Szám-sáv csempéi, kis képek és típus-jelek
+    ├── type-defs.js                             ← a TÍPUSSZABÁLYOK tiszta modulja (mezők, azonosító-mód, hibalista, sorozat-azonosítók)
+    ├── component-template.js                    ← komponens-sablon (tiszta)
+    ├── personal.js, my-data.js                  ← személyes adat, „Saját adatlap"
+    ├── admin-forms.js                           ← 🔧 „+ Új tétel" űrlap (create_live_issue), Listák
+    ├── excel.js                                 ← Gyors Excel: új sor → create_live_issue, meglévő sor → szerkesztési munkaanyag
+    ├── admin-users.js
+    ├── my-series.js, series-proposal.js, series-list.js, series-sort.js   ← sorozat-választás / javaslás / keresés, rendezés
+    ├── karbantartas.js, draft-items.js, draft-diff.js   ← életciklus, munkaanyag-szerkesztés, publikálás előtti összefoglaló
+    ├── draft-excel.js, draft-excel-plan.js      ← oda-vissza sablon (a -plan a tiszta logika)
+    ├── changes.js                               ← verziókövetés / felkiáltójel
+    ├── component-images.js, image-resize.js     ← képfeltöltés / képjavaslat
+    ├── help.js, help-content.js                 ← beépített súgó
+    └── changelog.js, changelog-content.js       ← 🔔 Újdonságok
 ```
 `price-edit.js` **megszűnt** — a `my-data.js` teljesen leváltotta. Ha bármit módosítasz az appon (`index.html`/`js/`/`styles.css`), ebben a modul-szerkezetben kell — nem egyetlen nagy fájlban. A `scripts/` mappa ettől külön áll: helyi fejlesztői eszköz, sosem megy a Vercel build-be.
 
 ### Munkafolyamat
 1. Home-felületen (itt) átbeszéljük/kidolgozzuk a döntéseket, vagy egyben egy instrukció-fájlt (`claude-code-N-lepes-....md`) állítunk össze.
-2. Ezt bemásolod a Claude Code-nak, ő megépíti, kérdez ha kell, majd — csak a te kifejezett "mehet a commit és push" jóváhagyásod után — commit+push.
-3. Te éles teszteléssel (bejelentkezve!) ellenőrződ — a Code anonim/publikus adatot lát csak, a személyes/védett adatot NEKED kell tesztelned.
-4. Ha minden jó, a Code frissíti a specifikációt is, és ezt az állapot-összefoglalót.
+2. Ezt bemásolod a Claude Code-nak, ő megépíti, kérdez ha kell. Commit és push csak akkor, ha az utasítás vagy te kifejezetten jóváhagytad (az utasítás megmondhatja: „commitold, de ne pushold").
+3. A Code a jelentés végén kiírja, mit nézz meg élesben; te bejelentkezve ellenőrzöd. A Code az adatbázist csak olvasó segéddel (`scripts/ro.js`) látja, a felületet pedig külön teszt-felhasználóval próbálja — a te fiókodba nem lép be, a személyes státuszgombjaidat nem kattintja.
+4. Minden kör végén: súgó, változásnapló, specifikáció (verzióemelés), ez az állapot-összefoglaló.
 
-**SQL-migrációk módja MEGVÁLTOZOTT (lásd lent):** eddig a Code csak írta a `.sql` fájlt, TE futtattad a Supabase SQL Editorban. Mostantól a Code közvetlen Postgres-kapcsolattal MAGA futtatja le — a jóváhagyási igény (a teljes SQL megmutatása + explicit "mehet" várása) VÁLTOZATLANUL kötelező, csak a végrehajtás módja más. Részletek: `README.md` "Migrációk" szakasza.
+A Code állandó munkaszabályai a repó `CLAUDE.md` fájljában vannak (nyelv, migrációk, próbák, titkok kezelése).
+
+**Szabályok, amelyek ebben a körben alakultak ki:**
+- **Migráció:** a teljes SQL megmutatása → a te jóváhagyásod → `node scripts/run-migration.js <fájl> <címke>` (mentés a `db-backups/` mappába, egyetlen tranzakció, 3 mp-es `lock_timeout`, hiba esetén ROLLBACK) → számlálók és a függvények hash-e előtte és utána. A jóváhagyott SQL szövegén a Code egy karaktert sem változtat; eltérésnél megáll. Hibánál nem próbálja újra.
+- **Visszagörgetett próba élő adaton** (`scripts/trial-*.js`): egyetlen tranzakció, a végén mindig ROLLBACK, előtte / utána azonos számlálók és hash-ek. Csak jóváhagyással.
+- **Olvasás:** mindig a `scripts/ro.js` segéddel (csak olvasó tranzakció).
+- **Felületi próba:** külön teszt-felhasználóval, erre létrehozott TESZT sorozaton. A jelszót te írod be a böngészőben; a Code soha nem írja ki, és nem gépeli be. A jelszó a próba után kikerül a `.env.test` fájlból, a TESZT sorozatot te törlöd.
+- **Titkok:** kapcsolati szöveg, kulcs, jelszó, a felhasználók e-mail-címe nem kerül jelentésbe, naplóba, commitba.
+- **Átnézendő csomag:** nagyobb migráció előtt `NN-lepes-atnezesre.md` készül (teljes SQL, mellékhatások, számlálók, próbák, futtatási terv, visszaút); ez nem kerül a repóba.
+- **Sorvégek:** az `.sql` fájlok LF sorvégűek (`.gitattributes`).
 
 ### Közvetlen Postgres-kapcsolat a migrációkhoz **[DÖNTVE, megvalósítva]**
 Az anyanotesz projektben már bevált minta átvéve: a Code egy `scripts/run-migration.js` Node-scripttel (a `pg` npm-csomaggal, `scripts/`-en belüli, gitignore-olt saját `node_modules`-szal — ez NEM az app build-jének/deploy-jának a része) fut le a Postgres ellen, `db.local.js`-ben (gitignore-olt, `db.local.example.js` a minta) tárolt connection stringgel. **v1.10: "Session pooler"-re váltva** (korábban "Direct connection") — az kizárólag IPv6-címet publikál, ami egy munkamenetből elérhetetlennek bizonyult; a Session pooler IPv4-kompatibilis és megtartja a session-t egy tranzakción belül, tehát a `BEGIN`/`COMMIT` migrációkhoz is jó. Minden futtatás előtt automatikusan friss `db-backups/` JSON-pillanatképet készít az összes táblából (gitignore-olt), és a migrációt `BEGIN`/`COMMIT`/`ROLLBACK` tranzakcióba csomagolja. A jóváhagyási kapu (teljes SQL megmutatása, explicit "mehet" várása, mielőtt a script lefut) VÁLTOZATLANUL kötelező — ez nem szoftveres kényszer, hanem a beszélgetés szintjén betartott szabály. Technikai eltérés az anyanotesz-mintától: az eredetileg tervezett ephemeral `npx -p pg` injektálás ezen a gépen nem működött megbízhatóan (modul-feloldási hiba), ezért egy dedikált `scripts/package.json` + helyi `node_modules` lett a megoldás — funkcionálisan egyenértékű, semmi nem kerül belőle git-be. **Élesben végpontig tesztelve** (2026-08-26): valódi kapcsolódás, mind a 17 tábla helyes JSON-backupja, és egy idempotens migráció sikeres, tranzakciós újrafuttatása.
@@ -98,7 +114,16 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 - **change_log** — mezőnkénti változás-napló (series/issue/component közösen); **member_seen** — userenkénti „utoljára látott verzió".
 - **image_proposals** — képjavaslat-workflow; **`components.upload_enabled`**, **`components/issues/series.version`**, **`series.lifecycle`** (`active`/`unpublished`) + `force_delete_*` mezők.
 - **`issues.is_deleted`** (v1.7) — Szám soft-delete jelzője (lásd 4. fejezet).
-- **global_counters** — a sorozat-kód-számláló globálissá vált (a régi, userenkénti `counters` tábla holtan megmaradt).
+- **global_counters** — a sorozat-kód-számláló globálissá vált (a régi, userenkénti `counters` tábla holtan megmaradt). A sorszám soha nem használódik újra: a törölt sorozatok (legutóbb a TESZT próbasorozat) után hézag marad, a következő szabad szám ma a 16.
+
+**A 22–37. lépésből (v1.24–v1.26):**
+- **`components.is_main`** (fő elem ★), **`components.is_deleted`** / **`draft_components.deleted`** (komponens soft-delete), **`components.adatok jsonb`** (a típus saját mezői, pl. a Kártya Gyűjteménye).
+- **`series.component_template`** / **`draft_series.component_template`** — a komponens-sablon (az új Számok kiindulása).
+- **`component_type_defs`** — a típusleírás és a típusszabályok (azonosító-mód: fix / választható / nincs / szabad; megengedett azonosító-típusok; a mezők és a kötelezők). Csak migrációval állítható, az app nem írhatja.
+- **`series.azonositok`** / **`draft_series.azonositok`** — sorozat-azonosítók (legfeljebb két ISBN / ISSN), CHECK-kel.
+- **37 függvény** a `public` sémában (lista: specifikáció 13.14.7). Az új Szám közvetlen felvétele: `create_live_issue`.
+
+**Az élő adat ma (2026-10-13, a TESZT sorozat törlése után):** 10 sorozat, 582 Szám, 1026 komponens; 2 tag (tulajdonos + a teszt-felhasználó admin szerepkörrel). Sorozat-azonosítója öt sorozatnak van (Disney, Volkswagen model, Disney Hangos, Lego Star Wars, Lego Marvel).
 - Storage: `component-images` bucket (publikus, közös — nem felhasználónkénti).
 
 ### RLS-modell összefoglalva
@@ -180,6 +205,15 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 - **22. lépés / 1. kör (v1.24):** összecsukott Szám-sor (legfeljebb 3 elem egymás alatt, kis kép + státuszgomb, „+N"); **fő elem (★)** a komponensen (`is_main`, csendes váltás, nem törölhető); „N Szám" a függő listákon + publikálás előtti összefoglaló (`draft-diff.js`); sorozat-lista keresés/rendezés közös komponenssel (`series-list.js`); stabil lapozás; `scripts/compare-before-after.js` (színek / haladás / összeg, minden sorozatra).
 - **22. lépés / 2. kör (v1.25):** komponens-sablon (sorrend, fő elem, kötelező, azonosító-szabály, alap azonosító-típus, számít a színnél) + típusleírás; sablon szerinti színezés (538 Szám, 0 eltérés); más típusú elem egy Számhoz, külön haladásjelzővel; „Kész” figyelmeztetések (ajánlott / duplikált azonosító); komponens valódi törlése (soft-delete, csendes, a fő elem nem törölhető); törölt komponens egyetlen szűrési ponton (`model.js`). SQL: `komponens-sablon`, `tipus-hozzaadas`, `komponens-torles` — ÉLESÍTVE.
 
+**27–37. lépés — típusszabályok, sorozat-azonosítók, közvetlen új Szám, adatrendezés (v1.26, részletek: specifikáció 13.14):**
+- **Új Szám-sáv (27. lépés):** az elemek csempékben, legfeljebb három egymás mellett, a fő elem (★) elöl; csempénként státuszgomb az elem nevével, kép, típus-jel, darabszám (mindig látszik); „+N" a többire.
+- **S1 — szerkezet (29. lépés, ÉLES):** a típusleírás szabályai; a Kártya hét mezője (Gyártó, Gyűjtemény*, Széria, Kiadás éve, Sorozatváltozat, Kód*, Név*); a Figura neve kötelező; Lego és Kártya rögzített azonosító-típus, Magazin / Könyv csak ISBN vagy ISSN, Figura / Modell azonosító nélkül; sorozat-azonosítók (legfeljebb kettő, a fejlécben látszik, csendes). A „Kész" csak az új és a módosított elemeken blokkol, a régieknél figyelmeztet.
+- **A szerkesztők egysége (33. lépés):** a típusnak nem megfelelő tárolt adat látszik és javítható; a kötelező üres mező kiemelve; a sorozat-azonosító hibája a mező elhagyásakor jelez; állandó elem-sorrend.
+- **`create_live_issue` (35. lépés, ÉLES):** a „+ Új tétel" űrlap és a Gyors Excel új sorai egyetlen szerver-oldali függvényt hívnak — vagy a teljes Szám létrejön, vagy semmi; a szabályok a munkaanyagéval azonosak; a hibák egyszerre, érthetően jönnek.
+- **S2 — adatrendezés (37. lépés, ÉLES, 2026-10-13):** öt sorozat megkapta a sorozat-azonosítóját, 155 komponensről lekerült az ismételt érték; a Disney Hangos 82 „modell" eleme „figura" lett; a Lego Star Wars #29 kártya Kártyakód típusú; a Listákban „Kártya"; a `draft_ready_warnings` átmeneti szabálya kikerült. Csendes volt: a színek, a haladás, az összegek és a személyes adatok nem változtak, új felkiáltójel nem keletkezett.
+- **Tesztelés:** teszt-felhasználó + TESZT sorozat a felületi próbához (a sorozat azóta törölve), visszagörgetett próbák (60 + 19 ellenőrzés), `scripts/ro.js`.
+- SQL: `27-s1-szerkezet`, `33-uj-szam-fuggveny`, `27-s2-adatrendezes` — mind ÉLESÍTVE.
+
 ---
 
 ## 5. A kör során talált és javított RLS-hiba (tanulságos eset)
@@ -195,8 +229,8 @@ A hibajavítási kör 11. pontja (sablon-alapú tömeges feltöltés) a javaslat
 3. **Valódi fióktörlés** (Edge Function kell, service_role kulccsal — eddig csak letiltás épült meg).
 4. **Címkerendszer** — platform-szintű, még nem szabványosítva.
 5. **Hordozhatóság/export** — nincs kidolgozva.
-6. **Komponens soft-delete** — ma a draftból törölt komponens-példány az élő komponenst nem törli (a gomb figyelmeztet). Önálló kör: `components.is_deleted`, a szűrések és az értesítés.
-7. **Gyors szerkesztés → Excel azonosító-alapúvá tétele** — ma lapszám alapján párosít, és az új lapszámokat közvetlenül élőbe írja (a megerősítő ablak figyelmeztet). Önálló kör.
+6. **Komponens soft-delete** — **KÉSZ (v1.25).**
+7. **A Gyors Excel és a sablonok átdolgozása** — ma lapszám alapján párosít; a sablonjában nincs oszlopa az azonosító-típusnak és a típus saját mezőinek (pl. a Kártya Gyűjteménye), ezért Kártyát tartalmazó sablonú sorozatra ezen az úton nem vehető fel új Szám (ma nincs ilyen élő sorozat). Önálló kör. (Az új sorok már a `create_live_issue` függvényen mennek át.)
 8. **Egy szerkesztési draft egy élő sorozathoz** — **KÉSZ (v1.21):** részleges egyedi index + atomi `start_edit_draft()`; a Karbantartás gombja és a Gyors szerkesztés → Excel is ezt hívja (a soft-delete-elt Számokat nem másolja).
 9. **Döntés nélküli ötletek:** „tervezett” jelzés a még meg nem jelent számoknál; dátum szerinti rendezés segítségként (nem automatikus); eltolás ütközésnél felajánlott kényelmi lehetőségként.
 10. **A lapszám-csendesítés élő ellenőrzése** — **KÉSZ:** a visszagörgetett szintetikus próba (`scripts/trial-renumber.js`) igazolta: a puszta lapszám-változás nem emel verziót, a `change_log` rögzíti, a számlálók a ROLLBACK után azonosak.
@@ -207,6 +241,17 @@ A hibajavítási kör 11. pontja (sablon-alapú tömeges feltöltés) a javaslat
 15. **A régi szerkesztő kompatibilitási ága** — KÉSZ (lásd 17.).
 16. **Kézi törölt-jelölés kockázata** — kézi SQL előtt ellenőrizni, hogy nincs-e függő szerkesztési draft; a visszaállítás legyen kifejezett művelet.
 17. **Kompatibilitási ág kivétele** — KÉSZ: élesítve (a `sync_template_with_components` függvény megmaradt).
+
+**A 27–38. lépés köréből nyitva maradt (a javasolt sorrendben):**
+
+18. **Jogosultság-szigorítás** — a 37 függvényből 36-ot a bejelentkezés nélküli hívó is meghívhat. A legtöbb belül ellenőriz vagy csak számol, de három belső segéd ellenőrzés nélkül ír (`log_field_change`, `next_series_no`, `seed_issue_seen_for_subscribers`), egy pedig munkaanyagot módosít (`ensure_draft_main`). Teendő: a hívási jog megvonása a `PUBLIC` és az `anon` szerepkörtől, a belső segédeknél az `authenticated` szerepkörtől is. Migráció, jóváhagyással.
+19. **Védő trigger (C)** — az élő törzsadat-táblák közvetlen (függvényen kívüli) írásának szerver-oldali lezárása.
+20. **Verzióellenőrző sáv** — a régi, újra nem töltött böngészőfül ne írhasson a régi kóddal (kis kliens-lépés, a (C) előtt).
+21. **„Szám adatainak szerkesztése" gomb** a Szám sorából (egyenes út a munkaanyag-szerkesztőbe).
+22. **A Karbantartás és a szerkesztés összevonása.**
+23. **A javaslat-beküldő értesítése** (azonos az 1. ponttal).
+24. **Adat-teendők a tulajdonosnál:** a Mancs Őrjárat sorozat-azonosítója; a Lego Star Wars #29 kártya Gyűjteménye; a Disney Hangos #1 eltérő ISBN-jének (978-88-334-2839-0) ellenőrzése; a Disney Hangos 82 figurájának neve (nem sürgős: a régi elemeknél csak figyelmeztetés).
+25. **Apróságok jegyzetben:** a sorozat-azonosító hibájánál a szerkesztő mindkét kitöltött sort bekeretezi; a Gyors Excel sablon fejlécében néhány típus kisbetűs kulccsal áll („figura", „lego").
 
 ---
 
@@ -222,7 +267,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.25).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.26).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.
@@ -236,7 +281,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 ## 9. Javasolt következő lépések
 
-**A) A 6. fejezet nyitott pontjai** — sorrend rád van bízva; a sorozat-beküldő értesítése (1. pont) a legkonkrétabb, ha jön egy következő fejlesztési kör.
+**A) A 6. fejezet nyitott pontjai** — a 27–38. lépés köréből a 18–20. pont (jogosultság-szigorítás, védő trigger, verzióellenőrző sáv) a legsürgősebb; utána a 21–22. (szerkesztés gomb, összevonás) és a 7. (Excel átdolgozása).
 
 **B) Kockáról Kockára adatmodell kidolgozása** — ötletelős módban, ahogy a Lapról Laprát is felépítettük.
 

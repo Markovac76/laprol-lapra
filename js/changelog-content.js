@@ -7,6 +7,9 @@
    ============================================================ */
 export const CHANGELOG = [
   { date:"2026-10-13",
+    text:"Rendbe tettük a sorozat-azonosítókat és az elemek típusát. Öt sorozatnál (Disney, Volkswagen model, Disney Hangos, Lego Star Wars, Lego Marvel) az egész sorozatra érvényes ISSN / ISBN mostantól egyszer, a sorozat fejlécében, a név alatt látszik, és nem ismétlődik minden Számon. A Disney Hangos hangfigurái „Figura” néven szerepelnek (eddig „Modell” volt), a haladásjelzőn is. A Listákban a kártya típus neve „Kártya”. A jelöléseid, a darabszámok, a színek és az összegek nem változtak, és új felkiáltójel sem keletkezett. Karbantartóknak: a „Kész” előtt mostantól a Magazinon és a Könyvön is figyelmeztetés jön, ha ugyanaz az azonosító több Számon szerepel — ami az egész sorozaté, az a „Sorozat-azonosítók” szakaszba való."
+  },
+  { date:"2026-10-13",
     text:"Karbantartóknak: a 🔧 Gyors szerkesztés „+ Új tétel” űrlapja megújult. Az elemek a típusuk szerinti mezőket kapják (ugyanazokat, mint a Karbantartás szerkesztőjében, a kötelezők * jelöléssel), megjelölhető a ★ fő elem, és a mentés egy lépésben történik: vagy a teljes Szám létrejön, vagy semmi. A hiányzó vagy a típusnak nem megfelelő adatokat az űrlap egyszerre sorolja fel, a beírt adat megmarad; foglalt lapszámnál is érthetően szól. A saját jelölés és beszerzési adat megadása nem kötelező. Az Excel-feltöltés új sorai ugyanezekkel a szabályokkal jönnek létre: a hibás sor kimarad, a többi feltöltődik, a végén Számonként látszik, mi nem ment át és miért."
   },
   { date:"2026-10-12",
