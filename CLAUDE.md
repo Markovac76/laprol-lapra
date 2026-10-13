@@ -31,6 +31,7 @@ Nyelv: magyar. Tömör válaszok. A kérdéseket egyszerre, egyben, szövegben f
 - A képernyőképek a `scripts/ui-test/kepek/` mappába kerülnek (git-ből kizárva).
 
 ## Kliens
+- Új, nem az apphoz tartozó fájl vagy mappa (dokumentum, adat, eszköz) kerül a `.vercelignore`-ba; az élő címen 404-et kell adnia.
 - Natív ES modulok, build-eszköz nélkül. Nincs service worker; a deploy után az appot újra kell tölteni a böngészőben.
 
 ## Munkamód a jogosultságokhoz

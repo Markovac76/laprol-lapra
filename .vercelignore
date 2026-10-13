@@ -5,6 +5,11 @@
 *.md
 *.pdf
 *.xlsx
+*.txt
+*.csv
+*.docx
+*.pptx
+*.zip
 
 # adatbázis-migrációk
 *.sql
