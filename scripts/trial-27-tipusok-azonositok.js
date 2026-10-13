@@ -117,8 +117,11 @@ const AZ = (tipus, ertek) => ({ ertek, tipus });   // a jsonb kulcs-sorrendjébe
     };
 
     const snap0 = await snapshot();                       // a változtatás előtti állapot (még a DDL előtt)
-    await c.query(rd(S1));
-    console.log("\nAz S1 (szerkezet) SQL lefutott a tranzakción belül.\n\n[S1] próbák:");
+    // Az S1 a 29. lépés óta ÉLES: ilyenkor nem futtatjuk újra, a próbák az élő S1-en futnak.
+    // (Ha egy adatbázison még nincs S1 — nincs series.azonositok oszlop —, a tranzakción belül lefut.)
+    const s1Live = (await c.query(`select count(*)::int n from information_schema.columns where table_schema='public' and table_name='series' and column_name='azonositok'`)).rows[0].n === 1;
+    if (!s1Live) await c.query(rd(S1));
+    console.log(s1Live ? "\nAz S1 (szerkezet) már éles — a próbák az élő S1-en futnak.\n\n[S1] próbák:" : "\nAz S1 (szerkezet) SQL lefutott a tranzakción belül.\n\n[S1] próbák:");
 
     // ---- 1. típusleírás
     const td = Object.fromEntries((await q(`select * from public.component_type_defs`)).map(r => [r.tipus, r]));
@@ -153,8 +156,8 @@ const AZ = (tipus, ertek) => ({ ertek, tipus });   // a jsonb kulcs-sorrendjébe
     const LM = await seriesId("Lego Marvel");
     const e4 = await expectErr(() => q(`update public.series set azonositok='[{"tipus":"issn","ertek":"rossz"}]' where id=$1`, [LM]));
     report("A2 a series tábla megszorítása elutasítja a hibás sorozat-azonosítót", !!e4 && /azonositok_check/.test(e4.message), e4 ? e4.message.slice(0, 90) : "NEM dobott hibát");
-    report("A3 minden élő sorozat és draft sorozat-azonosítója üres lista az S1 után",
-      (await q(`select (select count(*) from public.series where azonositok <> '[]')::int + (select count(*) from public.draft_series where azonositok <> '[]')::int n`))[0].n === 0);
+    report("A3 az S2 előtt minden élő sorozat és draft sorozat-azonosítója üres lista (a TESZT próbasorozat kivételével)",
+      (await q(`select (select count(*) from public.series where azonositok <> '[]' and megjelenites <> 'TESZT')::int + (select count(*) from public.draft_series where azonositok <> '[]')::int n`))[0].n === 0);
 
     // ---- 3. start_edit_draft másolja; a Kész ellenőrzi
     await q(`update public.series set azonositok='[{"tipus":"issn","ertek":"3053-5611"}]' where id=$1`, [LM]);
@@ -354,6 +357,18 @@ const AZ = (tipus, ertek) => ({ ertek, tipus });   // a jsonb kulcs-sorrendjébe
       report("R1 az S2 megáll, ha egy érintett sorozaton függő szerkesztési draft van — semmi nem változik", !!e11 && /függő szerkesztési munkaanyag/.test(e11.message), e11 ? e11.message.slice(0, 110) : "NEM dobott hibát");
       await q(`delete from public.draft_series where id=$1`, [dDI]);
 
+      // ---- N: az ÁTMENETI duplikáció-szabály megszűnése (36. lépés) — az S2 ELŐTTI állapot
+      // Új próba-munkaanyag: három Szám, mindhárom Könyv ugyanazzal az ISBN-nel (ez NEM sorozat-azonosító).
+      const fnHash = async () => Object.fromEntries((await q(`select p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' f, md5(pg_get_functiondef(p.oid)) h
+        from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.prokind='f'`)).map(r => [r.f, r.h]));
+      const DUP = "978-963-99-9999-7";
+      const dN = await newDraft(["konyv"], [T("konyv", { main: true })], "PRÓBA duplikált");
+      await upload(dN, [1, 2, 3].map(n => newItem(n, [{ tipus: "konyv", azonosito: DUP }])));
+      const dupOf = async did => (await warnings(did)).find(w => w.kod === "azonosito_duplikalt") || null;
+      const n0 = await dupOf(dN);
+      report("N1 az S2 ELŐTT (átmeneti szabállyal): három Könyv ugyanazzal az ISBN-nel NEM ad duplikáció-figyelmeztetést", n0 === null, n0 ? J(n0.tetelek) : "nincs figyelmeztetés");
+      const h0 = await fnHash();
+
       const pre = (await q(`select (select count(*) from public.change_log)::int cl, (select sum(version) from public.components)::int vc, (select sum(version) from public.series)::int vs,
         (select count(*) from public.member_status)::int ms, (select md5(string_agg(component_id::text || coalesce(status,'') || coalesce(db::text,''), ',' order by component_id, user_id)) from public.member_status) msh,
         (select count(*) from public.member_seen)::int seen`))[0];
@@ -361,13 +376,13 @@ const AZ = (tipus, ertek) => ({ ertek, tipus });   // a jsonb kulcs-sorrendjébe
       const post = (await q(`select (select count(*) from public.change_log)::int cl, (select sum(version) from public.components)::int vc, (select sum(version) from public.series)::int vs,
         (select count(*) from public.member_status)::int ms, (select md5(string_agg(component_id::text || coalesce(status,'') || coalesce(db::text,''), ',' order by component_id, user_id)) from public.member_status) msh,
         (select count(*) from public.member_seen)::int seen`))[0];
-      const sz = Object.fromEntries((await q(`select megjelenites, azonositok, components, component_template from public.series`)).map(r => [r.megjelenites, r]));
+      const sz = Object.fromEntries((await q(`select megjelenites, azonositok, components, component_template from public.series where megjelenites <> 'TESZT'`)).map(r => [r.megjelenites, r]));   // a TESZT próbasorozatot az S2 nem érinti
       report("R2 az öt sorozat megkapta a sorozatszámát", J(sz["Disney"].azonositok) === J([AZ("issn", "3103-4152")]) && J(sz["Volkswagen model"].azonositok) === J([AZ("isbn", "978-88-334-2749-2")])
         && J(sz["Disney Hangos"].azonositok) === J([AZ("isbn", "978-88-334-2840-6")]) && J(sz["Lego Star Wars"].azonositok) === J([AZ("issn", "2568-2474")])
         && J(sz["Lego Marvel"].azonositok) === J([AZ("issn", "3053-5611")]) && Object.values(sz).filter(r => r.azonositok.length).length === 5,
         Object.values(sz).filter(r => r.azonositok.length).map(r => `${r.megjelenites}: ${r.azonositok.map(a => a.tipus.toUpperCase() + " " + a.ertek).join(", ")}`).join(" | "));
       const rem = await q(`select s.megjelenites, c.tipus, c.azonosito, c.azonosito_tipus from public.components c join public.issues i on i.id=c.issue_id join public.series s on s.id=i.series_id
-        where coalesce(btrim(c.azonosito),'')<>'' and c.tipus in ('magazin','konyv','krtya') order by 1,2`);
+        where coalesce(btrim(c.azonosito),'')<>'' and c.tipus in ('magazin','konyv','krtya') and s.megjelenites <> 'TESZT' order by 1,2`);
       report("R3 a 155 komponens azonosítója kiürült; a magazinokon / könyveken csak a Disney Hangos eltérő ISBN-je maradt, a kártyán a kód",
         before.komponens_azonositoval - (await q(`select count(*)::int n from public.components where coalesce(btrim(azonosito),'')<>''`))[0].n === 155
         && J(rem) === J([{ megjelenites: "Disney Hangos", tipus: "konyv", azonosito: "978-88-334-2839-0", azonosito_tipus: "isbn" }, { megjelenites: "Lego Star Wars", tipus: "krtya", azonosito: "LE19", azonosito_tipus: "kartya_kod" }]), J(rem));
@@ -384,6 +399,28 @@ const AZ = (tipus, ertek) => ({ ertek, tipus });   // a jsonb kulcs-sorrendjébe
       report("V2 az S2 után a Számok színe, a haladásjelzők értéke és az Összeg-kártya minden sorozatnál azonos (csak a Disney Hangos „modell” címkéje lett „figura”)",
         dif.length === 0 && snap2.find(s => s.name === "Disney Hangos").progress.includes("figura=") && !snap2.find(s => s.name === "Disney Hangos").progress.includes("modell="),
         dif.length ? "ELTÉR: " + dif.join(", ") : snap2.find(s => s.name === "Disney Hangos").progress);
+      // ---- N: az S2 UTÁNI állapot (a draft_ready_warnings átmeneti szabálya kikerült)
+      const h1 = await fnHash();
+      const hChanged = Object.keys(h1).filter(k => h0[k] !== h1[k]), hNew = Object.keys(h1).filter(k => !(k in h0)), hGone = Object.keys(h0).filter(k => !(k in h1));
+      report(`N2 az S2 a ${Object.keys(h0).length} függvényből pontosan egyet változtat meg (draft_ready_warnings), a többi hash azonos`,
+        hChanged.length === 1 && hChanged[0] === "draft_ready_warnings(p_draft_id uuid)" && hNew.length === 0 && hGone.length === 0,
+        `változott: ${hChanged.join(", ") || "—"}; új: ${hNew.length}; megszűnt: ${hGone.length}; ${h0[hChanged[0]]} → ${h1[hChanged[0]]}`);
+      const n1 = await dupOf(dN);
+      report("N3 az S2 UTÁN: ugyanaz a három azonos ISBN már duplikáció-figyelmeztetést ad (mindhárom hely felsorolva)",
+        !!n1 && n1.tetelek.length === 1 && n1.tetelek[0].azonosito === DUP && n1.tetelek[0].helyek.length === 3, n1 ? J(n1.tetelek) : "NINCS figyelmeztetés");
+      await q(`update public.draft_series set azonositok=$2::jsonb where id=$1`, [dN, J([AZ("isbn", DUP)])]);
+      const n2 = await dupOf(dN);
+      report("N4 ha ugyanez az érték a sorozat-azonosító, továbbra sem számít duplikációnak", n2 === null, n2 ? J(n2.tetelek) : "nincs figyelmeztetés");
+      await q(`delete from public.draft_series where id=$1`, [dN]);
+      const hamis = [];
+      for (const nev of ["Disney", "Volkswagen model", "Disney Hangos", "Lego Star Wars", "Lego Marvel"]) {
+        const did = (await q(`select public.start_edit_draft($1) id`, [await seriesId(nev)]))[0].id;
+        const w = await warnings(did);
+        if (w.some(x => x.kod === "azonosito_duplikalt")) hamis.push(`${nev}: ${J(w.find(x => x.kod === "azonosito_duplikalt").tetelek)}`);
+        await q(`delete from public.draft_series where id=$1`, [did]);
+      }
+      report("N5 az S2 UTÁN a sorozat-azonosítóra átállított öt sorozat munkaanyagán a „Kész” előtt nincs duplikáció-figyelmeztetés", hamis.length === 0, hamis.join(" ;; ") || "Disney, Volkswagen model, Disney Hangos, Lego Star Wars, Lego Marvel: mind tiszta");
+
       const dDH = (await q(`select public.start_edit_draft($1) id`, [await seriesId("Disney Hangos")]))[0].id;
       const wDH = await warnings(dDH);
       report("R9 az S2 után a Disney Hangos draftján: nincs duplikáció-riasztás; a 82 név nélküli figura csak figyelmeztetés", !wDH.some(w => w.kod === "azonosito_duplikalt")
