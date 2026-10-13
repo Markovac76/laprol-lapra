@@ -1,0 +1,21 @@
+# Ami NEM az app része, ne kerüljön ki az élő címre (a Vercel a telepítésből kihagyja).
+# Az app: index.html, styles.css, js/, icons/, manifest.json + a build fájljai (vercel.json, build-config.js, kiadas.json).
+
+# dokumentumok, specifikáció, utasítások
+*.md
+*.pdf
+*.xlsx
+
+# adatbázis-migrációk
+*.sql
+
+# helyi fejlesztői eszközök, próbák
+scripts/
+
+# minták és beállító fájlok
+config.example.js
+db.local.example.js
+.env.test.example
+.gitattributes
+.gitignore
+.claude/
