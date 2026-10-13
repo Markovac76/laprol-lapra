@@ -1,7 +1,7 @@
 -- ============================================================================
 -- 42. lépés — (C3) AZ ÉLŐ TÖRZSADAT-TÁBLÁK KÖZVETLEN ÍRÁSI JOGÁNAK SZŰKÍTÉSE (csak REVOKE / GRANT).
 --
--- JÓVÁHAGYÁSRA VÁR — a tulajdonos kifejezett jóváhagyása nélkül NEM futtatható. ÉLESBEN NEM FUTOTT.
+-- Lefutott élesben 2026-10-13, mentés: db-backups/2026-10-13T11-06_pre-42-irasi-jogok.
 -- Futtatás: node scripts/run-migration.js laprol-lapra-42-irasi-jogok.sql 42-irasi-jogok
 -- (backup → egyetlen tranzakció, 3 mp-es lock_timeout → COMMIT, hiba esetén ROLLBACK).
 --
