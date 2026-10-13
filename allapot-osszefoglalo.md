@@ -1,4 +1,4 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v16)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v17)
 
 **Frissítve:** 2026. október 13. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
@@ -8,7 +8,7 @@
 
 ## 1. A nagy kép
 
-**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított. Legutóbb a 27–43. lépés köre zárult (v1.26–v1.28): típusszabályok (a Kártya hét mezője, a Figura neve, rögzített / választható azonosító-típusok), sorozat-azonosítók a sorozat törzsében, új Szám-sáv csempékkel, a „+ Új tétel” és a Gyors Excel új sorai egyetlen szerver-oldali függvényen át (`create_live_issue`), az S2 adatrendezés (öt sorozat azonosítója, Disney Hangos figurák), végül a függvények hívási jogának és a törzsadat-táblák közvetlen írási jogának szűkítése. **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
+**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított. Legutóbb a 27–46. lépés köre zárult (v1.26–v1.29): típusszabályok (a Kártya hét mezője, a Figura neve, rögzített / választható azonosító-típusok), sorozat-azonosítók a sorozat törzsében, új Szám-sáv csempékkel, a „+ Új tétel” és a Gyors Excel új sorai egyetlen szerver-oldali függvényen át (`create_live_issue`), az S2 adatrendezés (öt sorozat azonosítója, Disney Hangos figurák), a függvények hívási jogának és a törzsadat-táblák közvetlen írási jogának szűkítése, végül a verzióellenőrző sáv és a repó dokumentumainak kizárása az élő címről. **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
 
 ---
 
@@ -19,7 +19,7 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.28** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.29** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 - **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
@@ -30,6 +30,11 @@ laprol-lapra/
 ├── README.md             ← projekt-belépő dokumentum
 ├── CLAUDE.md             ← a Claude Code munkaszabályai (minden munkamenet elején ezt olvassa)
 ├── .gitattributes        ← az .sql fájlok sorvége mindig LF (a függvény-hash ne függjön a sorvégtől)
+├── .vercelignore         ← ami NEM az app része (dokumentumok, SQL, scripts/, minták), nem kerül ki az élő címre
+├── vercel.json           ← build parancs (node build-config.js) + a verzio.json no-store fejléce
+├── build-config.js       ← a Vercel build: config.js (kulcs + verzió) és verzio.json; helyben nem kell futtatni
+├── kiadas.json           ← mit tiltson a RÉGI kód: "torzs" (alap: a személyes mentés megy) vagy "minden"
+├── verzio.json           ← a szerver aktuális verziója — NINCS git-ben, a build írja
 ├── config.js            ← NINCS git-ben, Vercel generálja env változóból
 ├── config.example.js
 ├── db.local.js            ← Postgres kapcsolati szöveg a migrációkhoz — NINCS git-ben
@@ -47,10 +52,10 @@ laprol-lapra/
 │   ├── test-deleted-component.js
 │   ├── tests/                             ← Node-tesztek a tiszta modulokra + szam-sav-proba.html (látványpróba bejelentkezés nélkül)
 │   └── ui-test/kepek/                     ← a felületi próbák képernyőképei — NINCS git-ben
-├── vercel.json
 ├── manifest.json + icons/
 └── js/
     ├── supabase.js, state.js, modal.js, auth.js, permissions.js, main.js
+    ├── version.js                               ← verzióellenőrzés: a régi kód jelzése, a kérések kapuja, a függvényhívások besorolása (tiszta részei tesztelve)
     ├── data.js, model.js, totals.js            ← adatbetöltés, a sorozat-modell (tiszta), az Összeg-kártya számítása (tiszta)
     ├── render.js, thumb.js                      ← megjelenítés, a Szám-sáv csempéi, kis képek és típus-jelek
     ├── type-defs.js                             ← a TÍPUSSZABÁLYOK tiszta modulja (mezők, azonosító-mód, hibalista, sorozat-azonosítók)
@@ -85,6 +90,7 @@ A Code állandó munkaszabályai a repó `CLAUDE.md` fájljában vannak (nyelv, 
 - **Titkok:** kapcsolati szöveg, kulcs, jelszó, a felhasználók e-mail-címe nem kerül jelentésbe, naplóba, commitba.
 - **Átnézendő csomag:** nagyobb migráció előtt `NN-lepes-atnezesre.md` készül (teljes SQL, mellékhatások, számlálók, próbák, futtatási terv, visszaút); ez nem kerül a repóba.
 - **Sorvégek:** az `.sql` fájlok LF sorvégűek (`.gitattributes`).
+- **Telepítés:** új, nem az apphoz tartozó fájl vagy mappa a `.vercelignore`-ba kerül (az élő címen 404-et kell adnia). Új `.rpc("…")` vagy Storage-hívás csak a `js/version.js` besorolási listáival együtt kerülhet a kódba (a gépi próba őrzi).
 
 ### Közvetlen Postgres-kapcsolat a migrációkhoz **[DÖNTVE, megvalósítva]**
 Az anyanotesz projektben már bevált minta átvéve: a Code egy `scripts/run-migration.js` Node-scripttel (a `pg` npm-csomaggal, `scripts/`-en belüli, gitignore-olt saját `node_modules`-szal — ez NEM az app build-jének/deploy-jának a része) fut le a Postgres ellen, `db.local.js`-ben (gitignore-olt, `db.local.example.js` a minta) tárolt connection stringgel. **v1.10: "Session pooler"-re váltva** (korábban "Direct connection") — az kizárólag IPv6-címet publikál, ami egy munkamenetből elérhetetlennek bizonyult; a Session pooler IPv4-kompatibilis és megtartja a session-t egy tranzakción belül, tehát a `BEGIN`/`COMMIT` migrációkhoz is jó. Minden futtatás előtt automatikusan friss `db-backups/` JSON-pillanatképet készít az összes táblából (gitignore-olt), és a migrációt `BEGIN`/`COMMIT`/`ROLLBACK` tranzakcióba csomagolja. A jóváhagyási kapu (teljes SQL megmutatása, explicit "mehet" várása, mielőtt a script lefut) VÁLTOZATLANUL kötelező — ez nem szoftveres kényszer, hanem a beszélgetés szintjén betartott szabály. Technikai eltérés az anyanotesz-mintától: az eredetileg tervezett ephemeral `npx -p pg` injektálás ezen a gépen nem működött megbízhatóan (modul-feloldási hiba), ezért egy dedikált `scripts/package.json` + helyi `node_modules` lett a megoldás — funkcionálisan egyenértékű, semmi nem kerül belőle git-be. **Élesben végpontig tesztelve** (2026-08-26): valódi kapcsolódás, mind a 17 tábla helyes JSON-backupja, és egy idempotens migráció sikeres, tranzakciós újrafuttatása.
@@ -218,6 +224,8 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 
 **42–43. lépés — a közvetlen írások lezárása (v1.28, ÉLES, 2026-10-13; részletek: specifikáció 13.14.10):** az élő törzsadat-táblákba a kliens már csak hat oszlopot írhat közvetlenül (kép, kapcsolók, életciklus, a Listák megjelenített neve) és a Listákba szúrhat be; Számot, komponenst, sorozatot közvetlenül sem beszúrni, sem törölni, sem átírni nem lehet — csak függvényen át. A bejelentkezés nélküli hívó sehol nem ír. A felhasználónak látható működés nem változott. SQL: `42-irasi-jogok` — ÉLESÍTVE.
 
+**44–46. lépés — verzióellenőrző sáv és a nyilvános dokumentumok lezárása (v1.29, ÉLES, 2026-10-13; részletek: specifikáció 13.14.11):** (1) **Lelet és lezárás:** a Vercel beállítása miatt a repó minden fájlja letölthető volt az élő címen (dokumentumok, SQL-ek, szkriptek; titok nem). A `.vercelignore` óta csak az app kerül ki; a többi 404-et ad. (2) **Sáv:** a build (`build-config.js`) az app fájljainak ujjlenyomatát írja a `config.js`-be és a `verzio.json`-ba; a kliens (`js/version.js`) betöltéskor, visszatéréskor és törzsadat-írás előtt ellenőriz; régi kódnál sáv szól, és a Supabase-kliens kapuja a törzsadat-írásokat nem engedi ki. A `kiadas.json` dönti el, hogy egy kiadás a régi kódnak a személyes mentést is tiltsa-e. Adatbázis-változás nincs.
+
 ---
 
 ## 5. A kör során talált és javított RLS-hiba (tanulságos eset)
@@ -250,7 +258,7 @@ A hibajavítási kör 11. pontja (sablon-alapú tömeges feltöltés) a javaslat
 
 18. **Jogosultság-szigorítás** — **KÉSZ (v1.27, 39–40. lépés, 2026-10-13):** a bejelentkezés nélküli hívó már csak 8 függvényt hívhat (`is_staff`, `is_active`, `my_role` és az 5 trigger-függvény — indok: specifikáció 13.14.9), a bejelentkezett 24-et, a 13 belső segédet csak más függvény. Az új függvények nem öröklik a `PUBLIC` / `anon` jogot. A „Teszt Kiadó” próbasor törölve.
 19. **A közvetlen írások lezárása (C)** — **KÉSZ (v1.28, 42–43. lépés, 2026-10-13):** trigger helyett a táblajogok szűkítésével. Az élő törzsadat-táblákon (`series`, `issues`, `components`, `lists`, `change_log`, `global_counters`) az `anon` nem ír; az `authenticated` csak hat oszlopot módosíthat (`components.kep_url`, `components.upload_enabled`, `series.borito_url`, `series.borito_upload_enabled`, `series.lifecycle`, `lists.megjelenites`), és a Listákba szúrhat be; minden más függvényen át megy. A régi, újra nem töltött fül közvetlen beszúrása hibával megáll. Részletek: specifikáció 13.14.10.
-20. **Verzióellenőrző sáv** — a régi, újra nem töltött böngészőfül kapjon érthető jelzést („Új verzió érhető el, töltsd újra az oldalt”), és az újratöltésig ne írjon. A szerver már megfogja a régi fül hibás írását (19. pont), de a hibaüzenete félrevezető. Terv (41. lépés): a build a commit azonosítóját a `config.js`-be és egy `verzio.json` fájlba írja; a kliens betöltéskor, visszatéréskor és írás előtt ellenőriz; a tiltás egy helyen, a Supabase-kliens kérésein. Kb. 100 sor, 6 fájl.
+20. **Verzióellenőrző sáv** — **KÉSZ (v1.29, 44–46. lépés, 2026-10-13):** ha a fül vagy a telepített app régi kódot futtat, sárga sáv szól a fejléc tetején („Új verzió érhető el”, Újratöltés gombbal), és a törzsadat-írások az újratöltésig nem mennek ki; a személyes mentés (jelölés, darabszám, jegyzet, ár) megy. A verzió az app fájljainak tartalom-ujjlenyomata (dokumentáció-commit nem ad új verziót). Részletek: specifikáció 13.14.11. Ami ebből nyitva maradt: az űrlapok tartalmának megőrzése az újratöltésen át.
 21. **„Szám adatainak szerkesztése" gomb** a Szám sorából (egyenes út a munkaanyag-szerkesztőbe).
 22. **A Karbantartás és a szerkesztés összevonása.**
 23. **A javaslat-beküldő értesítése** (azonos az 1. ponttal).
@@ -274,7 +282,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.28).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.29).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.
@@ -288,7 +296,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 ## 9. Javasolt következő lépések
 
-**A) A 6. fejezet nyitott pontjai** — a 27–43. lépés köréből a 20. pont (verzióellenőrző sáv) a következő; a 18. (jogosultság-szigorítás) és a 19. (a közvetlen írások lezárása) kész; utána a 26–28. (holt kliens-kód, Listák törlés, jogosultsági higiénia); utána a 21–22. (szerkesztés gomb, összevonás) és a 7. (Excel átdolgozása).
+**A) A 6. fejezet nyitott pontjai** — a 27–46. lépés köréből a 18. (jogosultság-szigorítás), a 19. (a közvetlen írások lezárása) és a 20. (verzióellenőrző sáv) kész; a következők a 26–28. (holt kliens-kód, Listák törlés, jogosultsági higiénia), utána a 21–22. és a 7.; utána a 21–22. (szerkesztés gomb, összevonás) és a 7. (Excel átdolgozása).
 
 **B) Kockáról Kockára adatmodell kidolgozása** — ötletelős módban, ahogy a Lapról Laprát is felépítettük.
 

@@ -13,10 +13,11 @@ https://laprol-lapra.vercel.app
 
 Nincs npm-csomag, nincs bundler, nincs framework az appban magában — a
 böngésző natívan tölti be az ES modulokat `<script type="module">`-lal.
-Az egyetlen build-lépés (`vercel.json` `buildCommand`-ja) a Supabase
-anon key-t írja bele `config.js`-be, Vercel környezeti változóból. A
-`scripts/` mappa (lásd "Migrációk" lent) ettől független, önálló,
-fejlesztői eszköz — sosem megy a Vercel build-be.
+Az egyetlen build-lépés (`vercel.json` `buildCommand`-ja: `node build-config.js`)
+megírja a `config.js`-t (a Supabase anon key a Vercel környezeti változóból + az
+app verziója) és a `verzio.json`-t. A `scripts/` mappa (lásd "Migrációk" lent)
+ettől független, önálló, fejlesztői eszköz — a `.vercelignore` miatt nem kerül ki
+az élő címre (ahogy a dokumentumok és az SQL-migrációk sem).
 
 ## Mappaszerkezet
 
@@ -24,8 +25,12 @@ fejlesztői eszköz — sosem megy a Vercel build-be.
 ├── index.html              # Belépő HTML, betölti js/main.js-t
 ├── styles.css               # Az egész app stílusa
 ├── manifest.json + icons/   # PWA
-├── vercel.json               # Build-parancs: config.js generálása env változóból
-├── config.js                 # Supabase URL + anon key — NINCS git-ben, build-időben generált
+├── vercel.json               # Build-parancs (node build-config.js) + a verzio.json no-store fejléce
+├── build-config.js           # A Vercel build: config.js és verzio.json megírása (helyben nem kell futtatni)
+├── kiadas.json               # Mit tiltson a régi kód: "torzs" (alap) vagy "minden"
+├── .vercelignore             # Ami nem az app része, nem kerül ki az élő címre
+├── config.js                 # Supabase URL + anon key + APP_VERSION — NINCS git-ben, build-időben generált
+├── verzio.json               # A szerver aktuális verziója — NINCS git-ben, build-időben generált
 ├── config.example.js         # Minta config.js helyi fejlesztéshez
 ├── db.local.js                # Postgres connection string a migrációkhoz — NINCS git-ben
 ├── db.local.example.js        # Minta db.local.js-hez
@@ -45,6 +50,7 @@ fejlesztői eszköz — sosem megy a Vercel build-be.
 │   ├── component-images.js, image-resize.js  # képfeltöltés/-javaslat
 │   ├── my-data.js                            # „Saját adatlap" — konszolidált személyes-adat panel
 │   ├── draft-excel.js                        # sablon-alapú tömeges tétel-feltöltés draftokhoz
+│   ├── version.js                            # verzióellenőrzés: régi kód jelzése, a kérések kapuja
 │   └── help.js, help-content.js              # beépített súgó
 ├── laprol-lapra-*.sql          # sorszámozott/névvel azonosított SQL-migrációk (nem mappában, a gyökérben)
 ├── laprol-lapra-specifikacio.md      # a hiteles, technikai állapot
@@ -67,7 +73,8 @@ kerül git-be). A `scripts/` mappának VAN saját, külön `npm install`-ja
 
 ## Deploy-folyamat
 
-- **Vercel**: a repó a Vercel projekthez van kötve, minden `main`-re történő push automatikusan deployol. A `vercel.json` `buildCommand`-ja a `SUPABASE_ANON_KEY` Vercel environment változóból generálja le `config.js`-t (Vercel projekt → Settings → Environment Variables).
+- **Vercel**: a repó a Vercel projekthez van kötve, minden `main`-re történő push automatikusan deployol. A `vercel.json` `buildCommand`-ja (`node build-config.js`) a `SUPABASE_ANON_KEY` Vercel environment változóból (Vercel projekt → Settings → Environment Variables) generálja le a `config.js`-t, és beleírja az app verzióját (`window.APP_VERSION`): ez az app fájljainak (a `config.js` alapja, `index.html`, `styles.css`, `manifest.json`, `js/*.js`) tartalom-ujjlenyomata. Ugyanezt a verziót a `verzio.json` fájlba is kiírja. Ha egy nyitva hagyott fül vagy a telepített app régebbi verziót futtat, mint ami a `verzio.json`-ban áll, a felület sávval szól, és a törzsadat-írások az újratöltésig nem mennek ki (`js/version.js`; részletek: specifikáció 13.14.11). Egy dokumentáció-commit nem ad új verziót. Helyi futtatásnál (kézzel készített `config.js`, `APP_VERSION` nélkül) az ellenőrzés kikapcsol.
+- **Mi kerül ki az élő címre**: csak az app (`index.html`, `styles.css`, `js/`, `icons/`, `manifest.json`, és a generált `config.js`, `verzio.json`). Minden mást a `.vercelignore` kizár — új, nem az apphoz tartozó fájl vagy mappa oda kerüljön.
 - **Supabase**: külön projekt, semmilyen automatikus CI/CD nincs hozzá kötve — a migrációk manuálisan (lásd lent) kerülnek fel, közvetlen Postgres-kapcsolattal.
 
 ## A kialakult munkamódszer
