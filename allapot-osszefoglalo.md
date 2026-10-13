@@ -1,4 +1,4 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v15)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v16)
 
 **Frissítve:** 2026. október 13. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
@@ -8,7 +8,7 @@
 
 ## 1. A nagy kép
 
-**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított. Legutóbb a 27–40. lépés köre zárult (v1.26–v1.27): típusszabályok (a Kártya hét mezője, a Figura neve, rögzített / választható azonosító-típusok), sorozat-azonosítók a sorozat törzsében, új Szám-sáv csempékkel, a „+ Új tétel” és a Gyors Excel új sorai egyetlen szerver-oldali függvényen át (`create_live_issue`), az S2 adatrendezés (öt sorozat azonosítója, Disney Hangos figurák), végül a függvények hívási jogának szűkítése. **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
+**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított. Legutóbb a 27–43. lépés köre zárult (v1.26–v1.28): típusszabályok (a Kártya hét mezője, a Figura neve, rögzített / választható azonosító-típusok), sorozat-azonosítók a sorozat törzsében, új Szám-sáv csempékkel, a „+ Új tétel” és a Gyors Excel új sorai egyetlen szerver-oldali függvényen át (`create_live_issue`), az S2 adatrendezés (öt sorozat azonosítója, Disney Hangos figurák), végül a függvények hívási jogának és a törzsadat-táblák közvetlen írási jogának szűkítése. **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
 
 ---
 
@@ -19,7 +19,7 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.27** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.28** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 - **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
@@ -36,13 +36,13 @@ laprol-lapra/
 ├── db.local.example.js     ← minta db.local.js-hez
 ├── .env.test               ← a teszt-felhasználó adatai a felületi próbához — NINCS git-ben; a jelszó csak a próba idejére van benne
 ├── db-backups/               ← migráció előtti JSON-pillanatképek — NINCS git-ben
-├── laprol-lapra-*.sql         ← a migrációk, időrendben (a legutóbbiak: 27-s2-adatrendezes, 39-jogosultsag-szigoritas, 40-alapertelmezett-jogok, 40-teszt-kiado-torles)
+├── laprol-lapra-*.sql         ← a migrációk, időrendben (a legutóbbiak: 39-jogosultsag-szigoritas, 40-alapertelmezett-jogok, 40-teszt-kiado-torles, 42-irasi-jogok)
 ├── scripts/                   ← helyi fejlesztői eszközök, saját package.json + node_modules (utóbbi NINCS git-ben)
 │   ├── ro.js                              ← CSAK OLVASÓ lekérdezés (READ ONLY tranzakció, a végén mindig ROLLBACK)
 │   ├── backup-db.js, run-migration.js     ← mentés + migráció egy tranzakcióban, 3 mp-es lock_timeout
 │   ├── trial-*.js                         ← visszagörgetett próbák élő adaton, MINDIG ROLLBACK, csak jóváhagyással:
 │   │                                         publish, renumber, start-edit, uj-szam-komponens, 22-komponensek,
-│   │                                         27-tipusok-azonositok (az S2 előtti állapotra íródott), 33-uj-szam, 39-jogosultsag
+│   │                                         27-tipusok-azonositok (az S2 előtti állapotra íródott), 33-uj-szam, 39-jogosultsag, 42-irasi-jogok
 │   ├── compare-before-after.js            ← olvasó visszaellenőrzés két kódállapot közt: színek / haladás / összeg
 │   ├── test-deleted-component.js
 │   ├── tests/                             ← Node-tesztek a tiszta modulokra + szam-sav-proba.html (látványpróba bejelentkezés nélkül)
@@ -127,7 +127,7 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 - Storage: `component-images` bucket (publikus, közös — nem felhasználónkénti).
 
 ### RLS-modell összefoglalva
-`series/issues/components/lists` írása (insert/update): `is_staff() AND is_active()`; a `series` **törlése** RLS-szinten senkinek sincs engedélyezve — kizárólag owner-ellenőrzött SQL-függvényeken át (13.7). Olvasása: mindenki. `member_status`/`member_issue_data`/`member_series`/`member_seen`: mindenki csak a sajátját. `change_log`/`image_proposals`: olvasás mindenkinek, írás staffnak. `draft_series` SELECT **staff-only**, INSERT bárki aktív fióknak `pool_type='new'`-ra; `draft_issues`/`draft_components` **teljesen staff-only** — a javaslat-beküldő saját, még fel nem vett javaslatához külön SECURITY DEFINER RPC-n (`propose_bulk_issues`) ír, nem közvetlenül. A legtöbb összetettebb művelet (publikálás, force-törlés, seed, tömeges javaslat-feltöltés) SECURITY DEFINER SQL-függvényen át fut, egy tranzakcióban.
+`series/issues/components/lists` írása (insert/update): `is_staff() AND is_active()`; a `series` **törlése** RLS-szinten senkinek sincs engedélyezve — kizárólag owner-ellenőrzött SQL-függvényeken át (13.7). Olvasása: mindenki. `member_status`/`member_issue_data`/`member_series`/`member_seen`: mindenki csak a sajátját. `change_log`/`image_proposals`: olvasás mindenkinek, írás staffnak. `draft_series` SELECT **staff-only**, INSERT bárki aktív fióknak `pool_type='new'`-ra; `draft_issues`/`draft_components` **teljesen staff-only** — a javaslat-beküldő saját, még fel nem vett javaslatához külön SECURITY DEFINER RPC-n (`propose_bulk_issues`) ír, nem közvetlenül. A legtöbb összetettebb művelet (publikálás, force-törlés, seed, tömeges javaslat-feltöltés) SECURITY DEFINER SQL-függvényen át fut, egy tranzakcióban. **v1.28 óta a táblajog is szűk:** a `series`, `issues`, `components`, `lists`, `change_log`, `global_counters` táblán a kliens csak hat oszlopot írhat közvetlenül (és a Listákba szúrhat be), minden más írás függvényen át megy — a sorszintű szabály fölött ez egy második zár (specifikáció 13.14.10).
 
 **Fontos, éles tapasztalatból tanult minta:** ha egy táblán a SELECT-szabály szűkebb, mint az INSERT-szabály, egy `.insert().select()` (visszaolvasással kombinált beszúrás) a szűkebb jogú felhasználóknál RLS-hibával elbukik, még ha a beszúrás önmagában sikeres is lenne — Postgres a `INSERT...RETURNING` kimenetét is a SELECT-szabályon engedi át, és hibát dob, ha az nem enged. Ez okozott egy valós regressziót ebben a körben (lásd 5. fejezet) — a tanulság: ilyen esetben a kliens generálja az id-t (`crypto.randomUUID()`) beszúrás előtt, nincs szükség visszaolvasásra.
 
@@ -216,6 +216,8 @@ A Supabase Free plan 7 nap valódi adatbázis-aktivitás (írás) hiánya után 
 
 **39–40. lépés — jogosultság-szigorítás (v1.27, ÉLES, 2026-10-13; részletek: specifikáció 13.14.9):** a függvények hívási joga szűkítve (a bejelentkezés nélküli hívó 36 helyett 8 függvényt hívhat, a változásnaplóba és a sorszámlálóba író belső segédeket már senki kívülről); az új függvények alapértelmezett joga átállítva; a „Teszt Kiadó” próbasor törölve. A felhasználónak látható működés nem változott. SQL: `39-jogosultsag-szigoritas`, `40-alapertelmezett-jogok`, `40-teszt-kiado-torles` — mind ÉLESÍTVE.
 
+**42–43. lépés — a közvetlen írások lezárása (v1.28, ÉLES, 2026-10-13; részletek: specifikáció 13.14.10):** az élő törzsadat-táblákba a kliens már csak hat oszlopot írhat közvetlenül (kép, kapcsolók, életciklus, a Listák megjelenített neve) és a Listákba szúrhat be; Számot, komponenst, sorozatot közvetlenül sem beszúrni, sem törölni, sem átírni nem lehet — csak függvényen át. A bejelentkezés nélküli hívó sehol nem ír. A felhasználónak látható működés nem változott. SQL: `42-irasi-jogok` — ÉLESÍTVE.
+
 ---
 
 ## 5. A kör során talált és javított RLS-hiba (tanulságos eset)
@@ -247,15 +249,16 @@ A hibajavítási kör 11. pontja (sablon-alapú tömeges feltöltés) a javaslat
 **A 27–38. lépés köréből nyitva maradt (a javasolt sorrendben):**
 
 18. **Jogosultság-szigorítás** — **KÉSZ (v1.27, 39–40. lépés, 2026-10-13):** a bejelentkezés nélküli hívó már csak 8 függvényt hívhat (`is_staff`, `is_active`, `my_role` és az 5 trigger-függvény — indok: specifikáció 13.14.9), a bejelentkezett 24-et, a 13 belső segédet csak más függvény. Az új függvények nem öröklik a `PUBLIC` / `anon` jogot. A „Teszt Kiadó” próbasor törölve.
-19. **Védő trigger (C)** — az élő törzsadat-táblák közvetlen (függvényen kívüli) írásának szerver-oldali lezárása.
-20. **Verzióellenőrző sáv** — a régi, újra nem töltött böngészőfül ne írhasson a régi kóddal (kis kliens-lépés, a (C) előtt).
+19. **A közvetlen írások lezárása (C)** — **KÉSZ (v1.28, 42–43. lépés, 2026-10-13):** trigger helyett a táblajogok szűkítésével. Az élő törzsadat-táblákon (`series`, `issues`, `components`, `lists`, `change_log`, `global_counters`) az `anon` nem ír; az `authenticated` csak hat oszlopot módosíthat (`components.kep_url`, `components.upload_enabled`, `series.borito_url`, `series.borito_upload_enabled`, `series.lifecycle`, `lists.megjelenites`), és a Listákba szúrhat be; minden más függvényen át megy. A régi, újra nem töltött fül közvetlen beszúrása hibával megáll. Részletek: specifikáció 13.14.10.
+20. **Verzióellenőrző sáv** — a régi, újra nem töltött böngészőfül kapjon érthető jelzést („Új verzió érhető el, töltsd újra az oldalt”), és az újratöltésig ne írjon. A szerver már megfogja a régi fül hibás írását (19. pont), de a hibaüzenete félrevezető. Terv (41. lépés): a build a commit azonosítóját a `config.js`-be és egy `verzio.json` fájlba írja; a kliens betöltéskor, visszatéréskor és írás előtt ellenőriz; a tiltás egy helyen, a Supabase-kliens kérésein. Kb. 100 sor, 6 fájl.
 21. **„Szám adatainak szerkesztése" gomb** a Szám sorából (egyenes út a munkaanyag-szerkesztőbe).
 22. **A Karbantartás és a szerkesztés összevonása.**
 23. **A javaslat-beküldő értesítése** (azonos az 1. ponttal).
 24. **Adat-teendők a tulajdonosnál:** a Mancs Őrjárat sorozat-azonosítója; a Lego Star Wars #29 kártya Gyűjteménye; a Disney Hangos #1 eltérő ISBN-jének (978-88-334-2839-0) ellenőrzése; a Disney Hangos 82 figurájának neve (nem sürgős: a régi elemeknél csak figyelmeztetés).
 25. **Apróságok jegyzetben:** a sorozat-azonosító hibájánál a szerkesztő mindkét kitöltött sort bekeretezi; a Gyors Excel sablon fejlécében néhány típus kisbetűs kulccsal áll („figura", „lego").
 26. **A `seed_issue_seen_for_subscribers` lezárása** — a kliensben a hívása holt kód (`js/changes.js`, `seedNewIssueSeen`; a 35. lépés óta semmi nem futtatja). Teendő: a holt kód törlése, utána a függvény a belső segédek közé sorolható (a bejelentkezett se hívhassa), vagy belső staff-ellenőrzést kap.
-27. **Törlés a Listák ablakban** — ma csak hozzáadás és átnevezés van; törlés gomb kellene, amely használatban lévő értéket nem enged törölni.
+27. **Törlés a Listák ablakban** — ma csak hozzáadás és átnevezés van; a törlés függvényen át jöjjön (a `lists` táblán a kliensnek már nincs törlési joga), a használatban lévő érték védelmével.
+28. **Jogosultsági higiénia a többi táblán** — a `draft_*`, `member_*`, `image_proposals`, `members` táblákon (és a technikai táblákon) az `anon` írási jogai, a `TRUNCATE` / `REFERENCES` / `TRIGGER` / `MAINTAIN` jogok egyenkénti végignézése és megvonása; és a táblák alapértelmezett jogának átállítása (ma minden új tábla megkapja az `anon` és az `authenticated` teljes jogát), ahogy a függvényeknél már megtörtént. Kis, külön lépés.
 
 ---
 
@@ -271,7 +274,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.27).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.28).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.
@@ -285,7 +288,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 ## 9. Javasolt következő lépések
 
-**A) A 6. fejezet nyitott pontjai** — a 27–40. lépés köréből a 19–20. pont (védő trigger, verzióellenőrző sáv) a legsürgősebb (a 18., a jogosultság-szigorítás kész); utána a 21–22. (szerkesztés gomb, összevonás) és a 7. (Excel átdolgozása).
+**A) A 6. fejezet nyitott pontjai** — a 27–43. lépés köréből a 20. pont (verzióellenőrző sáv) a következő; a 18. (jogosultság-szigorítás) és a 19. (a közvetlen írások lezárása) kész; utána a 26–28. (holt kliens-kód, Listák törlés, jogosultsági higiénia); utána a 21–22. (szerkesztés gomb, összevonás) és a 7. (Excel átdolgozása).
 
 **B) Kockáról Kockára adatmodell kidolgozása** — ötletelős módban, ahogy a Lapról Laprát is felépítettük.
 

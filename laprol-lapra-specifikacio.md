@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.27 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.28 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -560,7 +560,7 @@ Egy már élő (aktív) sorozatra vadonatúj Számot vesz fel, egyetlen tranzakc
 | Szabály | `create_live_issue` | `mark_draft_ready` + `draft_type_field_issues` + `draft_ready_warnings`, majd `publish_draft_series` |
 
 A személyes adat (státusz, darabszám, jegyzet, fizetett ár, beszerzés) egyik útvonalon sem törzsadat: a Saját adatlap közvetlenül írja, csak a sajátot.
-A kliens közvetlenül (függvény nélkül) ma is tudna írni az élő táblákba a staff RLS-szabályai szerint; ennek szerver-oldali lezárása (védő trigger) nyitott — lásd 13.14.8. (A függvények hívási joga már szűkített: 13.14.9.)
+A kliens közvetlenül (függvény nélkül) az élő törzsadat-táblákba már nem tud írni, hat oszlop kivételével (kép, kapcsolók, életciklus, a Listák megjelenített neve) — lásd 13.14.10. A függvények hívási joga is szűkített: 13.14.9.
 
 #### 13.14.5 Az S2 adatrendezés eredménye (2026-10-13)
 Egyetlen tranzakció, minden lépése csendes (nincs verzióemelés, nincs felkiáltójel), 280 `change_log` bejegyzéssel; a személyes adatok, a színek, a haladás és az összegek nem változtak.
@@ -589,7 +589,7 @@ Egyetlen tranzakció, minden lépése csendes (nincs verzióemelés, nincs felki
 
 #### 13.14.8 Nyitott a körből
 - **Jogosultság-szigorítás — KÉSZ (v1.27, 2026-10-13):** lásd 13.14.9. Ami ebből nyitva maradt: (1) a `seed_issue_seen_for_subscribers` belső staff-ellenőrzése, és a kliens holt kódjának (`js/changes.js`, `seedNewIssueSeen`) törlése — utána a függvény a belső segédek közé sorolható; (2) az `is_staff`, `is_active`, `my_role` a bejelentkezés nélküli hívónak is nyitva maradt, szándékosan (indok: 13.14.9).
-- **Védő trigger (C):** az élő törzsadat-táblák közvetlen (függvényen kívüli) írásának lezárása.
+- **A közvetlen írások lezárása (C) — KÉSZ (v1.28, 2026-10-13):** trigger helyett a táblajogok szűkítésével, lásd 13.14.10. Ebből nyitva maradt a „jogosultsági higiénia” a többi táblán (`draft_*`, `member_*`, `image_proposals`, `members`) és a táblák alapértelmezett joga.
 - **Verzióellenőrző sáv:** a régi, újra nem töltött böngészőfül ne írhasson a régi kóddal.
 - **„Szám adatainak szerkesztése” gomb** a Szám sorából; **a Karbantartás és a szerkesztés összevonása.**
 - **A Gyors Excel és a sablonok átdolgozása** (a típus saját mezői, azonosító-típus, azonosító-alapú párosítás).
@@ -607,9 +607,31 @@ Előzmény: a 37 függvényből 36-ot a bejelentkezés nélküli hívó (a nyilv
 - Ugyanebben a lépésben törölve a Listákból a „Teszt Kiadó” próbasor. (A Listák felületén ma nincs törlés gomb; a tábla szabálya staffnak engedné, a használatban lévő érték védelme nélkül.)
 SQL: `39-jogosultsag-szigoritas`, `40-alapertelmezett-jogok`, `40-teszt-kiado-torles`.
 
+#### 13.14.10 A törzsadat-táblák írási jogai — a közvetlen írások lezárása **[DÖNTVE, megvalósítva — v1.28]**
+Előzmény: az élő törzsadat-táblákon (`series`, `issues`, `components`, `lists`, `change_log`, `global_counters`) az `anon` és az `authenticated` szerepkörnek minden táblajoga megvolt; csak a sorszintű szabály (staff + aktív) védett. Aki staff, az a függvényeket megkerülve bármelyik oszlopba bármit írhatott, Számot és komponenst szúrhatott be és törölhetett (régi, újra nem töltött böngészőfül; közvetlen hívás). A 42–43. lépés ezt zárta le — nem triggerrel, hanem a táblajogok szűkítésével: ha a közvetlen beszúrás eleve tilos, a triggernek nincs mit ellenőriznie, a jog szűkítése pedig a függvényeket nem érinti.
+- **Végállapot (`authenticated`; a sorszintű szabály — staff + aktív — ezekre továbbra is érvényes):**
+
+| Tábla | Közvetlenül írható | Miért |
+|---|---|---|
+| `issues` | semmi | az új Számot a `create_live_issue`, minden mást a `publish_draft_series` ír |
+| `components` | csak a `kep_url` és az `upload_enabled` oszlop módosítása | képfeltöltés / képtörlés / képjavaslat elfogadása; a feltöltés engedélyezése |
+| `series` | csak a `borito_url`, a `borito_upload_enabled` és a `lifecycle` oszlop módosítása | borítókép; publikálatlanná / újra aktívvá tétel |
+| `lists` | beszúrás, és a `megjelenites` oszlop módosítása | ☰ Listák: hozzáadás és átnevezés (törlés nincs) |
+| `change_log` | semmi | csak a `log_field_change` írja |
+| `global_counters` | semmi | csak a `next_series_no` írja |
+
+- **Az `anon` sehol nem ír.** Az olvasás (`SELECT`) mindenhol megmaradt. A `service_role` és a tulajdonos (`postgres`) joga nem változott.
+- **Megvont jogok:** `INSERT`, `UPDATE` (táblaszinten), `DELETE`, és a sorszintű szabályok által NEM fogott `TRUNCATE`, `REFERENCES`, `TRIGGER`, `MAINTAIN`. A `MAINTAIN` (karbantartás: `VACUUM`, `ANALYZE`, tábla zárolása; Postgres 17) azért került a megvonásba, mert semmilyen kliens-útvonal nem használja, és egy írási jogkészlet félig szűkítve nem ad biztonságot.
+- **A két írási útvonal új modellje:** (1) a törzsadat **függvényen át** íródik (`create_live_issue`, `publish_draft_series`, a törlés függvényei) — ezek `SECURITY DEFINER` függvények, a tulajdonos jogával írnak, és maguk ellenőriznek; (2) **oszlopszintű kivétel** a fenti hat oszlop, amelyet a kliens közvetlenül ír, mert nem törzsadat-tartalom (kép, kapcsoló, életciklus, megjelenített név). A munkaanyag- és a személyes táblákat a kliens továbbra is közvetlenül írja (a „Kész” és a publikálás a szerveren ellenőriz; a személyes sor a sajátja). **Szabály:** új közvetlen írási igényhez függvény kell, vagy az oszlopszintű kivétel külön döntéssel.
+- **A régi böngészőfül:** a 35. lépés előtti kód a „+ Új tétel” és a Gyors Excel új sorainál közvetlenül szúrt be az `issues` táblába. Ez mostantól az első lépésnél elbukik (fél Szám nem marad), a felhasználó a „Hiba: Ehhez a művelethez nincs jogosultságod (vagy a fiókod nem aktív).” üzenetet látja. Az üzenet félrevezető (a valódi ok a régi kód) — ezt a verzióellenőrző sáv oldja majd meg a jövőre nézve.
+- **Igazolás:** visszagörgetett próba valódi szerepkörökkel (`scripts/trial-42-irasi-jogok.js`: staff nevében 36 tiltott közvetlen írás mind „permission denied” — a szűkítés előtt 34 ténylegesen végrehajtódott volna; a kliens 14 mai közvetlen írása változatlanul működik; sima felhasználó és `anon` semmit nem ír; a 34 lépéses forgatókönyv — 13/13), a futtatás után az új Szám próba 19/19, a jogosultság-próba 14/14, és valódi HTTP-hívás a nyilvános kulccsal (előtte 204, nulla sor; utána 401, `permission denied`).
+- **Nem része:** a `draft_*`, `member_*`, `image_proposals`, `members` táblák jogai (ott az `anon` jogait egyenként kell végignézni), és a táblák alapértelmezett joga (ma minden új tábla megkapja az `anon` és az `authenticated` teljes jogát) — „jogosultsági higiénia”, nyitott.
+SQL: `42-irasi-jogok`.
+
 ---
 
 *Napló:*
+- v1.28 — **42–43. lépés — a közvetlen írások lezárása (C)** (13.14.10): az élő törzsadat-táblákon (`series`, `issues`, `components`, `lists`, `change_log`, `global_counters`) az `anon` nem ír, az `authenticated` csak hat oszlopot módosíthat és a Listákba szúrhat be; minden más függvényen át megy. Trigger helyett a táblajogok szűkítése (a `TRUNCATE` és a `MAINTAIN` is megvonva). Függvény, sorszintű szabály és adat nem változott. SQL: `42-irasi-jogok`.
 - v1.27 — **39–40. lépés — a függvények jogosultsági modellje** (13.14.9): a hívási jog szűkítése (16 függvényt csak bejelentkezett hívhat, 13 belső segédet csak más függvény, 8 nyitva maradt indokkal), az új függvények alapértelmezett jogának átállítása (nincs `PUBLIC` / `anon`), szabály az új függvények jogának kifejezett megadására; a „Teszt Kiadó” próbasor törlése. Függvény-definíció nem változott. SQL: `39-jogosultsag-szigoritas`, `40-alapertelmezett-jogok`, `40-teszt-kiado-torles`.
 - v1.26 — **27–37. lépés — Típusszabályok, sorozat-azonosítók, közvetlen új Szám, adatrendezés** (13.14): a típusleírás szabályai (azonosító-mód, megengedett azonosító-típusok, kötelező mezők; a Kártya hét mezője, a Figura kötelező neve); sorozat-azonosítók a sorozat törzsében (legfeljebb két ISBN / ISSN, csendes, a fejlécben látszik); új Szám-sáv csempékkel; a szerkesztők egysége (a típusnak nem megfelelő tárolt adat látszik és javítható); `create_live_issue` — a „+ Új tétel” és a Gyors Excel új sorai egy tranzakcióban, a munkaanyaggal azonos szabályokkal; S2 adatrendezés (öt sorozat azonosítója, 155 komponens, Disney Hangos 82 figura, Kártyakód, „Kártya”); az átmeneti duplikáció-szabály kivétele; tesztelési mód (teszt-felhasználó, visszagörgetett próbák, `scripts/ro.js`); a 37 függvény listája és a jogosultság-felmérés nyitott pontjai. SQL: `27-s1-szerkezet`, `33-uj-szam-fuggveny`, `27-s2-adatrendezes`.
 - v1.25 — **22. lépés / 2. kör — Komponensek** (13.13): komponens-sablon + típusleírás (`component_type_defs`, `adatok jsonb`), sablon szerinti színezés (0 eltérés), más típusú elem egy Számhoz (típusválasztó, külön haladásjelző), „Kész” figyelmeztetések, **komponens valódi törlése** (soft-delete, csendes; a fő elem nem törölhető), `model.js` egyetlen szűrési pont, publikálás-összefoglaló a komponens-törlésre. SQL: `komponens-sablon`, `tipus-hozzaadas`, `komponens-torles`; indexek a draft-táblákon.
