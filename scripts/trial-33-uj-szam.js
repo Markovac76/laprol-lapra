@@ -53,8 +53,19 @@ async function counts(c, label) {
     let sp = 0;
     const expectErr = async fn => { const n = `sp${++sp}`; await c.query(`SAVEPOINT ${n}`);
       try { await fn(); await c.query(`ROLLBACK TO ${n}`); return null; } catch (e) { await c.query(`ROLLBACK TO ${n}`); return e; } };
-    const T = (await q(`select id from public.series where megjelenites='TESZT'`))[0];
-    if (!T) throw new Error("A TESZT sorozat nem található — a próba csak azon futhat.");
+    // 39. lépés: a TESZT sorozatot a tulajdonos törölte. Ha nincs meg, a próba a tranzakción BELÜL hoz létre
+    // egy ugyanolyan próbasorozatot (mind a hét típus kötelező, fő elem a Magazin) — a ROLLBACK ezt is eltünteti.
+    let T = (await q(`select id from public.series where megjelenites='TESZT'`))[0];
+    if (!T) {
+      const tt = ["magazin", "konyv", "lego", "krtya", "figura", "modell", "egyeb"];
+      T = (await q(`insert into public.series (megnevezes, megjelenites, kiado, szin, components, component_template, lifecycle)
+                    values ('TESZT szerkesztő-próba', 'TESZT', 'egyeb', '#336699', $1, $2::jsonb, 'active') returning id`,
+        [tt, J(tt.map(t => ({ tipus: t, main: t === "magazin", required: true, id_rule: "nincs", default_azonosito_tipus: null, counts_for_color: true, default_megnevezes: null })))]))[0];
+      console.log("(A TESZT sorozat nincs meg — a próba a tranzakción belül létrehozott próbasorozaton fut.)\n");
+    }
+    // 39. lépés: további, még nem éles SQL alkalmazása a tranzakción belül, a próbák ELŐTT (--with <fájl>).
+    const wi = process.argv.indexOf("--with");
+    if (wi > 0) { await c.query(fs.readFileSync(path.resolve(process.argv[wi + 1]), "utf8")); console.log(`(A tranzakción belül lefutott még: ${path.basename(process.argv[wi + 1])})\n`); }
     const call = (issue, personal = null, sid = T.id) => q(`select public.create_live_issue($1,$2::jsonb,$3::jsonb) r`, [sid, J(issue), personal == null ? null : J(personal)]).then(r => r[0].r);
     const full = (o = {}) => [{ tipus: "magazin", is_main: true }, { tipus: "konyv" }, { tipus: "lego", azonosito: "912399" },
       { tipus: "krtya", azonosito: "K77", megnevezes: "Próba", adatok: { gyujtemeny: "Gy", kiadas_eve: "2025", ismeretlen: "x" } },
