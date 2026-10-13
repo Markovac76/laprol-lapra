@@ -6,6 +6,9 @@
    Legújabb elöl. Szándékosan elválasztva a UI-tól (changelog.js).
    ============================================================ */
 export const CHANGELOG = [
+  { date:"2026-10-13",
+    text:"Karbantartóknak: a 🔧 Gyors szerkesztés „+ Új tétel” űrlapja megújult. Az elemek a típusuk szerinti mezőket kapják (ugyanazokat, mint a Karbantartás szerkesztőjében, a kötelezők * jelöléssel), megjelölhető a ★ fő elem, és a mentés egy lépésben történik: vagy a teljes Szám létrejön, vagy semmi. A hiányzó vagy a típusnak nem megfelelő adatokat az űrlap egyszerre sorolja fel, a beírt adat megmarad; foglalt lapszámnál is érthetően szól. A saját jelölés és beszerzési adat megadása nem kötelező. Az Excel-feltöltés új sorai ugyanezekkel a szabályokkal jönnek létre: a hibás sor kimarad, a többi feltöltődik, a végén Számonként látszik, mi nem ment át és miért."
+  },
   { date:"2026-10-12",
     text:"Karbantartóknak: a Szám szerkesztője megmutatja és javíthatóvá teszi azt az adatot, ami nem felel meg az elem típusának (pl. Kártyán más azonosító-típus, Figurán azonosító) — eddig az ilyen adat rejtve maradt. A kötelező, de még üres mezők halvány kiemelést kapnak („a „Kész”-hez kell”). A sorozat-azonosító hibájára a szerkesztő már a mező elhagyásakor szól. A munkaanyag Szám-listájában az elemek sorrendje állandó: a fő elem (★) elöl, utána a sablon sorrendje. A Saját adatlapon és az „Új szám” űrlapon minden típus a rendes nevén látszik."
   },

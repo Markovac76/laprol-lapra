@@ -106,6 +106,53 @@ export function orderComponents(comps, typeOrder = []){
     || String(a.id || "").localeCompare(String(b.id || "")));
 }
 
+// ---- Új Szám felvétele élő sorozatra: a create_live_issue szerver-függvény bemenete ----
+// master:    {n, name, date, eredeti_ar, fizetett_ar, besz_menny, besz_datum, forras} (űrlap-értékek, szövegként is)
+// instances: [{key, tipus, azonosito_tipus, azonosito, megnevezes, adatok, status, db, jegyzet}]
+// mainKey:   a fő elemnek jelölt példány kulcsa (vagy null → a szerver a szokásos szabály szerint jelöl)
+// A LÉTREHOZÓ SZEMÉLYES ADATA csak akkor megy el, ha ténylegesen megadott valamit:
+//   • elemenként a status / db / jegyzet kulcs csak akkor, ha van státusz, VAGY a darabszám nem 1, VAGY van jegyzet
+//     (az alapértelmezett 1 db önmagában nem számít megadott adatnak);
+//   • a beszerzési adat (personal) null, ha nincs fizetett ár, a mennyiség 1, nincs dátum és nincs forrás —
+//     az üres objektum sort hozna létre, és kikapcsolná az automatikus ár-kitöltést.
+export function buildLiveIssuePayload(master, instances, mainKey = null){
+  const int = v => { const t = str(v); return /^-?\d+$/.test(t) ? parseInt(t, 10) : null; };
+  const comps = (instances || []).map(inst => {
+    const c = { tipus: inst.tipus, azonosito_tipus: str(inst.azonosito_tipus) || null, azonosito: str(inst.azonosito) || null,
+                megnevezes: str(inst.megnevezes) || null, is_main: mainKey != null && inst.key === mainKey };
+    const adatok = {}; Object.entries(inst.adatok || {}).forEach(([k, v]) => { if(str(v) !== "") adatok[k] = v; });
+    if(Object.keys(adatok).length) c.adatok = adatok;
+    const status = str(inst.status) || null, db = int(inst.db), jegyzet = str(inst.jegyzet) || null;
+    const dbv = db == null ? 1 : Math.max(0, db);
+    if(status || dbv !== 1 || jegyzet){ c.status = status; c.db = dbv; c.jegyzet = jegyzet; }
+    return c;
+  });
+  const fiz = int(master.fizetett_ar), menny = Math.max(1, int(master.besz_menny) || 1);
+  const datum = str(master.besz_datum) || null, forras = str(master.forras) || null;
+  const personal = (fiz != null || menny !== 1 || datum || forras)
+    ? { fizetett_ar: fiz, beszerzesi_mennyiseg: menny, beszerzes_datuma: datum, forras } : null;
+  return {
+    issue: { lapszam: int(master.n), cim: str(master.name) || null, megjelenes: str(master.date) || null, eredeti_ar: int(master.eredeti_ar), comps },
+    personal,
+  };
+}
+
+// A Gyors Excel egy ÚJ sora → a create_live_issue bemenete. item: {n, p:{cim, megjelenes, eredeti_ar},
+// pi:{fizetett_ar?}, comps:[{t, status, azonosito, megnevezes}]}. A sorozat minden komponens-típusából egy
+// elem (mint eddig); a személyes státusz csak akkor megy el, ha a cellában volt érték; a beszerzési adat
+// csak akkor, ha volt fizetett ár. A fő elemet a szerver jelöli a szokásos szabály szerint.
+export function excelRowToLiveIssue(item){
+  const comps = (item.comps || []).map(c => {
+    const o = { tipus: c.t, azonosito: c.azonosito || null, megnevezes: c.megnevezes || null };
+    if(c.status !== undefined && c.status !== null) o.status = c.status;
+    return o;
+  });
+  const personal = (item.pi && item.pi.fizetett_ar != null) ? { fizetett_ar: item.pi.fizetett_ar } : null;
+  const p = item.p || {};
+  return { issue: { lapszam: item.n, cim: p.cim || null, megjelenes: p.megjelenes || null,
+                    eredeti_ar: p.eredeti_ar == null ? null : p.eredeti_ar, comps }, personal };
+}
+
 // ---- Sorozat-szintű azonosítók (series.azonositok): [{tipus:'isbn'|'issn', ertek}] legfeljebb 2 ----
 export const SERIES_ID_TYPES = [["isbn", "ISBN"], ["issn", "ISSN"]];
 export const SERIES_ID_MAX = 2;

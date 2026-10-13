@@ -16,6 +16,38 @@ import { typeDef, idMode, masterFields, extraFields, isRequired, defaultIdType, 
 
 const typeLabel = t => listName("komponens", t) || COMP_TYPES[t] || t;
 
+// A typeFieldsHtml mezőinek visszaolvasása a komponens-objektumba (megnevezés, azonosító-típus,
+// azonosító, a típus saját mezői az `adatok`-ba — az üres érték kulcsa kimarad).
+export function readTypeFields(c, k){
+  const nameEl=document.getElementById("di-name-"+k); if(nameEl) c.megnevezes=nameEl.value;
+  const idtEl=document.getElementById("di-ct-"+k); if(idtEl) c.azonosito_tipus=idtEl.value;
+  const idEl=document.getElementById("di-cid-"+k); if(idEl) c.azonosito=idEl.value;
+  extraFields(typeDef(state.TYPEDEFS, c.tipus)).forEach(f=>{
+    const el=document.getElementById(`di-x-${f.key}-${k}`); if(!el) return;
+    const raw=el.value.trim(); const a={...(c.adatok||{})};
+    if(raw==="") delete a[f.key];
+    else a[f.key] = f.kind==="egesz" && /^-?\d+$/.test(raw) ? parseInt(raw,10) : raw;
+    c.adatok=a;
+  });
+}
+// A typeFieldsHtml mezőinek élő viselkedése: a kötelező üres mező kiemelése gépelés közben frissül;
+// Könyvnél (ahol a típusnak van alap azonosító-típusa) az azonosító beírásakor az ISBN előre megjelenik.
+export function wireTypeFields(root){
+  root.querySelectorAll("input[data-req]").forEach(inp=>{
+    inp.addEventListener("input",()=>{
+      const empty = inp.value.trim()==="";
+      inp.classList.toggle("reqempty", empty);
+      const tag = inp.closest(".field").querySelector(".reqtag"); if(tag) tag.hidden = !empty;
+    });
+  });
+  root.querySelectorAll("input[data-ct]").forEach(inp=>{
+    inp.addEventListener("input",()=>{
+      const sel=document.getElementById(inp.dataset.ct);
+      if(sel && !sel.value && sel.dataset.deftype && inp.value.trim()) sel.value=sel.dataset.deftype;
+    });
+  });
+}
+
 export async function fetchDraftItems(draftSeriesId){
   const { data: issues, error: ie } = await fetchAllRows(()=>supabase.from("draft_issues")
     .select("*").eq("draft_series_id", draftSeriesId).order("lapszam"));
@@ -60,7 +92,9 @@ const REQ = `<span class="reqmark" title="Kötelező">*</span>`;
 // (pl. Kártya: Gyártó, Gyűjtemény…), a név / megnevezés, és az azonosító a típus szabálya
 // szerinti azonosító-típussal — fix típusnál nem szerkeszthető, a kiadvány családnál
 // (Magazin, Könyv) ISBN / ISSN választó, „nincs” szabálynál (Figura, Modell) nincs azonosító.
-function typeFieldsHtml(c, k, t, multi){
+// Közös a két Szám-űrlapnak: a Karbantartás draft-szerkesztőjének és a „+ Új tétel” űrlapnak
+// (admin-forms.js) — ugyanazok a mezők, jelölések és szabályok. Párja: readTypeFields, wireTypeFields.
+export function typeFieldsHtml(c, k, t, multi){
   const def = typeDef(state.TYPEDEFS, t);
   const { mode, types } = idMode(def);
   const fields = masterFields(def);
@@ -155,17 +189,7 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
     if(mainRadio) mainKey = mainRadio.value;
     comps.forEach(c=>{
       const k=keyOf(c);
-      const nameEl=document.getElementById("di-name-"+k); if(nameEl) c.megnevezes=nameEl.value;
-      const idtEl=document.getElementById("di-ct-"+k); if(idtEl) c.azonosito_tipus=idtEl.value;
-      const idEl=document.getElementById("di-cid-"+k); if(idEl) c.azonosito=idEl.value;
-      // a típus saját mezői (az `adatok`-ba): az üres érték kulcsa kimarad
-      extraFields(typeDef(state.TYPEDEFS, c.tipus)).forEach(f=>{
-        const el=document.getElementById(`di-x-${f.key}-${k}`); if(!el) return;
-        const raw=el.value.trim(); const a={...(c.adatok||{})};
-        if(raw==="") delete a[f.key];
-        else a[f.key] = f.kind==="egesz" && /^-?\d+$/.test(raw) ? parseInt(raw,10) : raw;
-        c.adatok=a;
-      });
+      readTypeFields(c, k);
       const typeEl=document.getElementById("di-type-"+k); if(typeEl) c.tipus=typeEl.value;
     });
   }
@@ -243,23 +267,9 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
       comps.push({tipus:t, azonosito_tipus:def, azonosito:"", megnevezes:(te&&te.default_megnevezes)||"", adatok:{}, _tmpKey:"tmp"+(tmpSeq++)});
       draw();
     };
-    // A kötelező, üres mező kiemelése gépelés közben frissül (kitöltve eltűnik).
-    sheet.querySelectorAll("input[data-req]").forEach(inp=>{
-      inp.addEventListener("input",()=>{
-        const empty = inp.value.trim()==="";
-        inp.classList.toggle("reqempty", empty);
-        const tag = inp.closest(".field").querySelector(".reqtag"); if(tag) tag.hidden = !empty;
-      });
-    });
+    wireTypeFields(sheet);   // kötelező üres mező kiemelése, Könyvnél az ISBN előre megjelenik
     // Utólagos átsorolásnál a mezők az új típus szerint rajzolódnak újra.
     sheet.querySelectorAll('select[id^="di-type-"]').forEach(s=>{ s.onchange=()=>{ syncFromDom(); draw(); }; });
-    // Könyvnél (ahol a típusnak van alap azonosító-típusa) az azonosító beírásakor az ISBN előre megjelenik.
-    sheet.querySelectorAll("input[data-ct]").forEach(inp=>{
-      inp.addEventListener("input",()=>{
-        const sel=document.getElementById(inp.dataset.ct);
-        if(sel && !sel.value && sel.dataset.deftype && inp.value.trim()) sel.value=sel.dataset.deftype;
-      });
-    });
     document.querySelectorAll("[data-removecomp]").forEach(b=>{
       b.onclick=guarded(async ()=>{
         syncFromDom();

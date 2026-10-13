@@ -15,10 +15,10 @@
    ============================================================ */
 import { supabase } from "./supabase.js";
 import { state, S, COMP_TYPES, esc } from "./state.js";
-import { openModal, closeModal, err, guarded } from "./modal.js";
+import { openModal, closeModal, err, friendlyError, guarded } from "./modal.js";
 import { reload } from "./data.js";
 import { upsertMyIssueData, upsertMyStatus } from "./personal.js";
-import { seedNewIssueSeen } from "./changes.js";
+import { excelRowToLiveIssue as newIssuePayload } from "./type-defs.js";
 
 let _xlsx=null;
 async function xlsx(){ if(!_xlsx) _xlsx=await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm"); return _xlsx; }
@@ -161,18 +161,14 @@ ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új
       let draftId=null;
 
       let ins=0, draftUpd=0;
+      const failed=[];   // az ÚJ Számok közül, amelyek nem jöttek létre: {n, cim, ok}
       for(const item of plan){
         if(item.isNew){
-          const {data,error}=await supabase.from("issues").insert({...item.p, series_id:s.id, lapszam:item.n}).select().single();
-          if(error) throw error; const issueId=data.id;
-          if(Object.keys(item.pi).length){ const pierr=await upsertMyIssueData(issueId, {...item.pi, ar_auto:false}); if(pierr) throw pierr; }
-          for(const c of item.comps){
-            const cpayload={}; if(c.azonosito) cpayload.azonosito=c.azonosito; if(c.megnevezes) cpayload.megnevezes=c.megnevezes;
-            const {data:cd,error:cerr}=await supabase.from("components").insert({...cpayload, issue_id:issueId, tipus:c.t}).select().single();
-            if(cerr) throw cerr;
-            if(c.status!==undefined){ const serr=await upsertMyStatus(cd.id, {status:c.status}); if(serr) throw serr; }
-          }
-          await seedNewIssueSeen(issueId);
+          // EGY Szám = EGY szerver-hívás (create_live_issue): egy tranzakció, a típusszabályok
+          // ellenőrzésével, a fő elem beállításával. Ha egy Szám hibás, CSAK az marad ki — a többi megy tovább.
+          const { issue, personal } = newIssuePayload(item);
+          const { error } = await supabase.rpc("create_live_issue", { p_series_id: s.id, p_issue: issue, p_personal: personal });
+          if(error){ failed.push({ n:item.n, cim:item.p.cim||"", ok: friendlyError(error) }); continue; }
           ins++;
         } else {
           const liveIssue = s.items.find(x=>x.n===item.n);
@@ -194,9 +190,15 @@ ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új
       }
       await reload();
       const msg = draftUpd>0
-        ? `Feltöltve.\nÚj szám (azonnal élő): ${ins}\nMeglévő szám törzsadat-módosítása (${draftUpd} db) egy szerkesztési draftba került a Karbantartásban — nézd át és publikáld, ha jó.\nA saját jelöléseid/áraid azonnal frissültek.`
-        : `Feltöltve.\nÚj szám: ${ins}\nA saját jelöléseid/áraid a meglévő számokon azonnal frissültek.`;
-      alert(msg);
+        ? `Új szám (azonnal élő): ${ins}\nMeglévő szám törzsadat-módosítása (${draftUpd} db) egy szerkesztési draftba került a Karbantartásban — nézd át és publikáld, ha jó.\nA saját jelöléseid/áraid azonnal frissültek.`
+        : `Új szám: ${ins}${updated>0?"\nA saját jelöléseid/áraid a meglévő számokon azonnal frissültek.":""}`;
+      if(!failed.length){ alert("Feltöltve.\n"+msg); return; }
+      // Számonként felsoroljuk, mi nem ment át és miért (a többi sor rendben feltöltődött).
+      openModal(`<h2>Feltöltés — ${failed.length} új Szám nem jött létre</h2>
+        <p class="msub" style="white-space:pre-wrap">${esc(msg)}</p>
+        <p class="msub">Az alábbi új Számok <b>nem kerültek be</b> (semmi nem mentődött belőlük). Javítsd a fájlban, vagy vedd fel őket a „+ Új tétel” űrlapon, ahol minden mező megadható:</p>
+        ${failed.map(f=>`<div class="formerr"><b>#${f.n}${f.cim?" – "+esc(f.cim):""}</b>\n${esc(f.ok)}</div>`).join("")}
+        <div class="modrow"><button class="btn" onclick="closeModal()">Rendben</button></div>`);
     }catch(e){ err(e); }
   });
 }

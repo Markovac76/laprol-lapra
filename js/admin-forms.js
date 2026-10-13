@@ -6,10 +6,11 @@
    ============================================================ */
 import { supabase } from "./supabase.js";
 import { state, S, esc, pad, opts, capFirst, slugify, sortEgyebLast, typeLabel } from "./state.js";
-import { openModal, closeModal, err, sheet, guarded } from "./modal.js";
+import { openModal, closeModal, err, friendlyError, sheet, guarded } from "./modal.js";
 import { reload } from "./data.js";
-import { upsertMyStatus, upsertMyIssueData } from "./personal.js";
-import { seedNewIssueSeen } from "./changes.js";
+import { typeFieldsHtml, readTypeFields, wireTypeFields } from "./draft-items.js";
+import { typeDef, defaultIdType, buildLiveIssuePayload } from "./type-defs.js";
+import { initialComponents } from "./component-template.js";
 
 /* ---- Új szám létrehozása (staff-only) ----
    Csak ÚJ tétel felvitelére való — meglévő publikált tétel törzsadat-
@@ -21,42 +22,62 @@ import { seedNewIssueSeen } from "./changes.js";
    közvetlenül írhat törzsadatot — ugyanaz az elv, mint az Excel-importnál. */
 let itemFormSeq=0;
 
-// Egy típusból itt is felvehető TÖBB, egyedi Megnevezésű példány (pl. két
-// különböző Lego-csomag) egyből, az első felviteléskor — a "+ Még egy X"
-// gomb helyben ad hozzá egy újabb, üres blokkot, mentés előtt.
+// Az elemek a TÍPUSLEÍRÁS szerinti mezőket kapják — ugyanaz a kód és ugyanazok a szabályok, mint a
+// Karbantartás draft-szerkesztőjében (draft-items.js: typeFieldsHtml). A mentés EGYETLEN szerver-hívás
+// (create_live_issue): egy tranzakció, a típusszabályok ellenőrzésével, a fő elem beállításával; hiba
+// esetén semmi nem mentődik, a hibák egyszerre jelennek meg az űrlapon, a beírt adat megmarad.
+// Egy típusból itt is felvehető TÖBB példány (a "+ Még egy X" gombbal).
 export function itemForm(){
   const s=S();
   const nextN = s.items.reduce((m,x)=>Math.max(m,x.n||0),0)+1;
   const scode=pad(S().kodSzam||(state.activeIdx+1),3);
+  const tmpl = Array.isArray(s.template) ? s.template : [];
+  const newInst = (t, o={}) => ({ tipus:t, key:"i"+(itemFormSeq++), status:null, db:1, jegyzet:"", adatok:{},
+    azonosito_tipus: defaultIdType(typeDef(state.TYPEDEFS, t), tmpl.find(e=>e.tipus===t)) || "",
+    azonosito:"", megnevezes:(tmpl.find(e=>e.tipus===t)||{}).default_megnevezes||"", ...o });
   let master = {n:nextN, name:"", date:"", eredeti_ar:"", fizetett_ar:"", besz_menny:1, besz_datum:"", forras:""};
-  let instances = s.components.map(t=>({tipus:t, key:"i"+(itemFormSeq++), status:null, db:1, azonosito_tipus:"", azonosito:"", megnevezes:"", jegyzet:""}));
+  // Kiindulás: a sorozat sablonjának KÖTELEZŐ típusai (sablon nélkül a sorozat komponens-listája).
+  const startTypes = tmpl.length ? initialComponents(tmpl).map(c=>c.tipus) : s.components.slice();
+  let instances = startTypes.map(t=>newInst(t));
+  // A választható típusok sorrendje: a sorozat típusai (a sablon szerint), a nem kötelezők is hozzáadhatók.
+  const seriesTypes = tmpl.length ? tmpl.map(e=>e.tipus) : s.components.slice();
+  // FŐ ELEM (★): a sablon fő típusa, ennek hiányában magazin, könyv, első — megegyezik a szerver szabályával.
+  const pickMain = () => { const mt=(tmpl.find(e=>e.main)||{}).tipus;
+    const m = instances.find(i=>i.tipus===mt) || instances.find(i=>i.tipus==="magazin") || instances.find(i=>i.tipus==="konyv") || instances[0];
+    return m ? m.key : null; };
+  let mainKey = pickMain();
+  let errText = "";
 
   function syncFromDom(){
     const v=id=>{const e=document.getElementById(id);return e?e.value:null;};
     master = { n:v("f-n"), name:v("f-name"), date:v("f-date"), eredeti_ar:v("f-eredeti"),
       fizetett_ar:v("f-fizetett"), besz_menny:v("f-menny"), besz_datum:v("f-fdatum"), forras:v("f-forras") };
+    const mr=sheet.querySelector('input[name="f-main"]:checked'); if(mr) mainKey=mr.value;
     instances.forEach(inst=>{
       const row=sheet.querySelector(`.statrow[data-stat="${inst.key}"]`);
       const pressed=row?row.querySelector('button[aria-pressed="true"]'):null;
       inst.status = pressed?(pressed.dataset.v||null):null;
-      inst.db = v("cdb-"+inst.key); inst.azonosito_tipus=v("ct-"+inst.key); inst.azonosito=v("cid-"+inst.key);
-      inst.megnevezes=v("cname-"+inst.key); inst.jegyzet=v("cn-"+inst.key);
+      inst.db = v("cdb-"+inst.key); inst.jegyzet=v("cn-"+inst.key);
+      readTypeFields(inst, inst.key);
     });
   }
 
   function draw(){
     const byType={}; instances.forEach(i=>{ (byType[i.tipus]=byType[i.tipus]||[]).push(i); });
+    if(!instances.some(i=>i.key===mainKey)) mainKey = pickMain();
     let ci=0;
-    const compBlocks = s.components.map(t=>{
+    const compBlocks = seriesTypes.map(t=>{
       const list=byType[t]||[];
       const blocks=list.map((inst,idx)=>{
         ci++;
         return `<div class="compedit">
           <h4>${esc(typeLabel(t))}${list.length>1?` #${idx+1}`:""}</h4>
           <div class="kod">${scode}-${pad(master.n||nextN,4)}-${pad(ci,2)}</div>
-          <div class="field"><label>Megnevezés (opcionális) <span style="color:var(--faint);font-weight:400">— ha üres, "${esc(typeLabel(t))}${list.length>1?" #N":""}" jelenik meg</span></label>
-            <input id="cname-${inst.key}" value="${esc(inst.megnevezes||"")}" placeholder="pl. Star Wars minifigura-csomag"></div>
-          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Státusz</label>
+          ${typeFieldsHtml(inst, inst.key, t, list.length>1)}
+          ${instances.length>1
+            ? `<label class="ckrow" style="margin-top:6px"><input type="radio" name="f-main" value="${esc(inst.key)}" ${inst.key===mainKey?"checked":""}> ★ Fő elem <span style="color:var(--faint);font-weight:400">— a sorban az első helyen áll</span></label>`
+            : `<div class="fieldnote">★ Ez a Szám egyetlen eleme, ezért ez a fő elem.</div>`}
+          <div class="msub" style="margin:10px 0 4px;color:var(--accent);filter:brightness(1.2);font-weight:600">Saját jelölés — csak a tiéd (nem kötelező)</div>
           <div class="statrow" data-stat="${inst.key}">
             <button type="button" data-v="megvan" aria-pressed="${inst.status==="megvan"}">megvan</button>
             <button type="button" data-v="hianyzik" aria-pressed="${inst.status==="hianyzik"}">hiány</button>
@@ -64,47 +85,46 @@ export function itemForm(){
             <button type="button" data-v="" aria-pressed="${!inst.status}">jelöletlen</button>
           </div>
           <div class="grid2" style="margin-top:8px">
-            <div class="field"><label>Darabszám (db)</label><input id="cdb-${inst.key}" type="number" min="0" value="${inst.db??1}"></div>
-            <div class="field"><label>Azonosító típusa</label>
-              <select id="ct-${inst.key}"><option value="">—</option>${opts("azonosito",inst.azonosito_tipus)}</select></div>
+            <div class="field"><label>Darabszám (db)</label><input id="cdb-${inst.key}" type="number" min="0" value="${esc(inst.db??1)}"></div>
+            <div class="field"><label>Jegyzet</label><input id="cn-${inst.key}" value="${esc(inst.jegyzet||"")}"></div>
           </div>
-          <div class="field"><label>Azonosító</label><input id="cid-${inst.key}" value="${esc(inst.azonosito||"")}"></div>
-          <div class="field"><label>Jegyzet</label><input id="cn-${inst.key}" value="${esc(inst.jegyzet||"")}"></div>
           ${list.length>1?`<button type="button" class="btn ghost" data-removeinst="${inst.key}">Ez a példány törlése</button>`:""}
         </div>`;
       }).join("");
-      return blocks + `<button type="button" class="btn ghost" data-addinst="${esc(t)}">+ Még egy ${esc(typeLabel(t))} hozzáadása</button>`;
+      return blocks + `<button type="button" class="btn ghost" data-addinst="${esc(t)}">+ ${list.length?"Még egy ":""}${esc(typeLabel(t))} hozzáadása</button>`;
     }).join("");
 
     openModal(`<h2>Új szám</h2>
-      <p class="msub">${esc(s.sorozat)}</p>
+      <p class="msub">${esc(s.sorozat)} — az új Szám mentéskor azonnal élő lesz.</p>
+      <div class="formerr" id="f-err"${errText?"":" hidden"}>${esc(errText)}</div>
       <div class="grid2">
-        <div class="field"><label>Lapszám</label><input id="f-n" type="number" value="${master.n}"></div>
-        <div class="field"><label>Megjelenés dátuma</label><input id="f-date" type="date" value="${master.date||""}"></div>
+        <div class="field"><label>Lapszám</label><input id="f-n" type="number" value="${esc(master.n??"")}"></div>
+        <div class="field"><label>Megjelenés dátuma</label><input id="f-date" type="date" value="${esc(master.date||"")}"></div>
       </div>
       <div class="field"><label>Cím</label><input id="f-name" value="${esc(master.name||"")}"></div>
       <div class="field"><label>Eredeti ár (Ft) <span style="color:var(--faint);font-weight:400">— a megjelenéskori/újságos ár (közös törzsadat)</span></label>
-        <input id="f-eredeti" type="number" value="${master.eredeti_ar??""}"></div>
-      <div class="msub" style="margin:14px 0 2px;color:var(--accent);filter:brightness(1.2);font-weight:600">Személyes beszerzés — csak a tiéd</div>
+        <input id="f-eredeti" type="number" value="${esc(master.eredeti_ar??"")}"></div>
+      <div class="msub" style="margin:14px 0 2px;color:var(--accent);filter:brightness(1.2);font-weight:600">Személyes beszerzés — csak a tiéd (nem kötelező)</div>
       <div class="grid2">
-        <div class="field"><label>Fizetett ár (Ft)</label><input id="f-fizetett" type="number" value="${master.fizetett_ar??""}"></div>
+        <div class="field"><label>Fizetett ár (Ft)</label><input id="f-fizetett" type="number" value="${esc(master.fizetett_ar??"")}"></div>
         <div class="field"><label>Beszerzési mennyiség (db) <span style="color:var(--faint);font-weight:400">— hány db-ot vettél</span></label>
-          <input id="f-menny" type="number" min="1" value="${master.besz_menny??1}"></div>
+          <input id="f-menny" type="number" min="1" value="${esc(master.besz_menny??1)}"></div>
       </div>
       <div class="grid2">
-        <div class="field"><label>Beszerzés dátuma</label><input id="f-fdatum" type="date" value="${master.besz_datum||""}"></div>
+        <div class="field"><label>Beszerzés dátuma</label><input id="f-fdatum" type="date" value="${esc(master.besz_datum||"")}"></div>
         <div class="field"><label>Beszerzés forrása</label><select id="f-forras"><option value="">—</option>${opts("forras",master.forras)}</select></div>
       </div>
       ${compBlocks}
       <div class="modrow"><button class="btn ghost" onclick="closeModal()">Mégse</button><button class="btn" id="f-save">Létrehozás</button></div>`);
 
+    wireTypeFields(sheet);
     // státusz-gombok
     sheet.querySelectorAll(".statrow").forEach(row=>{
       row.addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return;
         row.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
     });
     sheet.querySelectorAll("[data-addinst]").forEach(b=>{
-      b.onclick=()=>{ syncFromDom(); instances.push({tipus:b.dataset.addinst, key:"i"+(itemFormSeq++), status:null, db:1, azonosito_tipus:"", azonosito:"", megnevezes:"", jegyzet:""}); draw(); };
+      b.onclick=()=>{ syncFromDom(); instances.push(newInst(b.dataset.addinst)); draw(); };
     });
     sheet.querySelectorAll("[data-removeinst]").forEach(b=>{
       b.onclick=()=>{ syncFromDom(); instances=instances.filter(i=>i.key!==b.dataset.removeinst); draw(); };
@@ -112,30 +132,22 @@ export function itemForm(){
 
     document.getElementById("f-save").onclick=guarded(async ()=>{
       syncFromDom();
-      const n=parseInt(master.n); if(isNaN(n)){alert("A lapszám kötelező.");return;}
-      const masterPayload={ lapszam:n, cim:(master.name||"").trim()||null, megjelenes:master.date||null,
-        eredeti_ar:master.eredeti_ar?parseInt(master.eredeti_ar):null };
-      const personal={ fizetett_ar:master.fizetett_ar?parseInt(master.fizetett_ar):null,
-        beszerzesi_mennyiseg: Math.max(1, parseInt(master.besz_menny)||1),
-        beszerzes_datuma:master.besz_datum||null, forras:master.forras||null, ar_auto:false };
+      if(!/^-?\d+$/.test(String(master.n||"").trim())){ errText="A lapszám kötelező, és egész szám kell legyen."; draw(); showErr(); return; }
+      const { issue, personal } = buildLiveIssuePayload(master, instances, mainKey);
       try{
-        const {data,error}=await supabase.from("issues").insert({...masterPayload, series_id:s.id}).select().single();
+        // EGY Szám = EGY hívás: a Szám, az elemei, a fő elem, a feliratkozók „látott” sorai és (ha megadtad)
+        // a saját jelöléseid egy tranzakcióban jönnek létre — vagy semmi.
+        const { error } = await supabase.rpc("create_live_issue", { p_series_id: s.id, p_issue: issue, p_personal: personal });
         if(error) throw error;
-        const issueId=data.id;
-        const pierr=await upsertMyIssueData(issueId, personal); if(pierr) throw pierr;
-        for(const inst of instances){
-          const dbv=Math.max(0, parseInt(inst.db)||0);
-          const cmaster={ azonosito_tipus:(inst.azonosito_tipus||"").trim()||null, azonosito:(inst.azonosito||"").trim()||null, megnevezes:(inst.megnevezes||"").trim()||null };
-          const {data:cd,error:cerr}=await supabase.from("components").insert({...cmaster, issue_id:issueId, tipus:inst.tipus}).select().single();
-          if(cerr) throw cerr;
-          const merr=await upsertMyStatus(cd.id,{status:inst.status, db:dbv, jegyzet:(inst.jegyzet||"").trim()||null});
-          if(merr) throw merr;
-        }
-        await seedNewIssueSeen(issueId);
         closeModal(); await reload();
-      }catch(e){ err(e); }
+      }catch(e){
+        console.error(e);
+        errText = friendlyError(e);      // a szerver több soros, magyar üzenete — az űrlapon, a beírt adat megmarad
+        draw(); showErr();
+      }
     });
   }
+  function showErr(){ const el=document.getElementById("f-err"); if(el) el.scrollIntoView({block:"start"}); }
 
   draw();
 }

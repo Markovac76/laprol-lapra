@@ -392,6 +392,9 @@ footer{color:var(--faint);font-size:11.5px;text-align:center;padding:8px 0 26px}
 .sheet input.reqempty{border-style:dashed;border-color:color-mix(in srgb,var(--amber) 60%,var(--line));background:color-mix(in srgb,var(--amber) 7%,transparent)}
 .reqtag{font-size:10.5px;color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 50%,transparent);border-radius:6px;padding:0 5px;margin-left:4px;white-space:nowrap}
 .reqtag[hidden]{display:none}
+/* A szerver több soros hibaüzenete az űrlapon (sorokra bontva, a beírt adat megmarad) */
+.formerr{white-space:pre-wrap;font-size:13px;line-height:1.5;color:#f5c2bc;background:var(--red-d);border:1px solid var(--red);border-radius:10px;padding:10px 12px;margin:0 0 12px}
+.formerr[hidden]{display:none}
 .cn-type{display:inline-flex;vertical-align:-4px;margin-right:4px;color:var(--muted)}
 
 /* Telefon (B változat): a szöveg felül, a nyíl a jobb felső sarokban, a csempék

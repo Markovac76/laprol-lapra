@@ -67,6 +67,31 @@ const ord = T.orderComponents([{ id:"1", tipus:"krtya" }, { id:"2", tipus:"egyeb
 assert.deepEqual(ord.map(c => c.id), ["3", "5", "6", "4", "1", "2", "7"]);
 assert.deepEqual(T.orderComponents([{ id:"a", tipus:"modell", is_main:true }, { id:"b", tipus:"magazin" }], ["magazin", "modell"]).map(c => c.id), ["a", "b"]);   // a fő elem akkor is elöl, ha a sablonban hátrébb áll
 
+// --- az „Új szám” űrlap → create_live_issue bemenet: a személyes adat csak akkor megy el, ha megadták
+const M0 = { n:"5", name:" Ötödik ", date:"2026-01-15", eredeti_ar:"1990", fizetett_ar:"", besz_menny:"1", besz_datum:"", forras:"" };
+const I0 = [{ key:"i0", tipus:"magazin", azonosito_tipus:"issn", azonosito:" 1111-2222 ", megnevezes:"", adatok:{}, status:null, db:"1", jegyzet:"" },
+            { key:"i1", tipus:"krtya", azonosito_tipus:"kartya_kod", azonosito:"K1", megnevezes:"Kártya", adatok:{ gyujtemeny:"Gy", szeria:"" }, status:null, db:1, jegyzet:"" }];
+const b0 = T.buildLiveIssuePayload(M0, I0, "i0");
+assert.equal(b0.personal, null);                                             // nincs beszerzési adat → null (nem üres objektum)
+assert.deepEqual(b0.issue, { lapszam:5, cim:"Ötödik", megjelenes:"2026-01-15", eredeti_ar:1990, comps:[
+  { tipus:"magazin", azonosito_tipus:"issn", azonosito:"1111-2222", megnevezes:null, is_main:true },
+  { tipus:"krtya", azonosito_tipus:"kartya_kod", azonosito:"K1", megnevezes:"Kártya", is_main:false, adatok:{ gyujtemeny:"Gy" } }] });
+assert(!("status" in b0.issue.comps[0]) && !("db" in b0.issue.comps[0]) && !("jegyzet" in b0.issue.comps[0]));   // az alap 1 db nem megy el
+const b1 = T.buildLiveIssuePayload({ ...M0, fizetett_ar:"1500" }, [{ ...I0[0], status:"megvan" }, { ...I0[1], db:"3" }, { ...I0[1], key:"i2", jegyzet:"sérült" }], null);
+assert.deepEqual(b1.personal, { fizetett_ar:1500, beszerzesi_mennyiseg:1, beszerzes_datuma:null, forras:null });
+assert.deepEqual([b1.issue.comps[0].status, b1.issue.comps[0].db, b1.issue.comps[0].jegyzet], ["megvan", 1, null]);
+assert.deepEqual([b1.issue.comps[1].status, b1.issue.comps[1].db], [null, 3]);
+assert.equal(b1.issue.comps[2].jegyzet, "sérült");
+assert(b1.issue.comps.every(c => c.is_main === false));                      // fő elem megadása nélkül a szerver jelöl
+assert.deepEqual(T.buildLiveIssuePayload({ ...M0, besz_menny:"2" }, [], null).personal, { fizetett_ar:null, beszerzesi_mennyiseg:2, beszerzes_datuma:null, forras:null });
+assert.equal(T.buildLiveIssuePayload({ ...M0, n:"" }, [], null).issue.lapszam, null);
+
+// --- a Gyors Excel új sora → create_live_issue bemenet
+const x0 = T.excelRowToLiveIssue({ n:7, p:{ cim:"Hetedik", eredeti_ar:990 }, pi:{}, comps:[{ t:"magazin", status:undefined, azonosito:null, megnevezes:null }, { t:"modell", status:"megvan", azonosito:null, megnevezes:"Név" }] });
+assert.equal(x0.personal, null);
+assert.deepEqual(x0.issue, { lapszam:7, cim:"Hetedik", megjelenes:null, eredeti_ar:990, comps:[{ tipus:"magazin", azonosito:null, megnevezes:null }, { tipus:"modell", azonosito:null, megnevezes:"Név", status:"megvan" }] });
+assert.deepEqual(T.excelRowToLiveIssue({ n:8, p:{}, pi:{ fizetett_ar:500 }, comps:[] }).personal, { fizetett_ar:500 });
+
 // --- a Modell neve: üres megnevezésnél a Szám címe
 assert.equal(T.fallbackName(d("modell"), { megnevezes:null }, "Dodge Charger R/T (1970)"), "Dodge Charger R/T (1970)");
 assert.equal(T.fallbackName(d("modell"), { megnevezes:"Saját név" }, "Cím"), "Saját név");
