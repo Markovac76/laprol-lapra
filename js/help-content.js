@@ -23,6 +23,8 @@ export const HELP_CONTENT = {
         a:"<p>A bejelentkező képernyőn add meg az e-mail címed és a jelszavad, majd nyomd meg a <b>Belépés</b> gombot. Ha még nincs fiókod, a <b>Regisztrálj</b> linkkel hozhatsz létre egyet — utána ugyanezzel az e-maillel/jelszóval jelentkezz be. A bejelentkezés tartós, telefonon nem kell újra és újra belépned.</p>" },
       { q:"Mit jelentenek a fejléc gombjai?",
         a:"<p>Balról jobbra, amit mindenki lát: <b>📚 Sorozataim</b> (melyik sorozatokat követed), <b>🔔 Újdonságok</b> (mi változott a felületen, egyszerű nyelven), <b>❓ Súgó</b> (ez itt), és <b>⎋</b> (kijelentkezés). Ha staff (admin/tulajdonos) vagy, további gombok is megjelennek — ezekről az Adminisztrátori fülön olvashatsz.</p>" },
+      { q:"Mit jelent az „Új verzió érhető el” sáv a lap tetején?",
+        a:"<p>Az alkalmazás időnként frissül. Ha a lapot vagy a telepített appot régebb óta nyitva tartod, előfordul, hogy még a régi változat fut nálad. Ilyenkor a lap tetején sárga sáv jelenik meg. Nyomd meg az <b>Újratöltés</b> gombot: néhány másodperc, és a friss változatot kapod. A jelöléseid (megvan / hiány / nem kell), a darabszám és a jegyzet addig is menthetők. A többi mentés (pl. képjavaslat, új sorozat javaslása) az újratöltésig nem megy, hogy a régi változat ne írjon hibás adatot. Ha épp egy űrlapot töltesz, előbb másold ki, amit beírtál, mert az újratöltéskor elvész.</p>" },
     ]},
 
     { id:"sorozataim", title:"Sorozataim", open:false, items:[
@@ -132,6 +134,8 @@ export const HELP_CONTENT = {
         a:"<p>Ez staff-only (admin/tulajdonos) menüpont, innen kezelhető a sorozatok teljes életútja. Három fület tartalmaz: <b>Aktív sorozatok</b> (a már publikáltak), <b>Munka sorozatok</b> (a beérkezett javaslatok és folyamatban lévő szerkesztések) és <b>Publikálatlan</b> (a levett sorozatok).</p>" },
       { q:"Miben más ez, mint a 🔧 Gyors szerkesztés gomb?",
         a:"<p>A 🔧 gomb egy kis eszköztárat nyit meg a kiválasztott sorozat felett: <b>„+ Új tétel”</b> (vadonatúj Szám azonnali, közvetlen felvétele), <b>„☰ Listák”</b> (a választható listák — kiadó, komponens-típus stb. — bővítése), és <b>„⬇ Sablon”</b>/<b>„⬆ Excel”</b> (tömeges Excel-import a kiválasztott, már élő sorozathoz). Egy MÁR LÉTEZŐ Szám törzsadatát (cím, dátum, ár, azonosító, komponens-típus) ez az eszköztár nem tudja közvetlenül módosítani vagy törölni — ahhoz mindig a Karbantartás draft/publikálás útja kell, hogy a többi felhasználó a szokásos felkiáltójel-jelzést kapja a változásról. A saját (személyes) adataid — státusz, darabszám, jegyzet, fizetett ár — bármikor, közvetlenül a „Saját adatlap” ✎ ikonjával szerkesztheted, draft nélkül, mert ezek sosem törzsadat.</p>" },
+      { q:"Miért nem enged menteni, és miért kér újratöltést?",
+        a:"<p>Ha a lap tetején az „Új verzió érhető el” sáv látszik, nálad még a régi változat fut. A Karbantartás, a „+ Új tétel”, az Excel-feltöltés, a Listák és a képműveletek ilyenkor nem mentenek, és ezt az üzenetet adják: „Új verzió érhető el — töltsd újra az oldalt…”. Az újratöltés után minden megy. A beírt adat az űrlapon marad, amíg újra nem töltesz; ha hosszabb szöveget írtál, előbb másold ki.</p>" },
     ]},
 
     { id:"eletciklus", title:"Sorozat-életciklus", open:false, items:[

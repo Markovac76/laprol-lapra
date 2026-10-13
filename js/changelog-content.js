@@ -7,6 +7,9 @@
    ============================================================ */
 export const CHANGELOG = [
   { date:"2026-10-13",
+    text:"Ha az alkalmazás frissül, miközben nálad nyitva van (böngészőfül vagy a telepített app), mostantól sárga sáv szól a lap tetején: „Új verzió érhető el”, egy Újratöltés gombbal. A jelöléseid addig is menthetők; a többi mentés az újratöltésig vár, hogy a régi változat ne írjon hibás adatot."
+  },
+  { date:"2026-10-13",
     text:"Rendbe tettük a sorozat-azonosítókat és az elemek típusát. Öt sorozatnál (Disney, Volkswagen model, Disney Hangos, Lego Star Wars, Lego Marvel) az egész sorozatra érvényes ISSN / ISBN mostantól egyszer, a sorozat fejlécében, a név alatt látszik, és nem ismétlődik minden Számon. A Disney Hangos hangfigurái „Figura” néven szerepelnek (eddig „Modell” volt), a haladásjelzőn is. A Listákban a kártya típus neve „Kártya”. A jelöléseid, a darabszámok, a színek és az összegek nem változtak, és új felkiáltójel sem keletkezett. Karbantartóknak: a „Kész” előtt mostantól a Magazinon és a Könyvön is figyelmeztetés jön, ha ugyanaz az azonosító több Számon szerepel — ami az egész sorozaté, az a „Sorozat-azonosítók” szakaszba való."
   },
   { date:"2026-10-13",
