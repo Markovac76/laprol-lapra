@@ -18,6 +18,7 @@ import { uploadLiveImage, proposeImage, approveProposal, rejectProposal, setUplo
 import { reload } from "./data.js";
 import { err } from "./modal.js";
 import { showApp, loginWithPassword, registerWithPassword, logout, initSession } from "./auth.js";
+import { checkVersion, onStale } from "./version.js";
 
 let imgTarget=null;   // {type, id, mode:"upload"|"propose"} — a rejtett #imgUpl célja
 
@@ -219,6 +220,20 @@ window.addEventListener("focus", dayRolled);
   const n = new Date(), next = new Date(n.getFullYear(), n.getMonth(), n.getDate()+1, 0, 0, 1);
   setTimeout(()=>{ dayRolled(); scheduleMidnight(); }, Math.max(1000, next - n));
 })();
+
+/* ---- verzióellenőrzés: ha a szerveren már újabb kód van, sáv szól a fejléc tetején ----
+   (js/version.js; a törzsadat-írásokat a Supabase-kliens kapuja tiltja az újratöltésig.
+   A sáv soha nem tölt újra magától; nyitott ablaknál az Újratöltés előbb rákérdez.) */
+onStale(()=>{ document.getElementById("verbar").hidden=false; syncHeadHeight(); });
+document.getElementById("verReload").addEventListener("click",()=>{
+  const nyitva=document.getElementById("modal").classList.contains("open");
+  if(nyitva && !confirm("Nyitva van egy ablak. Amit beírtál és még nem mentettél, az újratöltéskor elvész. Újratöltöd?")) return;
+  location.reload();
+});
+checkVersion(true);                                                              // betöltéskor
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) checkVersion(); });
+window.addEventListener("focus", ()=>checkVersion());
+window.addEventListener("pageshow", e=>{ if(e.persisted) checkVersion(true); });  // a böngésző / telefon visszaállította a lapot
 
 /* ---- indítás: van-e már munkamenet? ---- */
 initSession();

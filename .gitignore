@@ -1,5 +1,7 @@
 # A tényleges kulcsot tartalmazó beállítás — ez NEM kerül a repóba
 config.js
+# A build írja (build-config.js) — generált fájl, nem kerül a repóba
+verzio.json
 
 # Közvetlen Postgres-kapcsolat a migrációkhoz — a jelszót tartalmazza,
 # SOSEM kerülhet git-be. Lásd README.md "Migrációk" szakasza.

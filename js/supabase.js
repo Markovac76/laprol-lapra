@@ -5,12 +5,16 @@
    (Mintát lásd: config.example.js)
    ============================================================ */
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import { gatedFetch } from "./version.js";
 
 export const SUPABASE_URL = window.SUPABASE_URL || "https://jwiujuxvymzxjpphrgip.supabase.co";
 export const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "";
 
+// A kliens minden kérése a verzió-kapun megy át (js/version.js): ha a fül régi kódot futtat, a törzsadat-
+// írások az újratöltésig nem mennek ki. Helyi futtatásnál (nincs APP_VERSION) a kapu semmit nem csinál.
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || "hianyzik", {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: "laprol-lapra-auth" }
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: "laprol-lapra-auth" },
+  global: { fetch: gatedFetch() }
 });
 
 // Supabase/PostgREST alapból max. 1000 sort ad vissza egy .select()-re,
