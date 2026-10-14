@@ -1,7 +1,8 @@
 -- ============================================================================
 -- 47. lépés — JOGOSULTSÁGI HIGIÉNIA a public séma MINDEN tábláján (csak REVOKE / GRANT / ALTER DEFAULT PRIVILEGES).
 --
--- JÓVÁHAGYÁSRA VÁR — a tulajdonos kifejezett jóváhagyása nélkül NEM futtatható. ÉLESBEN NEM FUTOTT.
+-- ÉLESBEN LEFUTOTT: 2026-10-14 (48. lépés), a tulajdonos jóváhagyásával; COMMIT megtörtént.
+-- Mentés előtte: db-backups/2026-10-14T21-02_pre-47-jogosultsagi-higienia (18 tábla).
 -- Futtatás: node scripts/run-migration.js laprol-lapra-47-jogosultsagi-higienia.sql 47-jogosultsagi-higienia
 -- (backup → egyetlen tranzakció, 3 mp-es lock_timeout → COMMIT, hiba esetén ROLLBACK).
 --
@@ -22,6 +23,7 @@
 --   5) Az ÚJ táblák és szekvenciák ne örököljék a nyitott jogot (ahogy a függvényeknél a 40. lépés óta).
 --
 -- ELŐFELTÉTEL a 0) ponthoz: a kliens holt kódja (js/changes.js, seedNewIssueSeen) már ne legyen kint.
+-- (Teljesült: e3314d5, élesben a 8b89f16f75 verzióval, a migráció előtt.)
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
