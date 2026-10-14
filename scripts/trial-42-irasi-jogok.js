@@ -72,6 +72,11 @@ async function state(c, label) {
     const ELES = !(await c.query("select has_table_privilege('authenticated', 'public.issues', 'UPDATE') x")).rows[0].x;
     console.log(ELES ? "\nA szűkítés a futás elején MÁR ÉL — a próba az éles állapotot ellenőrzi (az „előtte” oldal is szűkített)." : "\nA szűkítés a futás elején még NEM él — a próba az előtte / utána különbséget ellenőrzi.");
     const owner = (await c.query(`select user_id from public.members where role='owner' limit 1`)).rows[0].user_id;
+    // 48. lépés: él-e a 47-es jogosultsági higiénia? (az anon már nem olvashatja a series táblát). Ha igen: a 42-es migráció
+    // önellenőrzése (anon: SELECT a hat táblán; authenticated: SELECT a global_counters-en) már nem teljesül, ezért NEM fut újra;
+    // az anon semmit nem kap, a global_counters az authenticated-nek sem olvasható; a 22., 31., 32. lépés „permission denied”.
+    const M47 = !(await c.query("select has_table_privilege('anon', 'public.series', 'SELECT') x")).rows[0].x;
+    if (M47) console.log("A 47-es szűkítés MÁR ÉL: a 42-es migráció nem fut újra (az önellenőrzése a 47 előtti állapotot várja).");
     await c.query("BEGIN");
     await c.query("SET LOCAL lock_timeout = '3s'");
     await c.query("SET LOCAL statement_timeout = '120s'");
@@ -302,8 +307,8 @@ async function state(c, label) {
     console.log("\nA forgatókönyv és a közvetlen írások a szűkítés ELŐTT lefutottak (mentési pontban, visszagörgetve).");
 
     // ---- 2. a migráció ----
-    await c.query(SQL);
-    console.log("A migráció lefutott a tranzakción belül (a záró önellenőrzése nem adott hibát).\n\nPróbák:");
+    if (M47) console.log("A migráció NEM fut újra (a 47-es szűkítés él; a jogok a mostaniak).\n\nPróbák:");
+    else { await c.query(SQL); console.log("A migráció lefutott a tranzakción belül (a záró önellenőrzése nem adott hibát).\n\nPróbák:"); }
     const mid = (await c.query(FNS)).rows;
     report("K1 a migráció egyetlen függvény definícióját és hívási jogát sem változtatja meg (37 hash és 37 ACL azonos)",
       mid.length === 37 && mid.every((f, i) => before.fns[i].f === f.f && before.fns[i].h === f.h && before.fns[i].acl === f.acl));
@@ -317,9 +322,9 @@ async function state(c, label) {
     console.log("      jogok a migráció után (táblaszint | módosítható oszlopok):");
     mx.forEach(m => console.log(`        ${m.t.padEnd(16)} ${m.r.padEnd(14)} ${(m.tabla || "–").padEnd(61)} | ${m.upd.split(",").filter(Boolean).length > 6 ? "minden oszlop" : (m.upd || "–")}`));
     const exp = { "components/authenticated": ["SELECT", "kep_url,upload_enabled"], "series/authenticated": ["SELECT", "borito_upload_enabled,borito_url,lifecycle"], "lists/authenticated": ["SELECT,INSERT", "megjelenites"],
-      "issues/authenticated": ["SELECT", ""], "change_log/authenticated": ["SELECT", ""], "global_counters/authenticated": ["SELECT", ""] };
-    report("K2 a jogok pontosan a vártak: az anon mindenhol csak olvas; az authenticated a components 2, a series 3, a lists 1 oszlopát módosíthatja és a lists táblába beszúrhat; a service_role mindent megtart",
-      mx.every(m => m.r === "anon" ? (m.tabla === "SELECT" && m.upd === "") : m.r === "service_role" ? m.tabla === "SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN"
+      "issues/authenticated": ["SELECT", ""], "change_log/authenticated": ["SELECT", ""], "global_counters/authenticated": [M47 ? null : "SELECT", ""] };
+    report(`K2 a jogok pontosan a vártak: az anon ${M47 ? "semmit nem kap (47. lépés)" : "mindenhol csak olvas"}; az authenticated a components 2, a series 3, a lists 1 oszlopát módosíthatja és a lists táblába beszúrhat${M47 ? ", a global_counters-t nem olvassa" : ""}; a service_role mindent megtart`,
+      mx.every(m => m.r === "anon" ? (m.tabla === (M47 ? null : "SELECT") && m.upd === "") : m.r === "service_role" ? m.tabla === "SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN"
         : (exp[m.t + "/" + m.r] && m.tabla === exp[m.t + "/" + m.r][0] && m.upd === exp[m.t + "/" + m.r][1])));
 
     // ---- 3. UTÁNA ----
@@ -348,6 +353,7 @@ async function state(c, label) {
     report("D7 a próba-adat a műveletek után érintetlen (semmi nem maradt meg) — előtte és utána is", preD.__adat === postD.__adat && /"szam":2,"komp":2/.test(postD.__adat) && /"lsor":1/.test(postD.__adat), postD.__adat);
 
     const MUST_FAIL = ["02 ", "05 ", "18 ", "19 ", "20 ", "27 ", "29 "];
+    if (M47) MUST_FAIL.push("22 ", "31 ", "32 ");   // 48. lépés: a 47-es szűkítés után ezek is védelmek
     // A 19. lépés maga egy közvetlen törzsadat-írás (sima felhasználó: update issues set cim …) — ez VÁRT MÓDON szigorodik:
     // előtte a sorszintű szabály miatt „0 sor módosult”, utána a táblajog hiánya miatt „permission denied”. Írás egyik esetben sincs.
     const VART = { "19 ": [/^OK: 0 sor módosult$/, /^HIBA: permission denied for table issues/] };
@@ -362,7 +368,7 @@ async function state(c, label) {
     }
     report(`F1 a 39. lépés forgatókönyvének 34 lépéséből 33 a szűkítés előtt és után betűre ugyanazt adja; a 19. lépés (sima felhasználó közvetlen törzsadat-írása) várt módon szigorodik: „0 sor módosult” → „permission denied”`,
       names.length === 34 && Object.keys(post).length === 34 && (ELES ? same === 34 : (same === 33 && vart === 1)), `azonos: ${same}/34, várt változás: ${vart}${ELES ? " (éles állapot: a 19. lépés már előtte is „permission denied”, ezért mind a 34 azonos)" : ""}`);
-    report("F2 a 27 működő lépés sikeres (javaslat, sablon-feltöltés, „Kész”, publikálás, új Szám, szerkesztés indítása, Saját adatlap, képjavaslat, törlés indítása és véglegesítése), a 7 védelmi lépés hibát ad", okSteps === names.length, `${okSteps}/${names.length}`);
+    report(`F2 a ${34 - MUST_FAIL.length} működő lépés sikeres (javaslat, sablon-feltöltés, „Kész”, publikálás, új Szám, szerkesztés indítása, Saját adatlap, képjavaslat, törlés indítása és véglegesítése), a ${MUST_FAIL.length} védelmi lépés hibát ad`, okSteps === names.length, `${okSteps}/${names.length}`);
     const end = (await c.query(FNS)).rows;
     report("F3 a próbák után a függvények definíciója és hívási joga változatlan", end.every((f, i) => f.acl === mid[i].acl && f.h === mid[i].h));
   } catch (e) {

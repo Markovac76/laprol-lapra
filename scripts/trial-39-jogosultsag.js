@@ -98,6 +98,13 @@ async function state(c, label) {
   try {
     before = await state(c, "ELŐTTE (commitolt állapot):");
     const owner = (await c.query(`select user_id from public.members where role='owner' limit 1`)).rows[0].user_id;
+    // 48. lépés: él-e a 47-es jogosultsági higiénia? (az anon már nem olvashatja a series táblát). Ha igen: a
+    // seed_issue_seen_for_subscribers a B csoportba került; a 39-es migráció önellenőrzése (authenticated: 24 függvény)
+    // már nem teljesül, ezért a migráció NEM fut újra; a 22., 31., 32. lépés előtte és utána is „permission denied”.
+    const M47 = !(await c.query("select has_table_privilege('anon', 'public.series', 'SELECT') x")).rows[0].x;
+    if (M47) { const k = "seed_issue_seen_for_subscribers(p_issue_id uuid)"; GROUP_B[k] = GROUP_A[k]; delete GROUP_A[k]; }
+    const nA = Object.keys(GROUP_A).length, nB = Object.keys(GROUP_B).length;
+    console.log(M47 ? "\nA 47-es szűkítés MÁR ÉL: a B csoport 14, az A 14 függvény; a 39-es migráció nem fut újra (az önellenőrzése a 47 előtti állapotot várja)." : "\nA 47-es szűkítés még nem él.");
     await c.query("BEGIN");
     await c.query("SET LOCAL lock_timeout = '3s'");
     await c.query("SET LOCAL statement_timeout = '120s'");
@@ -227,14 +234,14 @@ async function state(c, label) {
     console.log("\nA forgatókönyv a szigorítás ELŐTT lefutott (mentési pontban, visszagörgetve).");
 
     // ---- 2. a migráció ----
-    await c.query(SQL);
-    console.log("A migráció lefutott a tranzakción belül.\n\nPróbák:");
+    if (M47) console.log("A migráció NEM fut újra (a 47-es szűkítés él; a jogok a mostaniak).\n\nPróbák:");
+    else { await c.query(SQL); console.log("A migráció lefutott a tranzakción belül.\n\nPróbák:"); }
     const mid = (await c.query(FNS)).rows;
     const byF = Object.fromEntries(mid.map(f => [f.f, f])), b0 = Object.fromEntries(before.fns.map(f => [f.f, f]));
     report("J1 a migráció egyetlen függvény definícióját sem változtatja meg (mind a 37 hash azonos), új és megszűnt függvény nincs",
       mid.length === 37 && before.fns.length === 37 && mid.every(f => b0[f.f] && b0[f.f].h === f.h), `${mid.filter(f => b0[f.f] && b0[f.f].h === f.h).length}/37 azonos`);
-    report("J2 A csoport (15): az ACL pontosan postgres + authenticated + service_role", Object.keys(GROUP_A).every(f => byF[f] && byF[f].acl === ACL_A), Object.keys(GROUP_A).filter(f => !byF[f] || byF[f].acl !== ACL_A).join(", ") || ACL_A);
-    report("J3 B csoport (13): az ACL pontosan postgres + service_role", Object.keys(GROUP_B).every(f => byF[f] && byF[f].acl === ACL_B), Object.keys(GROUP_B).filter(f => !byF[f] || byF[f].acl !== ACL_B).join(", ") || ACL_B);
+    report(`J2 A csoport (${nA}): az ACL pontosan postgres + authenticated + service_role`, Object.keys(GROUP_A).every(f => byF[f] && byF[f].acl === ACL_A), Object.keys(GROUP_A).filter(f => !byF[f] || byF[f].acl !== ACL_A).join(", ") || ACL_A);
+    report(`J3 B csoport (${nB}): az ACL pontosan postgres + service_role`, Object.keys(GROUP_B).every(f => byF[f] && byF[f].acl === ACL_B), Object.keys(GROUP_B).filter(f => !byF[f] || byF[f].acl !== ACL_B).join(", ") || ACL_B);
     report("J4 C csoport (8) és a create_live_issue: az ACL betűre a régi", GROUP_C.concat(["create_live_issue(p_series_id uuid, p_issue jsonb, p_personal jsonb)"]).every(f => byF[f] && byF[f].acl === b0[f].acl),
       "változatlan: " + GROUP_C.length + " + 1");
     report("J5 a három csoport és a create_live_issue együtt mind a 37 függvényt lefedi", new Set([...Object.keys(GROUP_A), ...Object.keys(GROUP_B), ...GROUP_C, "create_live_issue(p_series_id uuid, p_issue jsonb, p_personal jsonb)"].filter(f => byF[f])).size === 37);
@@ -245,15 +252,15 @@ async function state(c, label) {
         if (r.ok || r.code !== "42501" || !/permission denied for function/.test(r.err)) bad.push(`${f}: ${short(r)}`); }
       return bad; };
     const a1 = await denied("anon", null, GROUP_A), a2 = await denied("anon", null, GROUP_B);
-    report("N1 bejelentkezés nélkül (anon) az A csoport mind a 15 függvénye: permission denied", a1.length === 0, a1.join(" ;; ") || "15/15");
-    report("N2 bejelentkezés nélkül (anon) a B csoport mind a 13 függvénye: permission denied", a2.length === 0, a2.join(" ;; ") || "13/13");
+    report(`N1 bejelentkezés nélkül (anon) az A csoport mind a ${nA} függvénye: permission denied`, a1.length === 0, a1.join(" ;; ") || `${nA}/${nA}`);
+    report(`N2 bejelentkezés nélkül (anon) a B csoport mind a ${nB} függvénye: permission denied`, a2.length === 0, a2.join(" ;; ") || `${nB}/${nB}`);
     const a3 = await as("anon", null, () => q(`select public.create_live_issue(${Z}, '{}'::jsonb, null)`), false);
     report("N3 bejelentkezés nélkül a create_live_issue továbbra is: permission denied", !a3.ok && a3.code === "42501", short(a3));
     // ---- 4. bejelentkezve: a belső segédek zárva (sima felhasználónak és staffnak is) ----
     await as(null, null, async () => { await q(`insert into auth.users (id, instance_id, aud, role, email) values ($1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'proba-39b@example.invalid')`, ["39393939-3939-4939-8939-3939393939bb"]); });
     const b1 = await denied("authenticated", "39393939-3939-4939-8939-3939393939bb", GROUP_B), b2 = await denied("authenticated", owner, GROUP_B);
-    report("B1 bejelentkezett sima felhasználó a B csoport 13 belső segédjét nem hívhatja: permission denied", b1.length === 0, b1.join(" ;; ") || "13/13");
-    report("B2 bejelentkezett staff (tulajdonos) sem hívhatja közvetlenül a B csoport 13 belső segédjét", b2.length === 0, b2.join(" ;; ") || "13/13");
+    report(`B1 bejelentkezett sima felhasználó a B csoport ${nB} belső segédjét nem hívhatja: permission denied`, b1.length === 0, b1.join(" ;; ") || `${nB}/${nB}`);
+    report(`B2 bejelentkezett staff (tulajdonos) sem hívhatja közvetlenül a B csoport ${nB} belső segédjét`, b2.length === 0, b2.join(" ;; ") || `${nB}/${nB}`);
     const chg0 = (await q(`select count(*)::int n, (select next_series_no from public.global_counters where id=1) k from public.change_log`))[0];
     report("B3 a zárt hívások semmit nem írtak (a változásnapló és a sorozat-sorszámláló változatlan)", chg0.n === before.counts.change_log && chg0.k === before.counts.kovetkezo_sorozatszam, J(chg0));
 
@@ -262,6 +269,8 @@ async function state(c, label) {
     const post = await scenario();
     await c.query("ROLLBACK TO SAVEPOINT utana");
     const MUST_FAIL = ["02 ", "05 ", "18 ", "20 ", "27 ", "29 "];   // ezeknek ELŐTTE és UTÁNA is hibát kell adniuk (védelmek)
+    // 48. lépés: a 47-es szűkítés után a 22. (a belső függvény közvetlen hívása) és a 31., 32. (bejelentkezés nélküli olvasás) is védelem
+    if (M47) MUST_FAIL.push("22 ", "31 ", "32 ");
     console.log("\n  A forgatókönyv lépései (ELŐTTE = UTÁNA):");
     let same = 0, okSteps = 0; const names = Object.keys(pre);
     for (const n of names) {
@@ -274,7 +283,7 @@ async function state(c, label) {
       console.log(`    ${eq && good ? "✔" : "✘"} ${n}\n        ${eq ? post[n] : `ELŐTTE: ${pre[n]}  |  UTÁNA: ${post[n]}`}`);
     }
     report(`F1 a forgatókönyv ${names.length} lépése a szigorítás előtt és után betűre ugyanazt adja`, same === names.length && names.length === Object.keys(post).length && names.length === 34, `${same}/${names.length}`);
-    report("F2 a 27 működő lépés sikeres, a 6 védelmi lépés (hibás adat, jogosulatlan hívás) hibát ad, a 19. lépés (közvetlen törzsadat-írás) nem ír — előtte és utána is", okSteps === names.length, `${okSteps}/${names.length}`);
+    report(`F2 a ${33 - MUST_FAIL.length} működő lépés sikeres, a ${MUST_FAIL.length} védelmi lépés (hibás adat, jogosulatlan hívás${M47 ? ", a belső függvény, a bejelentkezés nélküli olvasás" : ""}) hibát ad, a 19. lépés (közvetlen törzsadat-írás) nem ír — előtte és utána is`, okSteps === names.length, `${okSteps}/${names.length}`);
     const end = (await c.query(FNS)).rows;
     report("F3 a forgatókönyv után az ACL-ek a szigorított állapotban maradtak, a definíciók változatlanok", end.every((f, i) => f.acl === mid[i].acl && f.h === mid[i].h));
   } catch (e) {
