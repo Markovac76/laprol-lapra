@@ -317,12 +317,15 @@ async function state(c, label) {
     console.log("\nA forgatókönyv és a közvetlen műveletek a szűkítés ELŐTT lefutottak (mentési pontban, visszagörgetve).");
 
     // ---- 2. a migráció ----
-    await c.query(SQL);
-    console.log("A migráció lefutott a tranzakción belül (a záró önellenőrzése nem adott hibát).\n\nPróbák:");
+    // 50. lépés: ha a 49-es migráció él (38 függvény, delete_list_value), a 47-es migráció NEM fut újra — a záró
+    // önellenőrzése a 49 előtti állapotot várja (az authenticated 23 függvényt hívhat; most 24). A 47-es jogok már élnek.
+    const M49 = before.fns.some(f => f.f === "delete_list_value(p_tipus text, p_ertek text)");
+    if (M49) console.log("A 49-es migráció MÁR ÉL: a 47-es migráció nem fut újra (az önellenőrzése a 49 előtti állapotot várja).\n\nPróbák:");
+    else { await c.query(SQL); console.log("A migráció lefutott a tranzakción belül (a záró önellenőrzése nem adott hibát).\n\nPróbák:"); }
     const mid = (await c.query(FNS)).rows;
     const SEED = "seed_issue_seen_for_subscribers(p_issue_id uuid)";
-    report("K1 a migráció egyetlen függvény definícióját sem változtatja meg (37 hash azonos); a hívási jog pontosan egy függvénynél változik (seed_issue_seen_for_subscribers: az authenticated kikerül)",
-      mid.length === 37 && mid.every((f, i) => before.fns[i].f === f.f && before.fns[i].h === f.h && (f.f === SEED ? f.acl === "{postgres=X/postgres,service_role=X/postgres}" : before.fns[i].acl === f.acl)),
+    report(`K1 a migráció egyetlen függvény definícióját sem változtatja meg (${before.fns.length} hash azonos); a hívási jog pontosan egy függvénynél változik (seed_issue_seen_for_subscribers: az authenticated kikerül)`,
+      mid.length === before.fns.length && mid.every((f, i) => before.fns[i].f === f.f && before.fns[i].h === f.h && (f.f === SEED ? f.acl === "{postgres=X/postgres,service_role=X/postgres}" : before.fns[i].acl === f.acl)),
       mid.find(f => f.f === SEED).acl);
     report("K2 a sorszintű szabályok (policy-k) változatlanok", md5(J((await c.query(POL)).rows)) === polBefore);
     const mx = (await c.query(`select c.relname t, r.r,

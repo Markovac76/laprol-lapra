@@ -103,6 +103,9 @@ async function state(c, label) {
     // már nem teljesül, ezért a migráció NEM fut újra; a 22., 31., 32. lépés előtte és utána is „permission denied”.
     const M47 = !(await c.query("select has_table_privilege('anon', 'public.series', 'SELECT') x")).rows[0].x;
     if (M47) { const k = "seed_issue_seen_for_subscribers(p_issue_id uuid)"; GROUP_B[k] = GROUP_A[k]; delete GROUP_A[k]; }
+    // 50. lépés: ha a 49-es migráció él, a delete_list_value (Listák törlése) a 38. függvény, az A csoportban.
+    if (before.fns.some(f => f.f === "delete_list_value(p_tipus text, p_ertek text)")) GROUP_A["delete_list_value(p_tipus text, p_ertek text)"] = `public.delete_list_value('x', 'y')`;
+    const NF = before.fns.length;
     const nA = Object.keys(GROUP_A).length, nB = Object.keys(GROUP_B).length;
     console.log(M47 ? "\nA 47-es szűkítés MÁR ÉL: a B csoport 14, az A 14 függvény; a 39-es migráció nem fut újra (az önellenőrzése a 47 előtti állapotot várja)." : "\nA 47-es szűkítés még nem él.");
     await c.query("BEGIN");
@@ -238,13 +241,13 @@ async function state(c, label) {
     else { await c.query(SQL); console.log("A migráció lefutott a tranzakción belül.\n\nPróbák:"); }
     const mid = (await c.query(FNS)).rows;
     const byF = Object.fromEntries(mid.map(f => [f.f, f])), b0 = Object.fromEntries(before.fns.map(f => [f.f, f]));
-    report("J1 a migráció egyetlen függvény definícióját sem változtatja meg (mind a 37 hash azonos), új és megszűnt függvény nincs",
-      mid.length === 37 && before.fns.length === 37 && mid.every(f => b0[f.f] && b0[f.f].h === f.h), `${mid.filter(f => b0[f.f] && b0[f.f].h === f.h).length}/37 azonos`);
+    report(`J1 a migráció egyetlen függvény definícióját sem változtatja meg (mind a ${NF} hash azonos), új és megszűnt függvény nincs`,
+      mid.length === NF && mid.every(f => b0[f.f] && b0[f.f].h === f.h), `${mid.filter(f => b0[f.f] && b0[f.f].h === f.h).length}/${NF} azonos`);
     report(`J2 A csoport (${nA}): az ACL pontosan postgres + authenticated + service_role`, Object.keys(GROUP_A).every(f => byF[f] && byF[f].acl === ACL_A), Object.keys(GROUP_A).filter(f => !byF[f] || byF[f].acl !== ACL_A).join(", ") || ACL_A);
     report(`J3 B csoport (${nB}): az ACL pontosan postgres + service_role`, Object.keys(GROUP_B).every(f => byF[f] && byF[f].acl === ACL_B), Object.keys(GROUP_B).filter(f => !byF[f] || byF[f].acl !== ACL_B).join(", ") || ACL_B);
     report("J4 C csoport (8) és a create_live_issue: az ACL betűre a régi", GROUP_C.concat(["create_live_issue(p_series_id uuid, p_issue jsonb, p_personal jsonb)"]).every(f => byF[f] && byF[f].acl === b0[f].acl),
       "változatlan: " + GROUP_C.length + " + 1");
-    report("J5 a három csoport és a create_live_issue együtt mind a 37 függvényt lefedi", new Set([...Object.keys(GROUP_A), ...Object.keys(GROUP_B), ...GROUP_C, "create_live_issue(p_series_id uuid, p_issue jsonb, p_personal jsonb)"].filter(f => byF[f])).size === 37);
+    report(`J5 a három csoport és a create_live_issue együtt mind a ${NF} függvényt lefedi`, new Set([...Object.keys(GROUP_A), ...Object.keys(GROUP_B), ...GROUP_C, "create_live_issue(p_series_id uuid, p_issue jsonb, p_personal jsonb)"].filter(f => byF[f])).size === NF);
 
     // ---- 3. bejelentkezés nélkül: minden érintett függvény „permission denied” ----
     const denied = async (role, uid, group) => { const bad = [];

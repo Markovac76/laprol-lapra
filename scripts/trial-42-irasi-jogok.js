@@ -310,8 +310,9 @@ async function state(c, label) {
     if (M47) console.log("A migráció NEM fut újra (a 47-es szűkítés él; a jogok a mostaniak).\n\nPróbák:");
     else { await c.query(SQL); console.log("A migráció lefutott a tranzakción belül (a záró önellenőrzése nem adott hibát).\n\nPróbák:"); }
     const mid = (await c.query(FNS)).rows;
-    report("K1 a migráció egyetlen függvény definícióját és hívási jogát sem változtatja meg (37 hash és 37 ACL azonos)",
-      mid.length === 37 && mid.every((f, i) => before.fns[i].f === f.f && before.fns[i].h === f.h && before.fns[i].acl === f.acl));
+    // 50. lépés: a 49-es migráció óta 38 függvény van — a darabszám a futás eleji állapotból jön.
+    report(`K1 a migráció egyetlen függvény definícióját és hívási jogát sem változtatja meg (${before.fns.length} hash és ${before.fns.length} ACL azonos)`,
+      mid.length === before.fns.length && mid.every((f, i) => before.fns[i].f === f.f && before.fns[i].h === f.h && before.fns[i].acl === f.acl));
     const polH = async () => md5(J((await c.query(`select schemaname, tablename, policyname, cmd, roles::text, qual, with_check from pg_policies where schemaname in ('public','storage') order by 1,2,3`)).rows));
     report("K3 a sorszintű szabályok (policy-k) változatlanok", (await polH()) === polBefore);
     const mx = (await c.query(`select c.relname t, r.r,
