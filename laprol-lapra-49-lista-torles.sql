@@ -1,7 +1,8 @@
 -- ============================================================================
 -- 49. lépés — LISTÁK TÖRLÉSE (függvény) és a SAJÁT KÉPJAVASLAT TÖRLÉSÉNEK SZABÁLYA (policy).
 --
--- JÓVÁHAGYÁSRA VÁR — a tulajdonos kifejezett jóváhagyása nélkül NEM futtatható. ÉLESBEN NEM FUTOTT.
+-- ÉLESBEN LEFUTOTT: 2026-10-16 (50. lépés), a tulajdonos jóváhagyásával; COMMIT megtörtént.
+-- Mentés előtte: db-backups/2026-10-16T08-10_pre-49-lista-torles (18 tábla).
 -- Futtatás: node scripts/run-migration.js laprol-lapra-49-lista-torles.sql 49-lista-torles
 -- (backup → egyetlen tranzakció, 3 mp-es lock_timeout → COMMIT, hiba esetén ROLLBACK).
 --
