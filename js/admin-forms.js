@@ -163,10 +163,10 @@ const normName=x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ");
 export function listsForm(){
   const grps=Object.keys(LIST_TITLES).map(t=>`
     <div class="listgrp"><h4>${LIST_TITLES[t]}</h4>
-      <div class="vals">${(state.LISTS[t]||[]).map(o=>`<span class="val">${esc(o.nev)}<button type="button" class="valedit" data-rename="${t}" data-e="${esc(o.ertek)}" title="Átnevezés" aria-label="Átnevezés: ${esc(o.nev)}">✎</button></span>`).join("")||'<span class="val">—</span>'}</div>
+      <div class="vals">${(state.LISTS[t]||[]).map(o=>`<span class="val">${esc(o.nev)}<button type="button" class="valedit" data-rename="${t}" data-e="${esc(o.ertek)}" title="Átnevezés" aria-label="Átnevezés: ${esc(o.nev)}">✎</button>${o.ertek==="egyeb"?"":`<button type="button" class="valdel" data-del="${t}" data-e="${esc(o.ertek)}" title="Törlés" aria-label="Törlés: ${esc(o.nev)}">🗑</button>`}</span>`).join("")||'<span class="val">—</span>'}</div>
       <div class="addrow"><input id="nl-${t}" placeholder="új érték neve"><button data-add="${t}">+</button></div>
     </div>`).join("");
-  openModal(`<h2>Listák</h2><p class="msub">Itt bővítheted a választható értékeket, és a ✎ ikonnal átnevezheted őket (csak a megjelenített név változik, a már használt értékek nem). Rögzítés közben nem lehet bővíteni — így a listák nem híznak el.</p>
+  openModal(`<h2>Listák</h2><p class="msub">Itt bővítheted a választható értékeket, a ✎ ikonnal átnevezheted (csak a megjelenített név változik, a már használt értékek nem), a 🗑 ikonnal törölheted őket — de csak azt, ami sehol nincs használatban. Rögzítés közben nem lehet bővíteni — így a listák nem híznak el.</p>
     ${grps}
     <div class="modrow"><button class="btn" onclick="closeModal()">Kész</button></div>`);
   // FONTOS (12. pont): a gombokra KÖZVETLENÜL kötünk, nem a tartós #sheet
@@ -224,5 +224,21 @@ export function listsForm(){
         listsForm();
       });
     };
+  });
+
+  // Törlés: csak a használatlan, nem védett érték. A szerver dönt (delete_list_value), és ha nem törölhető,
+  // megmondja, hol van használatban / miért védett — az üzenet a szokásos hibaablakban jelenik meg.
+  sheet.querySelectorAll("[data-del]").forEach(b=>{
+    b.onclick=guarded(async ()=>{
+      const t=b.dataset.del, e=b.dataset.e;
+      const cur=(state.LISTS[t]||[]).find(o=>o.ertek===e); if(!cur) return;
+      if(!confirm(`Törlöd a(z) „${cur.nev}” értéket a(z) „${LIST_TITLES[t]}” listából?\n\nCsak akkor törlődik, ha sehol nincs használatban. Később újra felveheted.`)) return;
+      try{
+        const {error}=await supabase.rpc("delete_list_value",{p_tipus:t, p_ertek:e});
+        if(error) throw error;
+        await reload();            // a választók és a fülek se mutassák tovább
+      }catch(e2){ err(e2); return; }
+      listsForm();
+    });
   });
 }

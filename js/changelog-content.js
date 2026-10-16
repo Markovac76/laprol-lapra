@@ -6,6 +6,9 @@
    Legújabb elöl. Szándékosan elválasztva a UI-tól (changelog.js).
    ============================================================ */
 export const CHANGELOG = [
+  { date:"2026-10-16",
+    text:"Karbantartóknak: a ☰ Listákban mostantól törölni is lehet egy értéket (🗑) — de csak azt, ami sehol nincs használatban. Ha igen, az üzenet megmondja, hol (pl. melyik sorozatoknál). Az „Egyéb” és a rendszer által használt típusok nem törölhetők."
+  },
   { date:"2026-10-13",
     text:"Ha az alkalmazás frissül, miközben nálad nyitva van (böngészőfül vagy a telepített app), mostantól sárga sáv szól a lap tetején: „Új verzió érhető el”, egy Újratöltés gombbal. A jelöléseid addig is menthetők; a többi mentés az újratöltésig vár, hogy a régi változat ne írjon hibás adatot."
   },

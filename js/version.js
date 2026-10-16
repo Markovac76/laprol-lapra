@@ -23,7 +23,7 @@ export const RPC_OLVASO = ["draft_ready_warnings", "draft_lapszam_conflicts"];
 export const RPC_SZEMELYES = ["seed_member_seen"];
 // (c) minden más: törzsadatot / munkaanyagot ír — régi kódnál tiltott
 export const RPC_TILTOTT = ["create_live_issue", "start_edit_draft", "apply_draft_upload", "mark_draft_ready", "return_draft_to_edit",
-  "publish_draft_series", "start_force_delete", "finalize_delete_series", "propose_bulk_issues"];
+  "publish_draft_series", "start_force_delete", "finalize_delete_series", "propose_bulk_issues", "delete_list_value"];
 
 // A személyes táblák: a felhasználó saját sorai (jelölés, darabszám, jegyzet, ár, feliratkozás, „látott”).
 export const SZEMELYES_TABLAK = ["member_status", "member_issue_data", "member_seen", "member_series"];
