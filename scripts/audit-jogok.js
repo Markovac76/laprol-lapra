@@ -13,6 +13,8 @@
    (a postgres nevében nem módosíthatók).
 
    Használat: node scripts/audit-jogok.js
+   Modulként (próbából): const { audit } = require("./audit-jogok.js"); const kod = await audit(q);
+     — a q a hívó saját lekérdező függvénye (pl. egy visszagörgetett tranzakcióé); a visszatérési érték a kilépési kód.
    ============================================================ */
 const { withRO } = require("./ro.js");
 
@@ -20,7 +22,8 @@ const TPRIV = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES",
 const TILOS_AUTH = ["TRUNCATE", "REFERENCES", "TRIGGER", "MAINTAIN"];
 const KIND = { r: "tábla", p: "particionált tábla", v: "nézet", m: "anyagi nézet", f: "külső tábla", S: "szekvencia" };
 
-withRO(async q => {
+// Visszaad: 0 = nincs hiba, 1 = van hiba. Nem ír semmit; csak a kapott q-val olvas.
+async function audit(q) {
   const hibak = [], info = [];
   const rel = await q(`select c.oid::int as oid, c.relname as nev, c.relkind as k, c.relrowsecurity as rls
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -55,6 +58,12 @@ withRO(async q => {
   const t = rel.filter(r => r.k !== "S").length, s = rel.length - t;
   console.log(`Jogosultsági audit — public séma: ${t} tábla / nézet, ${s} szekvencia.`);
   if (info.length) { console.log("\nTájékoztató (nem hiba):"); info.forEach(x => console.log("  • " + x)); }
-  if (hibak.length) { console.log(`\n✘ ${hibak.length} HIBA:`); hibak.forEach(x => console.log("  ✘ " + x)); process.exitCode = 1; }
+  if (hibak.length) { console.log(`\n✘ ${hibak.length} HIBA:`); hibak.forEach(x => console.log("  ✘ " + x)); return 1; }
   else console.log("\n✔ Nincs hiba: az anon semmit nem kap, az authenticated-nek nincs TRUNCATE / REFERENCES / TRIGGER / MAINTAIN joga, minden táblán be van kapcsolva az RLS, és a postgres alapértelmezett jogai zártak.");
-}).catch(e => { console.error("HIBA: " + e.message); process.exit(2); });
+  return 0;
+}
+
+module.exports = { audit };
+
+if (require.main === module)
+  withRO(audit).then(kod => { process.exitCode = kod; }).catch(e => { console.error("HIBA: " + e.message); process.exit(2); });
