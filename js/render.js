@@ -1,7 +1,7 @@
 /* ============================================================
    Megjelenítés: fülek, hero, szűrők, lista, tapadó fejléc.
    ============================================================ */
-import { state, S, COMP_TYPES, isFutureDate, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus, issueSlots, typeLabel, issueHasUnmarked } from "./state.js";
+import { state, S, COMP_TYPES, isFutureDate, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus, issueSlots, typeLabel, issueHasUnmarked, issueHasStatus } from "./state.js";
 import { thumbUrl, typeIcon, TILE_W, TILE_H } from "./thumb.js";
 import { typeDef, fallbackName, formatSeriesIds } from "./type-defs.js";
 import { stats } from "./data.js";
@@ -106,7 +106,6 @@ export function renderHero(){
 // A „Jelöletlen” 0-nál is látszik (a jelöléssel csökken — ne tűnjön el, és ne ugorjon a lista „Mind”-re);
 // csak a „Várható” rejtőzik el 0-nál (a dátumot a felhasználó nem tudja átírni).
 const FILTERS=[["mind","Mind"],["megvan","Megvan"],["hianyzik","Hiányzik"],["nemkell","Nem kell"],["jeloletlen","Jelöletlen"],["varhato","Várható"]];
-function issueHasStatus(it,s,stt){ return s.components.some(t=>compsOfType(it,t).some(c=>c.status===stt)); }
 
 export function renderChips(){
   const s=S(); const activeItems=s.items.filter(it=>!it.deleted);

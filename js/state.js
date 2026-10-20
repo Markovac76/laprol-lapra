@@ -150,6 +150,14 @@ export function issueHasUnmarked(it, s){
   return allComps(it).some(c=>c && !c.is_deleted && !c.deleted && !c.status);
 }
 
+// Megvan / Hiányzik / Nem kell szűrő: a Szám, amelynek BÁRMELYIK (nem törölt) komponens-
+// példánya az adott státuszú — a Számhoz külön hozzáadott, sablonon kívüli típusúak is,
+// ugyanúgy, mint a „Jelöletlen” szűrőnél (52. lépés: mind a négy szűrő ugyanazt az elemkört nézi).
+export function issueHasStatus(it, s, stt){
+  if(!it) return false;
+  return allComps(it).some(c=>c && !c.is_deleted && !c.deleted && c.status===stt);
+}
+
 // A Szám színe a "számít a színnél" típus(ok) összes példányának együttes állapotából jön
 // ("legrosszabb eset nyer", 6.3–6.4). Ha a sorozatnak van komponens-sablonja, a sablon
 // `counts_for_color` jelzője dönt; sablon nélkül (régi adat / teszt) a korábbi szabály:

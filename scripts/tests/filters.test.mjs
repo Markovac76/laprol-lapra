@@ -6,7 +6,7 @@ globalThis.Date = class extends RealDate {
   constructor(...a){ if(a.length) super(...a); else super(FIXED); }
   static now(){ return FIXED; }
 };
-const { issueHasUnmarked } = await import("../../js/state.js");
+const { issueHasUnmarked, issueHasStatus } = await import("../../js/state.js");
 const s = { components: ["magazin", "figura"] };
 const C = (status, o = {}) => ({ id: Math.random().toString(36).slice(2), status, ...o });
 const it = (comps, date = "2026-10-01") => ({ n: 1, date, comps });
@@ -23,3 +23,15 @@ ok(issueHasUnmarked(it(undefined), s), false, "nincs comps mező → hamis");
 ok(issueHasUnmarked(it({ magazin: [C("megvan")], egyeb: [C(null)] }), s), true, "a sablonon kívüli (külön hozzáadott) típusú jelöletlen elem is számít");
 ok(issueHasUnmarked(it({ magazin: [C(null)] }, null), s), true, "dátum nélküli, jelöletlen Szám → igaz (megjelentnek számít)");
 console.log(`OK — a Jelöletlen szűrő ${n} esete átment`);
+
+// Megvan / Hiányzik / Nem kell szűrő (issueHasStatus): minden nem törölt elem számít, a sablonon kívüliek is.
+let m = 0; const ok2 = (v, exp, msg) => { assert.equal(v, exp, msg); m++; };
+ok2(issueHasStatus(it({ magazin: [C("megvan")], figura: [C("hianyzik")] }), s, "megvan"), true, "a sablon típusában a keresett státusz → találat");
+ok2(issueHasStatus(it({ magazin: [C("megvan")], figura: [C("hianyzik")] }), s, "hianyzik"), true, "a sablon másik típusában a keresett státusz → találat");
+ok2(issueHasStatus(it({ magazin: [C("megvan")], krtya: [C("nemkell")] }), s, "nemkell"), true, "a sablonon kívüli elem a keresett státusszal → találat");
+ok2(issueHasStatus(it({ magazin: [C("megvan")], krtya: [C("hianyzik")] }), s, "nemkell"), false, "a sablonon kívüli elem más státusszal → nincs találat");
+ok2(issueHasStatus(it({ magazin: [C("megvan")], figura: [C("nemkell", { is_deleted: true })] }), s, "nemkell"), false, "törölt elem a keresett státusszal → nincs találat");
+ok2(issueHasStatus(it({}), s, "megvan"), false, "nincs elem → nincs találat");
+ok2(issueHasStatus(it(undefined), s, "megvan"), false, "nincs comps mező → nincs találat");
+ok2(issueHasStatus(it({ magazin: [C(null)] }), s, "megvan"), false, "jelöletlen elem nem számít egyik státusz-szűrőben sem");
+console.log(`OK — a státusz-szűrő (Megvan / Hiányzik / Nem kell) ${m} esete átment`);
