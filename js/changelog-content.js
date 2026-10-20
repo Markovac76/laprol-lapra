@@ -6,6 +6,9 @@
    Legújabb elöl. Szándékosan elválasztva a UI-tól (changelog.js).
    ============================================================ */
 export const CHANGELOG = [
+  { date:"2026-10-20",
+    text:"Új szűrő: a Jelöletlen azokat a már megjelent Számokat mutatja, amelyeknek legalább egy eleme még nincs megjelölve; a Nem kell és a Várható között találod. Új a képnagyítás is: a lenyitott sorban a nagy képre koppintva teljes képernyőn látod, a ✕-szel vagy a képre koppintva zárod be."
+  },
   { date:"2026-10-16",
     text:"Karbantartóknak: a ☰ Listákban mostantól törölni is lehet egy értéket (🗑) — de csak azt, ami sehol nincs használatban. Ha igen, az üzenet megmondja, hol (pl. melyik sorozatoknál). Az „Egyéb” és a rendszer által használt típusok nem törölhetők."
   },

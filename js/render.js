@@ -1,7 +1,7 @@
 /* ============================================================
    Megjelenítés: fülek, hero, szűrők, lista, tapadó fejléc.
    ============================================================ */
-import { state, S, COMP_TYPES, isFutureDate, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus, issueSlots, typeLabel } from "./state.js";
+import { state, S, COMP_TYPES, isFutureDate, fmtDate, fmtFt, esc, pad, listName, issueState, hasOwnedComponent, compsOfType, worstStatus, issueSlots, typeLabel, issueHasUnmarked } from "./state.js";
 import { thumbUrl, typeIcon, TILE_W, TILE_H } from "./thumb.js";
 import { typeDef, fallbackName, formatSeriesIds } from "./type-defs.js";
 import { stats } from "./data.js";
@@ -103,12 +103,15 @@ export function renderHero(){
   if(hcb) hcb.onclick=()=>showSeriesChangePopup(s);
 }
 
-const FILTERS=[["mind","Mind"],["megvan","Megvan"],["hianyzik","Hiányzik"],["nemkell","Nem kell"],["varhato","Várható"]];
+// A „Jelöletlen” 0-nál is látszik (a jelöléssel csökken — ne tűnjön el, és ne ugorjon a lista „Mind”-re);
+// csak a „Várható” rejtőzik el 0-nál (a dátumot a felhasználó nem tudja átírni).
+const FILTERS=[["mind","Mind"],["megvan","Megvan"],["hianyzik","Hiányzik"],["nemkell","Nem kell"],["jeloletlen","Jelöletlen"],["varhato","Várható"]];
 function issueHasStatus(it,s,stt){ return s.components.some(t=>compsOfType(it,t).some(c=>c.status===stt)); }
 
 export function renderChips(){
   const s=S(); const activeItems=s.items.filter(it=>!it.deleted);
-  const c=id=> id==="mind"?activeItems.length : id==="varhato"?activeItems.filter(it=>isFutureDate(it.date)).length : activeItems.filter(it=>issueHasStatus(it,s,id)).length;
+  const c=id=> id==="mind"?activeItems.length : id==="varhato"?activeItems.filter(it=>isFutureDate(it.date)).length
+    : id==="jeloletlen"?activeItems.filter(it=>issueHasUnmarked(it,s)).length : activeItems.filter(it=>issueHasStatus(it,s,id)).length;
   const fl=FILTERS.filter(([id])=>id!=="varhato"||c("varhato")>0);
   if(state.filter==="varhato"&&c("varhato")===0) state.filter="mind";
   const chgBtn = s.anyChanged ? `<button class="chip chgchip" id="collectedChgBtn" title="Összes változás ebben a sorozatban">!</button>` : "";
@@ -119,6 +122,7 @@ export function renderChips(){
 
 function matches(it){ const s=S();
   if(state.filter==="varhato"){ if(!isFutureDate(it.date)) return false; }
+  else if(state.filter==="jeloletlen"){ if(!issueHasUnmarked(it,s)) return false; }
   else if(state.filter!=="mind"){ if(!issueHasStatus(it,s,state.filter)) return false; }
   if(state.query){ const q=state.query.toLowerCase(); if(!((it.name&&it.name.toLowerCase().includes(q))||String(it.n)===q)) return false; }
   return true;

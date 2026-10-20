@@ -19,6 +19,7 @@ import { reload } from "./data.js";
 import { err } from "./modal.js";
 import { showApp, loginWithPassword, registerWithPassword, logout, initSession } from "./auth.js";
 import { checkVersion, onStale } from "./version.js";
+import { openImageZoom } from "./image-zoom.js";
 
 let imgTarget=null;   // {type, id, mode:"upload"|"propose"} — a rejtett #imgUpl célja
 
@@ -96,6 +97,10 @@ document.getElementById("list").addEventListener("click",async e=>{
 
   const exp=e.target.closest(".expander");
   if(exp){ const n=+exp.dataset.exp; state.openIssue=(state.openIssue===n)?null:n; renderList(); return; }
+
+  // Teljes képernyős nagyítás: csak a lenyitott sor nagy képe (a „nincs adat” keretben nincs <img>).
+  const zimg=e.target.closest(".imgpanel .imgbox img");
+  if(zimg){ openImageZoom(zimg.currentSrc||zimg.src, zimg.alt); return; }
 
   // Saját adatlap (mindenkinek) — a panel ✎ ikonja
   const pe=e.target.closest("[data-mydata]");

@@ -167,6 +167,16 @@ header.top{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,va
 /* Levágás nélkül: a teljes kép mindig látszik, arányosan kicsinyítve —
    üres sáv a doboz oldalán/alján megengedett, tartalom sosem veszhet el. */
 .imgbox img{width:100%;height:100%;object-fit:contain}
+.imgpanel .imgbox img{cursor:zoom-in}
+/* Teljes képernyős képnagyítás (js/image-zoom.js) — a #modal (z-index 60) fölött */
+.imgzoom{position:fixed;inset:0;z-index:70;background:rgba(5,7,15,.94);display:flex;align-items:center;justify-content:center;
+  padding:calc(env(safe-area-inset-top) + 56px) 12px calc(env(safe-area-inset-bottom) + 16px);overscroll-behavior:contain;cursor:zoom-out}
+.imgzoom[hidden]{display:none}
+.imgzoom-fig{margin:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:0}
+.imgzoom-fig img{max-width:100%;max-height:calc(100vh - 140px);max-height:calc(100dvh - 140px);object-fit:contain;flex:0 1 auto;min-height:0}
+.imgzoom-fig figcaption{color:var(--ink);font-size:14px;text-align:center;max-width:100%}
+.imgzoom-x{position:absolute;top:calc(env(safe-area-inset-top) + 8px);right:8px;width:44px;height:44px;border-radius:50%;
+  border:1px solid var(--line);background:var(--panel-2);color:var(--ink);font-size:20px;line-height:1;cursor:pointer}
 /* Magazin/Könyv — jellemzően álló (portré) borító, kb. A4-arányú (~1:1.4)
    doboz, hogy a "contain" mellett is minimális legyen a felesleges üres tér. */
 .imgbox.tall{width:150px;height:210px;margin:0 auto}

@@ -80,12 +80,14 @@ export const HELP_CONTENT = {
       { q:"Hogyan keresek és rendezek a sorozatok között?",
         a:"<p>A <b>📚 Sorozataim</b> ablakban és a Karbantartás <b>Aktív sorozatok</b> fülén van egy keresőmező és egy rendező. A keresés névre megy, <b>kis- és nagybetű-, valamint ékezetfüggetlenül</b> (a „forma” megtalálja a „Formula” sorozatot, az „orjarat” az „Őrjárat”-ot). Rendezés: <b>ABC szerint</b> (magyar sorrend), <b>legutóbb módosított</b> (az a legutóbbi publikálás, ami a sorozatot ténylegesen érintette; ha még sosem módosult, a létrehozás ideje), vagy a <b>Számok száma</b> szerint. A választott rendezést megjegyzi.</p>" },
       { q:"Mit jelentenek a szűrő-gombok?",
-        a:"<p><b>Mind</b> — minden szám; <b>Megvan / Hiányzik / Nem kell</b> — csak azok a számok, amiknek legalább egy komponense az adott státuszban van; <b>Várható</b> — csak a még meg nem jelent, jövőbeli számok; a mai dátumú szám már megjelentnek számít (ez a gomb csak akkor látszik, ha van ilyen a sorozatban).</p>" },
+        a:"<p><b>Mind</b> — minden szám; <b>Megvan / Hiányzik / Nem kell</b> — csak azok a számok, amiknek legalább egy komponense az adott státuszban van; <b>Jelöletlen</b> — azokat a már megjelent Számokat mutatja, amelyeknek legalább egy eleme még nincs megjelölve (se megvan, se hiány, se nem kell). Hasznos, ha át akarod nézni, mit felejtettél el jelölni. Egy Szám több elemből áll, ezért ugyanaz a Szám több szűrőben is megjelenhet: ha a magazinja megvan, a figurája pedig még jelöletlen, a Megvan és a Jelöletlen szűrőben is látod. A még meg nem jelent (Várható) Számok nem kerülnek bele; <b>Várható</b> — csak a még meg nem jelent, jövőbeli számok; a mai dátumú szám már megjelentnek számít (ez a gomb csak akkor látszik, ha van ilyen a sorozatban).</p>" },
     ]},
 
     { id:"kepek", title:"Képek", open:false, items:[
       { q:"Hogyan nézem meg egy komponens képét?",
         a:"<p>Nyisd le a sor végén a nyilat — minden komponenshez tartozik egy képkocka; ha még nincs kép feltöltve, „nincs adat” felirat látszik helyette.</p>" },
+      { q:"Nagyíthatom a képeket?",
+        a:"<p>Igen. Nyisd le a Szám sorát, és koppints a nagy képre: teljes képernyőn jelenik meg. Bezárni a képre koppintva, a ✕ gombbal vagy (számítógépen) az Esc billentyűvel tudod.</p>" },
       { q:"Hogyan javasolhatok saját képet egy komponenshez?",
         a:"<p>A lenyitott képsávban, a kép alatt megjelenik egy <b>„Kép javaslása”</b> (vagy meglévő képnél <b>„Csere javaslása”</b>) gomb — ide koppintva választhatsz fájlt. A kép automatikusan átméreteződik feltöltés előtt, nem kell magadnak méretezned.</p>" },
       { q:"Miért nem látom a javaslás gombot egyik komponensnél sem?",

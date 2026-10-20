@@ -140,6 +140,16 @@ export function hasOwnedComponent(it,s){
   return allComps(it).some(c=>c.status==="megvan");
 }
 
+// „Jelöletlen” szűrő: a MÁR MEGJELENT Szám, amelynek legalább egy (nem törölt) komponens-
+// példánya még nincs megjelölve (se megvan, se hiányzik, se nem kell). A még meg nem jelent
+// Szám nem számít (a jelölő gombja le van tiltva; arra a „Várható” szűrő van). Az összes
+// példányt nézi — a Számhoz külön hozzáadott, sablonon kívüli típusúakat is. A törölt
+// komponens a modellben már nem szerepel (model.js); a feltétel itt csak óvatosság.
+export function issueHasUnmarked(it, s){
+  if(!it || isFutureDate(it.date)) return false;
+  return allComps(it).some(c=>c && !c.is_deleted && !c.deleted && !c.status);
+}
+
 // A Szám színe a "számít a színnél" típus(ok) összes példányának együttes állapotából jön
 // ("legrosszabb eset nyer", 6.3–6.4). Ha a sorozatnak van komponens-sablonja, a sablon
 // `counts_for_color` jelzője dönt; sablon nélkül (régi adat / teszt) a korábbi szabály:
