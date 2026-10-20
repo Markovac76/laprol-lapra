@@ -1,4 +1,4 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v20)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v21)
 
 **Frissítve:** 2026. október 20. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
@@ -8,7 +8,7 @@
 
 ## 1. A nagy kép
 
-**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított. Legutóbb a 27–50. lépés köre zárult (v1.26–v1.31), és elkezdődött az F kör (51. lépés, v1.32: „Jelöletlen” szűrő, teljes képernyős képnagyítás). A 27–50. lépés köre: típusszabályok (a Kártya hét mezője, a Figura neve, rögzített / választható azonosító-típusok), sorozat-azonosítók a sorozat törzsében, új Szám-sáv csempékkel, a „+ Új tétel” és a Gyors Excel új sorai egyetlen szerver-oldali függvényen át (`create_live_issue`), az S2 adatrendezés (öt sorozat azonosítója, Disney Hangos figurák), a függvények hívási jogának és a törzsadat-táblák közvetlen írási jogának szűkítése, a verzióellenőrző sáv és a repó dokumentumainak kizárása az élő címről, a többi tábla jogosultsági higiéniája (bejelentkezés nélkül semmi nem olvasható és írható), végül a Listák törlés gombja és a beragadt képjavaslat megszüntetése. **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
+**OM Curator** platform (még nincs építve) + modulok. **Első modul: Lapról Lapra** — éles, működő, több körben tesztelt és javított. Legutóbb a 27–50. lépés köre zárult (v1.26–v1.31), utána lezárult az F kör (51–52. lépés, v1.32–v1.33: „Jelöletlen” szűrő, teljes képernyős képnagyítás, a státusz-szűrők egységesítése). A hátralévő témák sorrendje a 9. fejezet után. A 27–50. lépés köre: típusszabályok (a Kártya hét mezője, a Figura neve, rögzített / választható azonosító-típusok), sorozat-azonosítók a sorozat törzsében, új Szám-sáv csempékkel, a „+ Új tétel” és a Gyors Excel új sorai egyetlen szerver-oldali függvényen át (`create_live_issue`), az S2 adatrendezés (öt sorozat azonosítója, Disney Hangos figurák), a függvények hívási jogának és a törzsadat-táblák közvetlen írási jogának szűkítése, a verzióellenőrző sáv és a repó dokumentumainak kizárása az élő címről, a többi tábla jogosultsági higiéniája (bejelentkezés nélkül semmi nem olvasható és írható), végül a Listák törlés gombja és a beragadt képjavaslat megszüntetése. **Második modul (vázlat): Kockáról Kockára** (Lego-gyűjtemény) — csak v0.1 ötletelés, adatmodell nincs kidolgozva.
 
 ---
 
@@ -19,7 +19,7 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.32** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.33** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 - **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
@@ -249,7 +249,7 @@ A hibajavítási kör 11. pontja (sablon-alapú tömeges feltöltés) a javaslat
 8. **Egy szerkesztési draft egy élő sorozathoz** — **KÉSZ (v1.21):** részleges egyedi index + atomi `start_edit_draft()`; a Karbantartás gombja és a Gyors szerkesztés → Excel is ezt hívja (a soft-delete-elt Számokat nem másolja).
 9. **Döntés nélküli ötletek:** „tervezett” jelzés a még meg nem jelent számoknál; dátum szerinti rendezés segítségként (nem automatikus); eltolás ütközésnél felajánlott kényelmi lehetőségként.
 10. **A lapszám-csendesítés élő ellenőrzése** — **KÉSZ:** a visszagörgetett szintetikus próba (`scripts/trial-renumber.js`) igazolta: a puszta lapszám-változás nem emel verziót, a `change_log` rögzíti, a számlálók a ROLLBACK után azonosak.
-11. **„Jelöletlen” szűrő** — **KÉSZ (v1.32, 51. lépés, 2026-10-20):** a megjelent Szám, amelynek legalább egy eleme jelöletlen; a „Nem kell” és a „Várható” között, 0-nál is látszik; a még meg nem jelent Számok kimaradnak. Megjegyzés: a Megvan / Hiányzik / Nem kell szűrő a Számhoz külön hozzáadott (sablonon kívüli) típusú elemet nem nézi, a Jelöletlen igen (ma 1 élő elem) — összehangolás külön döntés. Ugyanebben a lépésben: teljes képernyős képnagyítás a lenyitott sor nagy képeire (specifikáció 5.3).
+11. **„Jelöletlen” szűrő** — **KÉSZ (v1.32, 51. lépés, 2026-10-20):** a megjelent Szám, amelynek legalább egy eleme jelöletlen; a „Nem kell” és a „Várható” között, 0-nál is látszik; a még meg nem jelent Számok kimaradnak. Megjegyzés: a Megvan / Hiányzik / Nem kell szűrő a Számhoz külön hozzáadott (sablonon kívüli) típusú elemet nem nézi, a Jelöletlen igen (ma 1 élő elem) — összehangolás külön döntés. **LEZÁRVA (v1.33, 52. lépés):** mind a négy státusz-szűrő minden nem törölt elemet néz. Ugyanebben a lépésben: teljes képernyős képnagyítás a lenyitott sor nagy képeire (specifikáció 5.3).
 12. **Gyors szerkesztés → Excel: komponens nélküli Szám csendes kihagyása** — jelzés kellene.
 13. **Az Excel-sablon a fő elemet nem viszi / nem módosítja** — új sornál tartalék szabály; a kijelölés a draft-szerkesztőben.
 14. **Új sorozat sablonja: DB-szintű kikényszerítés későbbre** — a kliens kényszeríti ki, üres sablonnál az alapértelmezett lép be.
@@ -286,7 +286,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.32).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.33).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.
@@ -300,11 +300,32 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 ## 9. Javasolt következő lépések
 
-**A) A 6. fejezet nyitott pontjai** — a 27–50. lépés köréből a 18. (jogosultság-szigorítás), a 19. (a közvetlen írások lezárása), a 20. (verzióellenőrző sáv), a 26. (holt kliens-kód), a 27. (Listák törlés), a 28. (jogosultsági higiénia) és a 29. (a saját képjavaslat törlése) kész. **Kész az F kör eleje (51. lépés):** a 11. („Jelöletlen” szűrő) és a képnagyítás. A következő a 21–22. (szerkesztés gomb, összevonás) és a 7. (Excel átdolgozása).
+**A) A 6. fejezet nyitott pontjai** — a 27–50. lépés köréből a 18. (jogosultság-szigorítás), a 19. (a közvetlen írások lezárása), a 20. (verzióellenőrző sáv), a 26. (holt kliens-kód), a 27. (Listák törlés), a 28. (jogosultsági higiénia) és a 29. (a saját képjavaslat törlése) kész. **Az F kör lezárult (51–52. lépés):** a 11. („Jelöletlen” szűrő), a képnagyítás és a státusz-szűrők egységesítése. A hátralévő munkák sorrendje: lásd lent, „Hátralévő témák”.
 
 **B) Kockáról Kockára adatmodell kidolgozása** — ötletelős módban, ahogy a Lapról Laprát is felépítettük.
 
 **C) OM Curator platform specifikálása** — most, hogy két modul körvonalazódik.
+
+## Hátralévő témák (Lapról Lapra) — javasolt sorrend
+
+A betűjelek a Claude Home csevegésben használt címkék. Egy „kör” = a prompt megírása, a Code futtatása, az eredmény visszamásolása és átnézése. Az F kör (Jelöletlen szűrő, képnagyítás, szűrők egységesítése) lezárult.
+
+| Jel | Téma | Becsült kör | Megjegyzés |
+|---|---|---|---|
+| D | Karbantartás és szerkesztés összevonása: „Szám adatainak szerkesztése” gomb, piros törlés gombok, saját hibaablak, azonosító-hibaüzenetek | 5–6 | Közös tervezést igényel; a tulajdonos három kérdése még megválaszolatlan. |
+| E | Gyors Excel és sablonok átdolgozása | 3–4 | Lásd a nyitott pontok között a Gyors Excel (azonosító-alapú párosítás, komponens nélküli Szám jelzése) és az Excel-sablon (fő elem) tételeit. |
+| G | A beküldő értesítése és üzenet az adminnak | 5–6 | |
+| H | Valódi fióktörlés (Edge Function) | kb. 3 | A `lists.user_id` `ON DELETE CASCADE` miatt a törölt fiók által felvett közös lista-értékek is törlődnének: ezt előbb el kell dönteni. |
+| J | Export | 2–3 | |
+| I | Címkerendszer | 3–4 | A logika (hierarchia, szinonimák, kanonikus alak) külön átbeszélendő. |
+
+Összesen kb. **21–26 kör.**
+
+**Nem számolt tételek:**
+- Döntés nélküli ötletek: „tervezett” jelzés a még meg nem jelent számoknál; dátum szerinti rendezés segítségként; eltolás ütközésnél felajánlott kényelmi lehetőségként.
+- A tulajdonos adatfeladatai: Lego SW #29 Gyűjtemény; Mancs Őrjárat azonosító; Disney Hangos #1 ISBN (978-88-334-2839-0); a Disney Hangos 82 figurájának neve; a Lego Avengers munkaanyag lapszám-ütközése.
+- Opcionális érték-takarítás a 🗑 gombbal (a tulajdonos döntése): Kategória „Kártya” (`krtya`), a Beszerzés forrása használatlan értékei, Kiadó „Magyar”, Azonosító „Vonalkód”.
+- Új modulok és a közös adatbázis jogosultsági modellje: lásd a Claude-projekt `claude/epitesi-segedlet-biztonsag-es-modszer.md` dokumentumát (7. szakasz).
 
 ---
 
