@@ -1,6 +1,6 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v21)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v22)
 
-**Frissítve:** 2026. október 20. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
+**Frissítve:** 2026. október 22. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
 > Told fel ezt a fájlt a Claude projektbe (cseréld le a régi verziót). Új beszélgetés elején hivatkozz rá: "olvasd el az állapot-összefoglalót, onnan tudod, hol tartunk."
 
@@ -19,7 +19,7 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.33** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.34** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 - **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
@@ -72,6 +72,7 @@ laprol-lapra/
     ├── changes.js                               ← verziókövetés / felkiáltójel
     ├── component-images.js, image-resize.js     ← képfeltöltés / képjavaslat
     ├── image-zoom.js                            ← teljes képernyős képnagyítás (a lenyitott sor nagy képei)
+    ├── dialog.js                                ← az app saját üzenetablaka (showMessage; a natív alert helyett, sorba állítva)
     ├── help.js, help-content.js                 ← beépített súgó
     └── changelog.js, changelog-content.js       ← 🔔 Újdonságok
 ```
@@ -262,11 +263,11 @@ A hibajavítási kör 11. pontja (sablon-alapú tömeges feltöltés) a javaslat
 18. **Jogosultság-szigorítás** — **KÉSZ (v1.27, 39–40. lépés, 2026-10-13):** a bejelentkezés nélküli hívó már csak 8 függvényt hívhat (`is_staff`, `is_active`, `my_role` és az 5 trigger-függvény — indok: specifikáció 13.14.9), a bejelentkezett 24-et, a 13 belső segédet csak más függvény. Az új függvények nem öröklik a `PUBLIC` / `anon` jogot. A „Teszt Kiadó” próbasor törölve. (v1.30 óta: a bejelentkezett 23-at, a belső segéd 14 — lásd a 26. pontot; v1.31 óta: 38 függvény, a bejelentkezett 24-et hívhat — lásd a 27. pontot.)
 19. **A közvetlen írások lezárása (C)** — **KÉSZ (v1.28, 42–43. lépés, 2026-10-13):** trigger helyett a táblajogok szűkítésével. Az élő törzsadat-táblákon (`series`, `issues`, `components`, `lists`, `change_log`, `global_counters`) az `anon` nem ír; az `authenticated` csak hat oszlopot módosíthat (`components.kep_url`, `components.upload_enabled`, `series.borito_url`, `series.borito_upload_enabled`, `series.lifecycle`, `lists.megjelenites`), és a Listákba szúrhat be; minden más függvényen át megy. A régi, újra nem töltött fül közvetlen beszúrása hibával megáll. Részletek: specifikáció 13.14.10.
 20. **Verzióellenőrző sáv** — **KÉSZ (v1.29, 44–46. lépés, 2026-10-13):** ha a fül vagy a telepített app régi kódot futtat, sárga sáv szól a fejléc tetején („Új verzió érhető el”, Újratöltés gombbal), és a törzsadat-írások az újratöltésig nem mennek ki; a személyes mentés (jelölés, darabszám, jegyzet, ár) megy. A verzió az app fájljainak tartalom-ujjlenyomata (dokumentáció-commit nem ad új verziót). Részletek: specifikáció 13.14.11. Ami ebből nyitva maradt: az űrlapok tartalmának megőrzése az újratöltésen át.
-21. **„Szám adatainak szerkesztése" gomb** a Szám sorából (egyenes út a munkaanyag-szerkesztőbe).
-22. **A Karbantartás és a szerkesztés összevonása.**
+21. **„Szám adatainak szerkesztése" gomb** a Szám sorából (egyenes út a munkaanyag-szerkesztőbe). — A D kör része: specifikáció 13.15.
+22. **A Karbantartás és a szerkesztés összevonása.** — A D kör része: specifikáció 13.15.
 23. **A javaslat-beküldő értesítése** (azonos az 1. ponttal).
 24. **Adat-teendők a tulajdonosnál:** a Mancs Őrjárat sorozat-azonosítója; a Lego Star Wars #29 kártya Gyűjteménye; a Disney Hangos #1 eltérő ISBN-jének (978-88-334-2839-0) ellenőrzése; a Disney Hangos 82 figurájának neve (nem sürgős: a régi elemeknél csak figyelmeztetés).
-25. **Apróságok jegyzetben:** a sorozat-azonosító hibájánál a szerkesztő mindkét kitöltött sort bekeretezi; a Gyors Excel sablon fejlécében néhány típus kisbetűs kulccsal áll („figura", „lego").
+25. **Apróságok jegyzetben:** a sorozat-azonosító hibájánál a szerkesztő mindkét kitöltött sort bekeretezi; a Gyors Excel sablon fejlécében néhány típus kisbetűs kulccsal áll („figura", „lego"). — Az azonosító-hiba bekeretezése a D kör része: specifikáció 13.15.
 26. **A `seed_issue_seen_for_subscribers` lezárása** — **KÉSZ (v1.30, 48. lépés, 2026-10-14):** a holt kliens-kód (`js/changes.js`, `seedNewIssueSeen`) törölve, a függvény a belső segédek közé került (a bejelentkezett sem hívhatja közvetlenül; a `create_live_issue` és a `publish_draft_series` hívja).
 27. **Törlés a Listák ablakban** — **KÉSZ (v1.31, 49–50. lépés, 2026-10-16):** a ☰ Listákban 🗑 gomb (az „Egyéb” mellett nincs), a `delete_list_value` függvényen át; csak a használatlan, nem védett érték törölhető, különben az üzenet megmondja, hol van használatban. Védett: az „Egyéb”, a típusleírással rendelkező komponens-típusok, az ISBN, az ISSN és a típusleírás azonosító-típusai. Ma törölhető volna (a tulajdonos dönt róla): a „Beszerzés forrása” értékei az „Egyéb” kivételével, a Kategória „Kártya” értéke, a Kiadó „Magyar” és az Azonosító „Vonalkód” értéke. Részletek: specifikáció 13.14.13.
 28. **Jogosultsági higiénia a többi táblán** — **KÉSZ (v1.30, 47–48. lépés, 2026-10-14):** az `anon` egyik táblán sem kap jogot (az olvasást sem); a `TRUNCATE` / `REFERENCES` / `TRIGGER` / `MAINTAIN` a kliens-szerepköröktől mindenhol megvonva; a `members` és az `image_proposals` oszlopszintű kivétellel; a három nem használt tábla a bejelentkezettnek sem érhető el; a `member_seen` és a `member_series` közvetlenül nem törölhető; az új táblák és szekvenciák alapértelmezett joga zárva. Új, csak olvasó ellenőrző: `scripts/audit-jogok.js` (új tábla migrációja után futtatandó). Nem módosítható: a `supabase_admin` alapértelmezett jogai (a platform saját objektumaira). Részletek: specifikáció 13.14.12.
@@ -286,7 +287,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.33).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.34).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.
@@ -312,7 +313,7 @@ A betűjelek a Claude Home csevegésben használt címkék. Egy „kör” = a p
 
 | Jel | Téma | Becsült kör | Megjegyzés |
 |---|---|---|---|
-| D | Karbantartás és szerkesztés összevonása: „Szám adatainak szerkesztése” gomb, piros törlés gombok, saját hibaablak, azonosító-hibaüzenetek | 5–6 | Közös tervezést igényel; a tulajdonos három kérdése még megválaszolatlan. |
+| D | Karbantartás és szerkesztés összevonása: „Szám adatainak szerkesztése” gomb, piros törlés gombok, saját hibaablak, azonosító-hibaüzenetek | 5–6 | **Folyamatban (1/6 kör kész):** a döntések megszülettek, a körök ütemezése és az 1. kör (az app saját hibaablaka): specifikáció 13.15. |
 | E | Gyors Excel és sablonok átdolgozása | 3–4 | Lásd a nyitott pontok között a Gyors Excel (azonosító-alapú párosítás, komponens nélküli Szám jelzése) és az Excel-sablon (fő elem) tételeit. |
 | G | A beküldő értesítése és üzenet az adminnak | 5–6 | |
 | H | Valódi fióktörlés (Edge Function) | kb. 3 | A `lists.user_id` `ON DELETE CASCADE` miatt a törölt fiók által felvett közös lista-értékek is törlődnének: ezt előbb el kell dönteni. |

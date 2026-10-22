@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.33 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.34 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -598,7 +598,7 @@ Egyetlen tranzakció, minden lépése csendes (nincs verzióemelés, nincs felki
 - **A közvetlen írások lezárása (C) — KÉSZ (v1.28, 2026-10-13):** trigger helyett a táblajogok szűkítésével, lásd 13.14.10. A „jogosultsági higiénia” a többi táblán és a táblák alapértelmezett joga — **KÉSZ (v1.30, 2026-10-14)**, lásd 13.14.12.
 - **A saját képjavaslat törlésének szabálya és a Listák törlés gombja — KÉSZ (v1.31, 2026-10-16):** lásd 13.14.13.
 - **Verzióellenőrző sáv — KÉSZ (v1.29, 2026-10-13):** lásd 13.14.11.
-- **„Szám adatainak szerkesztése” gomb** a Szám sorából; **a Karbantartás és a szerkesztés összevonása.**
+- **„Szám adatainak szerkesztése” gomb** a Szám sorából; **a Karbantartás és a szerkesztés összevonása** — a D kör része, lásd 13.15 (folyamatban).
 - **A Gyors Excel és a sablonok átdolgozása** (a típus saját mezői, azonosító-típus, azonosító-alapú párosítás).
 - **A javaslat-beküldő értesítése; a Mancs Őrjárat sorozat-azonosítója; a Disney Hangos #1 eltérő ISBN-jének ellenőrzése; a Lego Star Wars #29 kártya Gyűjteménye.**
 SQL: `27-s1-szerkezet`, `33-uj-szam-fuggveny`, `27-s2-adatrendezes`.
@@ -691,9 +691,29 @@ Előzmény: a ☰ Listák felületen értéket felvenni és átnevezni lehetett,
 - **Igazolás:** visszagörgetett próba valódi szerepkörökkel (`scripts/trial-49-lista-torles.js`, 11/11: a használatlan érték mind az öt listában törlődik; a használt és a védett érték megáll a helyes üzenettel és semmit nem töröl; sima felhasználó, letiltott admin, `anon` nem törölhet; a közvetlen `DELETE FROM lists` továbbra is `permission denied`; a képjavaslat-takarítás a kliens útján előtte „törlés 0, bent maradt 1”, utána „törlés 1, bent maradt 0”; a 34 lépéses forgatókönyv azonos), az új Szám próba 19/19, a visszaút próbája; a futtatás után éles módban a 16 / 19 / 14 / 13 / 11 próba; valódi HTTP-hívás a nyilvános kulccsal (az `rpc/delete_list_value` előtte 404, utána 401 / `42501`; a közvetlen törlés 401). Az audit (`scripts/audit-jogok.js`) modulként is hívható (`audit(q)`), hibás-állapot próbája: `scripts/trial-49-audit.js` (3/3).
 SQL: `49-lista-torles`.
 
+### 13.15 D kör — a szerkesztés egységesítése **[DÖNTVE; folyamatban — 1/6 kör kész, v1.34]**
+
+**A tulajdonos döntései:**
+1. **„Szám adatainak szerkesztése” gomb** a lenyitott Szám sorában (staff): egy koppintással a Szám szerkesztőjébe visz, és a szerkesztési munkaanyagot a háttérben elindítja, ha még nincs. A „Kész” és a „Közzététel” lépés marad (több javítás gyűjthető, egyszerre tehető közzé). Egygombos gyors közzététel nincs (elvetve, később újra elővehető).
+2. **Egy szerkesztő gomb:** a 🔧 eszköztár tartalmazza az új Számot, a Listákat, az Excelt, a Szám és a sorozat szerkesztését, valamint a Karbantartás teljes nézetét; a 🗂️ gomb megszűnik.
+3. **Saját ablak minden hibaüzenetre és minden „Biztosan?” kérdésre.** A törlés gombok egységesen pirosak, és a megerősítés kimondja, mi fog történni.
+4. **A sorozat-azonosító hibájánál** a szerkesztő mindkét kitöltött sort bekeretezi, és az azonosító-hibaüzenetek érthetőbbek lesznek.
+
+**Körök (előzetes ütemezés):** 53. lépés — hibaablak-alap és a hibaüzenetek (**kész**) · 54 — megerősítő kérdések és piros törlés gombok · 55 — „Szám adatainak szerkesztése” gomb · 56 — egy szerkesztő gomb · 57 — azonosító-hibaüzenetek, súgó, dokumentáció · 58 — tartalék.
+
+**1. kör — az app saját üzenetablaka (`js/dialog.js`) [megvalósítva — v1.34]:**
+- `showMessage(text, { title = "Hiba" })` → `Promise`, amely az ablak bezárásakor teljesül. Cím: „Hiba”, figyelmeztetésnél „Figyelem”, a sikeres feltöltés visszajelzésénél „Kész”. A szöveg `textContent`-ként kerül be (nem HTML), a sortörések megmaradnak; egy „Rendben” gomb (legalább 44 px).
+- **Miért külön elem, nem a `#modal`:** a hiba gyakran egy nyitott űrlap fölött jön (pl. mentési hiba), és a `#modal` cseréje elvinné a beírt adatot. Az ablak a `#modal` és a képnagyítás fölött jelenik meg (`z-index` 80), az alatta lévő űrlaphoz nem nyúl.
+- **Sorba állítás:** az egymás után érkező üzenetek egymás után jelennek meg, nem csúsznak egymásra (`makeSerialQueue` — tiszta, gépi próbával: `scripts/tests/dialog.test.mjs`).
+- **Hozzáférhetőség:** `role="alertdialog"`, `aria-modal`, címke és leírás; megnyitáskor a fókusz a gombra kerül, bezáráskor visszaáll az előző elemre. Bezárás: a gomb, az Esc (a capture fázisban elnyelve, hogy az alatta lévő elemek — pl. a képnagyítás — ne kapják meg), a háttérre koppintás.
+- **A csere:** az `err(e)` (`js/modal.js`) a saját ablakot hívja (a „Hiba: ” előtag megszűnt, mert a cím már „Hiba”), és a `Promise`-t visszaadja; a 31 közvetlen `alert(` hívás `showMessage(`-re cserélve, a szövegek változatlanok. Ahol az `alert` után kód futott, amely a bezárásra várt (a munkaanyag-sablon két feltöltés-visszajelzése után az `onDone()`), ott `await` tartja a régi sorrendet. Az `err(e)` után futó kód (jellemzően a képernyő újrarajzolása) nem vár a „Rendben”-re; a hibaablak a fölött marad.
+- **Védőpróba:** `scripts/tests/no-native-dialogs.test.mjs` — elbukik, ha a `js/` alatt (a `dialog.js` kivételével) natív `alert(` hívás van; a megjegyzés és a karakterlánc-tartalom nem számít. A `confirm(` ellenőrzése a 2. körben kerül bele.
+- Nincs hálózati hívás, nincs új függőség. Súgó- és változásnapló-bejegyzés a 2. kör után, közösen.
+
 ---
 
 *Napló:*
+- v1.34 — **53. lépés — D kör / 1: az app saját üzenetablaka** (13.15): a D kör négy döntése és ütemezése rögzítve; új `js/dialog.js` (`showMessage`), az `err(e)` és mind a 31 közvetlen `alert(` a saját ablakot használja; védőpróba a natív `alert(` ellen. Csak kliens; adatbázis-változás nincs.
 - v1.33 — **52. lépés — a státusz-szűrők egységesítése** (7. fejezet „Szűrők”): a Megvan / Hiányzik / Nem kell szűrő is a Szám minden nem törölt elemét nézi (a sablonon kívülieket is), mint a Jelöletlen; az 51. lépés megjegyzése lezárva. Egyetlen élő Számot érint (Lego Star Wars Magazin #29). Az F kör lezárult. Csak kliens; adatbázis-változás nincs.
 - v1.32 — **51. lépés — „Jelöletlen” szűrő és teljes képernyős képnagyítás** (7. fejezet „Szűrők”, 5.3 „Képkezelés”; a 10. fejezet 9. és 20. pontja lezárva): új szűrő a megjelent, legalább egy jelöletlen elemmel bíró Számokra (0-nál is látszik, a meg nem jelent Számok kimaradnak); a lenyitott sor nagy képeire koppintva teljes képernyős nézet (`js/image-zoom.js`). Csak kliens; adatbázis-változás nincs.
 - v1.31 — **49–50. lépés — a Listák törlése; a saját függő képjavaslat törlése** (13.14.13): új `delete_list_value` függvény (A csoport; 38 függvény, a bejelentkezett 24-et hívhat) — csak a használatlan, nem védett érték törölhető, különben érthető üzenettel megáll; a ☰ Listákban 🗑 gomb; új sorszintű szabály: a beküldő a saját függő képjavaslatát törölheti (a beragadt javaslat megszűnik); az audit szkript modulként is hívható, hibás-állapot próbával. A régi 37 függvény változatlan. SQL: `49-lista-torles`.
