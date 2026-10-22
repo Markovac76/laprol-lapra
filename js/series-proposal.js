@@ -8,6 +8,7 @@
 import { supabase } from "./supabase.js";
 import { state, DISPLAY_MAX, PAL12, PAL_FAMILIES, esc, opts } from "./state.js";
 import { openModal, closeModal, err, sheet, guarded } from "./modal.js";
+import { showMessage } from "./dialog.js";
 import { downloadDraftTemplate, pickDraftExcelFile, confirmDraftUpload, bulkInsertDraftItemsAsProposer } from "./draft-excel.js";
 
 // Köztes lépés a javaslat beküldése és a "Köszönjük" képernyő között —
@@ -66,8 +67,8 @@ export function proposeSeriesForm(){
 
   document.getElementById("p-save").onclick=guarded(async ()=>{
     const nm=document.getElementById("p-name").value.trim();
-    if(!nm){ alert("A megnevezés kötelező."); return; }
-    if(!comps.length){ alert("Legalább egy komponens kell."); return; }
+    if(!nm){ showMessage("A megnevezés kötelező.", { title:"Figyelem" }); return; }
+    if(!comps.length){ showMessage("Legalább egy komponens kell.", { title:"Figyelem" }); return; }
     const disp=(dEl.value.trim()||nm).slice(0,DISPLAY_MAX);
     try{
       // Az id-t a kliens generálja és küldi be — a draft_series SELECT-
@@ -82,7 +83,7 @@ export function proposeSeriesForm(){
         megnevezes: nm, megjelenites: disp, szin: color, components: comps,
       });
       if(error){
-        if(error.code==="23505"){ alert("Ezt a javaslatot már beküldted."); return; }
+        if(error.code==="23505"){ showMessage("Ezt a javaslatot már beküldted.", { title:"Figyelem" }); return; }
         throw error;
       }
       renderProposalIntermediate(newId, comps, nm);

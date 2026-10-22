@@ -9,6 +9,7 @@
 import { supabase, fetchAllRows } from "./supabase.js";
 import { state, esc, listName, opts, fmtDate, DISPLAY_MAX, PAL12, PAL_FAMILIES } from "./state.js";
 import { openModal, err, sheet, guarded } from "./modal.js";
+import { showMessage } from "./dialog.js";
 import { reload } from "./data.js";
 import { isStaff, isOwnerRole } from "./permissions.js";
 import { fetchDraftItems, renderDraftItemsList, draftItemForm } from "./draft-items.js";
@@ -263,7 +264,7 @@ async function finalizeDelete(s){
   document.getElementById("fd-cancel").onclick=()=>karbantartasForm();
   document.getElementById("fd-go").onclick=guarded(async ()=>{
     const v=document.getElementById("fd-confirm").value.trim();
-    if(v!==s.megnevezes){ alert("A begépelt név nem egyezik pontosan."); return; }
+    if(v!==s.megnevezes){ showMessage("A begépelt név nem egyezik pontosan.", { title:"Figyelem" }); return; }
     await doFinalize(s.id, v);
   });
 }
@@ -296,7 +297,7 @@ async function markReady(d){
   // Új sorozatnál a komponens-sablon (fő elem) kötelezően megadandó — a kliens kényszeríti ki
   // (az adatbázis üres sablonnál az alapértelmezettet használja, hogy a régi út ne törjön el).
   if(d.pool_type==="new" && !hasTemplate(d.component_template)){
-    alert("Új sorozatnál előbb add meg a komponens-sablont (fő elem, típusok): nyisd meg a Szerkesztést, állítsd be a „Komponens-sablon” szakaszt, és mentsd a mezőket.");
+    showMessage("Új sorozatnál előbb add meg a komponens-sablont (fő elem, típusok): nyisd meg a Szerkesztést, állítsd be a „Komponens-sablon” szakaszt, és mentsd a mezőket.", { title:"Figyelem" });
     return;
   }
   let warns = [];
@@ -534,15 +535,15 @@ function renderEditDraft(d, color, tmpl, compList, items){
   document.getElementById("d-back").onclick=()=>karbantartasForm();
   document.getElementById("d-save").onclick=guarded(async ()=>{
     const nm=document.getElementById("d-name").value.trim();
-    if(!nm){ alert("A megnevezés kötelező."); return; }
+    if(!nm){ showMessage("A megnevezés kötelező.", { title:"Figyelem" }); return; }
     const terr = templateError(tmpl);
-    if(terr){ alert("A komponens-sablon nem menthető: "+terr+"."); return; }
+    if(terr){ showMessage("A komponens-sablon nem menthető: "+terr+"."); return; }
     comps = templateTypes(tmpl);
     // Sorozat-azonosítók: az üres sorok kimaradnak; a szabályok a szerverével azonosak (ISBN / ISSN, forma).
     const sids = cleanSeriesIds([0,1].slice(0,SERIES_ID_MAX).map(i=>({
       tipus:(sheet.querySelector(`[data-sid-t="${i}"]`)||{}).value, ertek:(sheet.querySelector(`[data-sid-v="${i}"]`)||{}).value })));
     const serr = seriesIdsError(sids);
-    if(serr){ alert("A sorozat-azonosítók nem menthetők: "+serr+"."); return; }
+    if(serr){ showMessage("A sorozat-azonosítók nem menthetők: "+serr+"."); return; }
     const disp=(dEl.value.trim()||nm).slice(0,DISPLAY_MAX);
     try{
       const { error } = await supabase.from("draft_series").update({
@@ -566,14 +567,14 @@ function renderEditDraft(d, color, tmpl, compList, items){
     b.onclick=()=>{ const it=items.find(x=>x.id===b.dataset.diedit); if(it) draftItemForm(d.id, it, comps, reopen, tmpl); };
   });
   document.getElementById("d-tmpl").onclick=()=>{
-    if(!comps.length){ alert("Előbb adj hozzá legalább egy komponens-típust a sablonhoz."); return; }
+    if(!comps.length){ showMessage("Előbb adj hozzá legalább egy komponens-típust a sablonhoz.", { title:"Figyelem" }); return; }
     // Oda-vissza sablon: a draft AKTUÁLIS állapotát tölti le (rejtett azonosítókkal).
     fetchDraftItems(d.id)
       .then(items=>downloadDraftTemplate(comps, d.megnevezes, { draftSeriesId:d.id, items, seriesIds:d.azonositok||[] }))
       .catch(err);
   };
   document.getElementById("d-tmplup").onclick=()=>{
-    if(!comps.length){ alert("Előbb adj hozzá legalább egy komponens-típust a sablonhoz."); return; }
+    if(!comps.length){ showMessage("Előbb adj hozzá legalább egy komponens-típust a sablonhoz.", { title:"Figyelem" }); return; }
     pickDraftExcelFile(file=>confirmDraftUpload(openModal, err, file, d.id, comps, reopen));
   };
 }

@@ -25,6 +25,7 @@ import { supabase } from "./supabase.js";
 import { state, COMP_TYPES, esc, listName } from "./state.js";
 import { loadXlsx, coerceDate, parseHuNumber } from "./excel.js";
 import { guarded, sheet } from "./modal.js";
+import { showMessage } from "./dialog.js";
 import { fetchDraftItems } from "./draft-items.js";
 import { templateModel, resolveColumns, rowsFromAoa, planUpload, buildPayload, draftFingerprint, idTypeGaps } from "./draft-excel-plan.js";
 import { typeDef, idMode, extraFields, fieldOf, defaultIdType, cleanSeriesIds, seriesIdsError, formatSeriesIds, SERIES_ID_TYPES } from "./type-defs.js";
@@ -139,7 +140,7 @@ export async function bulkInsertDraftItemsAsProposer(draftSeriesId, rows){
 
 function confirmProposerUpload(openModal, err, file, draftSeriesId, components, onDone, insertFn){
   parseDraftExcel(file, components).then(({rows,dateWarnings,skipped})=>{
-    if(!rows.length){ alert("Nem találtam feldolgozható sort a fájlban."); return; }
+    if(!rows.length){ showMessage("Nem találtam feldolgozható sort a fájlban.", { title:"Figyelem" }); return; }
     const warn=[];
     if(dateWarnings.length) warn.push(`⚠ ${dateWarnings.length} sor dátuma nem volt felismerhető (#${dateWarnings.slice(0,8).join(", #")}${dateWarnings.length>8?"…":""}) — ezeknél a dátum üresen marad.`);
     if(skipped.length) warn.push(`⚠ ${skipped.length} sort kihagytam (${skipped.slice(0,5).map(s=>`${s.rowNo}. sor: ${s.ok}`).join("; ")}${skipped.length>5?"…":""}).`);
@@ -155,7 +156,7 @@ ${rows.slice(0,5).map(x=>`  #${x.lapszam}${x.cim?" – "+esc(x.cim):""}`).join("
     document.getElementById("du-confirm").onclick=guarded(async ()=>{
       try{
         const {inserted,skipped:sk}=await insertFn(draftSeriesId, rows);
-        alert(`Feltöltve: ${inserted} új tétel.${sk?` (${sk} kihagyva, mert már létezett ilyen lapszám.)`:""}`);
+        await showMessage(`Feltöltve: ${inserted} új tétel.${sk?` (${sk} kihagyva, mert már létezett ilyen lapszám.)`:""}`, { title:"Kész" });
       }catch(e){ err(e); }
       onDone();
     });
@@ -193,10 +194,10 @@ function diffText(o){
 async function confirmStaffUpload(openModal, err, file, draftId, components, onDone){
   const parsed=await parseDraftExcel(file, components);
   if(parsed.legacy){
-    alert("Ez a fájl a régi sablon-formátumban van (nincsenek benne azonosító oszlopok), ezért biztonsági okból nem tölthető fel ide — a sorokat nem tudnám megbízhatóan a tételekhez párosítani.\n\nTöltsd le újra a ⬇ Sablon gombbal: az új sablon a draft jelenlegi állapotát tartalmazza, és azonosítókkal párosít.");
+    showMessage("Ez a fájl a régi sablon-formátumban van (nincsenek benne azonosító oszlopok), ezért biztonsági okból nem tölthető fel ide — a sorokat nem tudnám megbízhatóan a tételekhez párosítani.\n\nTöltsd le újra a ⬇ Sablon gombbal: az új sablon a draft jelenlegi állapotát tartalmazza, és azonosítókkal párosít.", { title:"Figyelem" });
     return;
   }
-  if(!parsed.rows.length){ alert("Nem találtam feldolgozható sort a fájlban."); return; }
+  if(!parsed.rows.length){ showMessage("Nem találtam feldolgozható sort a fájlban.", { title:"Figyelem" }); return; }
 
   const items=await fetchDraftItems(draftId);
   // A draft sorozat-azonosítói és sablonja: a „Sorozat-azonosítók” lap összevetéséhez és az
@@ -311,8 +312,8 @@ async function confirmStaffUpload(openModal, err, file, draftId, components, onD
         const { data, error } = await supabase.rpc("apply_draft_upload", { p_draft_id:draftId, p_payload:payload });
         if(error) throw error;
         const gapsAfter=idTypeGaps(plan, idTypeOf, allowedOf);
-        alert(`Feltöltve: ${data.uj} új tétel, ${data.frissitett} frissített tétel, ${data.uj_komponens} új és ${data.frissitett_komponens} frissített komponens${data.torolt?`, ${data.torolt} tétel törlésre jelölve/törölve`:""}${data.sorozat_azonositok?", a sorozat-azonosítók frissültek":""}.`
-          + (gapsAfter.length ? `\n\nTeendő a „Kész” előtt: ${gapText(gapsAfter)}. Nyisd meg ezeket a Számokat a szerkesztőben, és válaszd ki az azonosító típusát.` : ""));
+        await showMessage(`Feltöltve: ${data.uj} új tétel, ${data.frissitett} frissített tétel, ${data.uj_komponens} új és ${data.frissitett_komponens} frissített komponens${data.torolt?`, ${data.torolt} tétel törlésre jelölve/törölve`:""}${data.sorozat_azonositok?", a sorozat-azonosítók frissültek":""}.`
+          + (gapsAfter.length ? `\n\nTeendő a „Kész” előtt: ${gapText(gapsAfter)}. Nyisd meg ezeket a Számokat a szerkesztőben, és válaszd ki az azonosító típusát.` : ""), { title:"Kész" });
       }catch(e){ err(e); }
       onDone();
     });

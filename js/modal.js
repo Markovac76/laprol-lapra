@@ -1,6 +1,7 @@
 /* ============================================================
    Megosztott modál-primitívek és általános visszajelzés.
    ============================================================ */
+import { showMessage } from "./dialog.js";
 export const modal = document.getElementById("modal");
 export const sheet = document.getElementById("sheet");
 
@@ -34,7 +35,9 @@ export function friendlyError(e){
     return "A művelet olyan elemre hivatkozik, ami közben megszűnt — frissítsd az oldalt, és próbáld újra.";
   return msg;
 }
-export function err(e){ console.error(e); alert("Hiba: "+friendlyError(e)); }
+// A hiba az app saját ablakában (js/dialog.js) jelenik meg, „Hiba” címmel. A visszaadott
+// Promise a „Rendben”-re teljesül (ahol a sorrend számít, a hívó megvárhatja).
+export function err(e){ console.error(e); return showMessage(friendlyError(e)); }
 
 // Egységes "mentés közben" védelem minden mentő/beszúró kezelőhöz (12. pont):
 // futás alatt a gomb le van tiltva, és az ismételt kattintás/koppintás

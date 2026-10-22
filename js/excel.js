@@ -16,6 +16,7 @@
 import { supabase } from "./supabase.js";
 import { state, S, COMP_TYPES, esc } from "./state.js";
 import { openModal, closeModal, err, friendlyError, guarded } from "./modal.js";
+import { showMessage } from "./dialog.js";
 import { reload } from "./data.js";
 import { upsertMyIssueData, upsertMyStatus } from "./personal.js";
 import { excelRowToLiveIssue as newIssuePayload } from "./type-defs.js";
@@ -75,7 +76,7 @@ function tmplHead(s){ const h=["lapszám","cím","dátum (Excel dátum, pl. 2026
 
 export async function downloadTemplate(){
   const s=S();
-  if(!s){ alert("Előbb hozz létre egy sorozatot (+ Új sorozat), utána tudsz hozzá sablont letölteni."); return; }
+  if(!s){ showMessage("Előbb hozz létre egy sorozatot (+ Új sorozat), utána tudsz hozzá sablont letölteni.", { title:"Figyelem" }); return; }
   try{
     const X=await xlsx(), head=tmplHead(s);
     // valódi Excel dátum- és szám-típusú példacellák, hogy Excel a helyes formátumot ajánlja fel
@@ -95,7 +96,7 @@ export async function downloadTemplate(){
 
 export async function handleUpload(file){
   const s=S();
-  if(!s){ alert("Előbb hozz létre egy sorozatot (+ Új sorozat), utána tudsz hozzá Excelt feltölteni."); return; }
+  if(!s){ showMessage("Előbb hozz létre egy sorozatot (+ Új sorozat), utána tudsz hozzá Excelt feltölteni.", { title:"Figyelem" }); return; }
   let plan=[], dateWarnings=[];
   try{
     const X=await xlsx(); const wb=X.read(await file.arrayBuffer(),{cellDates:true});
@@ -122,7 +123,7 @@ export async function handleUpload(file){
     }
   }catch(e){ err(e); return; }
 
-  if(!plan.length){ alert("Nem találtam feldolgozható sort a fájlban."); return; }
+  if(!plan.length){ showMessage("Nem találtam feldolgozható sort a fájlban.", { title:"Figyelem" }); return; }
   const added=plan.filter(x=>x.isNew).length, updated=plan.length-added;
   const warnBlock = dateWarnings.length
     ? `<p class="msub" style="color:#f0cd8a">⚠ ${dateWarnings.length} sor dátuma nem volt felismerhető (#${dateWarnings.slice(0,8).join(", #")}${dateWarnings.length>8?"…":""}) — ezeknél a dátum üresen marad, a többi mező feltöltődik.</p>`
@@ -192,7 +193,7 @@ ${plan.slice(0,5).map(x=>`  #${x.n}${x.p.cim?" – "+x.p.cim:""}${x.isNew?" (új
       const msg = draftUpd>0
         ? `Új szám (azonnal élő): ${ins}\nMeglévő szám törzsadat-módosítása (${draftUpd} db) egy szerkesztési draftba került a Karbantartásban — nézd át és publikáld, ha jó.\nA saját jelöléseid/áraid azonnal frissültek.`
         : `Új szám: ${ins}${updated>0?"\nA saját jelöléseid/áraid a meglévő számokon azonnal frissültek.":""}`;
-      if(!failed.length){ alert("Feltöltve.\n"+msg); return; }
+      if(!failed.length){ showMessage("Feltöltve.\n"+msg, { title:"Kész" }); return; }
       // Számonként felsoroljuk, mi nem ment át és miért (a többi sor rendben feltöltődött).
       openModal(`<h2>Feltöltés — ${failed.length} új Szám nem jött létre</h2>
         <p class="msub" style="white-space:pre-wrap">${esc(msg)}</p>

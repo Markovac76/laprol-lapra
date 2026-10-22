@@ -7,6 +7,7 @@
 import { supabase } from "./supabase.js";
 import { state, S, esc, pad, opts, capFirst, slugify, sortEgyebLast, typeLabel } from "./state.js";
 import { openModal, closeModal, err, friendlyError, sheet, guarded } from "./modal.js";
+import { showMessage } from "./dialog.js";
 import { reload } from "./data.js";
 import { typeFieldsHtml, readTypeFields, wireTypeFields } from "./draft-items.js";
 import { typeDef, defaultIdType, buildLiveIssuePayload } from "./type-defs.js";
@@ -179,10 +180,10 @@ export function listsForm(){
       const t=b.dataset.add, inp=document.getElementById("nl-"+t);
       const nev=capFirst(inp.value); if(!nev) return;               // első betű automatikusan nagybetű (11. pont)
       const ertek=slugify(nev);                                      // ékezet nélküli azonosító (11. pont)
-      if(!ertek){ alert("Adj meg érvényes nevet."); return; }
+      if(!ertek){ showMessage("Adj meg érvényes nevet.", { title:"Figyelem" }); return; }
       // Érthető duplikátum-üzenet (kis/nagybetűre és szóközre érzéketlenül).
       if((state.LISTS[t]||[]).some(o=>normName(o.nev)===normName(nev) || o.ertek.toLowerCase()===ertek)){
-        alert("Ez az érték már szerepel a listában."); return;
+        showMessage("Ez az érték már szerepel a listában.", { title:"Figyelem" }); return;
       }
       try{
         const so=(state.LISTS[t]||[]).length+1;
@@ -208,17 +209,17 @@ export function listsForm(){
       inp.onkeydown=ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); save.click(); } else if(ev.key==="Escape") listsForm(); };
       save.onclick=guarded(async ()=>{
         const nev=capFirst(inp.value);
-        if(!nev){ alert("Adj meg nevet."); return; }
+        if(!nev){ showMessage("Adj meg nevet.", { title:"Figyelem" }); return; }
         if(nev===cur.nev){ listsForm(); return; }
         if((state.LISTS[t]||[]).some(o=>o.ertek!==e && normName(o.nev)===normName(nev))){
-          alert("Ez a név már szerepel a listában."); return;
+          showMessage("Ez a név már szerepel a listában.", { title:"Figyelem" }); return;
         }
         try{
           // Közvetlen módosítás (nem megy a draft/verzió-folyamaton át); a hivatkozások
           // az azonosítóra mutatnak, ezért nem kell őket átírni.
           const {data,error}=await supabase.from("lists").update({megjelenites:nev}).eq("tipus",t).eq("ertek",e).select();
           if(error) throw error;
-          if(!data || !data.length){ alert("Ez a lista-elem már nem található — frissítsd az oldalt."); return; }
+          if(!data || !data.length){ showMessage("Ez a lista-elem már nem található — frissítsd az oldalt."); return; }
           await reload();            // a fülek, választók az új nevet mutassák
         }catch(e2){ err(e2); return; }
         listsForm();

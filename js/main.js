@@ -17,6 +17,7 @@ import { showIssueChangePopup } from "./changes.js";
 import { uploadLiveImage, proposeImage, approveProposal, rejectProposal, setUploadEnabled, deleteLiveImage } from "./component-images.js";
 import { reload } from "./data.js";
 import { err } from "./modal.js";
+import { showMessage } from "./dialog.js";
 import { showApp, loginWithPassword, registerWithPassword, logout, initSession } from "./auth.js";
 import { checkVersion, onStale } from "./version.js";
 import { openImageZoom } from "./image-zoom.js";
@@ -121,7 +122,7 @@ document.getElementById("list").addEventListener("click",async e=>{
     else if(prevDb===0 || prevStatus!=="megvan") nextSt="megvan";
     comp.db=nextDb; comp.status=nextSt; renderAll();
     const error=await upsertMyStatus(comp.id,{db:nextDb,status:nextSt});
-    if(error){ comp.db=prevDb; comp.status=prevStatus; renderAll(); alert("Mentés sikertelen: "+error.message); return; }
+    if(error){ comp.db=prevDb; comp.status=prevStatus; renderAll(); showMessage("Mentés sikertelen: "+error.message); return; }
     await applyAutoPrice(it, S(), prevOwned); renderAll();
     return;
   }
@@ -144,7 +145,7 @@ document.getElementById("list").addEventListener("click",async e=>{
   const nextDb = (next==="megvan") ? Math.max(1, prevDb===0?1:prevDb) : prevDb;
   comp.status=next; comp.db=nextDb; renderAll();                 // optimista frissítés
   const error=await upsertMyStatus(comp.id,{status:next,db:nextDb});
-  if(error){ comp.status=prev; comp.db=prevDb; renderAll(); alert("Mentés sikertelen: "+error.message); return; }
+  if(error){ comp.status=prev; comp.db=prevDb; renderAll(); showMessage("Mentés sikertelen: "+error.message); return; }
   await applyAutoPrice(it, S(), prevOwned); renderAll();         // B2: auto fizetett ár kitöltés/nullázás
 });
 
@@ -152,7 +153,7 @@ document.getElementById("list").addEventListener("click",async e=>{
 document.getElementById("admToggle").onclick=function(){ state.adminMode=!state.adminMode;
   this.setAttribute("aria-pressed",state.adminMode); this.classList.toggle("on",state.adminMode);
   renderList(); applyPickerMode(); };
-document.getElementById("a-item").onclick=()=>{ if(!S()){ alert("Előbb válassz ki egy sorozatot a 📚 Sorozataim alatt (vagy javasolj újat)."); return; } itemForm(); };
+document.getElementById("a-item").onclick=()=>{ if(!S()){ showMessage("Előbb válassz ki egy sorozatot a 📚 Sorozataim alatt (vagy javasolj újat).", { title:"Figyelem" }); return; } itemForm(); };
 document.getElementById("a-lists").onclick=listsForm;
 document.getElementById("usersBtn").onclick=usersForm;
 document.getElementById("mySeriesBtn").onclick=mySeriesForm;

@@ -11,6 +11,7 @@
 import { supabase, fetchAllRows } from "./supabase.js";
 import { state, COMP_TYPES, esc, fmtDate, listName } from "./state.js";
 import { openModal, sheet, err, guarded } from "./modal.js";
+import { showMessage } from "./dialog.js";
 import { initialComponents } from "./component-template.js";
 import { typeDef, idMode, masterFields, extraFields, isRequired, defaultIdType, storedIdProblem, orderComponents } from "./type-defs.js";
 
@@ -275,8 +276,8 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
         syncFromDom();
         const k=b.dataset.removecomp, c=comps.find(x=>keyOf(x)===k);
         if(!c) return;
-        if(k===mainKey){ alert("Ez a fő elem. Előbb jelölj ki másikat fő elemnek."); return; }
-        if(comps.filter(x=>!x.deleted).length<=1){ alert("Egy Számnak mindig marad legalább egy komponense — csak a Számot lehet törölni."); return; }
+        if(k===mainKey){ showMessage("Ez a fő elem. Előbb jelölj ki másikat fő elemnek.", { title:"Figyelem" }); return; }
+        if(comps.filter(x=>!x.deleted).length<=1){ showMessage("Egy Számnak mindig marad legalább egy komponense — csak a Számot lehet törölni.", { title:"Figyelem" }); return; }
         if(c.id && c.source_component_id){
           // Élő párral rendelkező komponens: TÖRÖLT-JELÖLÉS (publikáláskor lesz törölt az élő komponens);
           // csendes, a személyes adatok megmaradnak, visszaállítható.
@@ -310,7 +311,7 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
 
     document.getElementById("di-save").onclick=guarded(async ()=>{
       syncFromDom();
-      const n=parseInt(master.lapszam); if(isNaN(n)){alert("A lapszám kötelező.");return;}
+      const n=parseInt(master.lapszam); if(isNaN(n)){showMessage("A lapszám kötelező.", { title:"Figyelem" });return;}
       const masterPayload={ draft_series_id:draftSeriesId, lapszam:n, cim:(master.cim||"").trim()||null, megjelenes:master.megjelenes||null,
         eredeti_ar:master.eredeti_ar?parseInt(master.eredeti_ar):null, deleted: !!master.deleted };
       // Azonosító-típus a típus szabálya szerint — csak az új és az itt módosított azonosítóra:
@@ -325,7 +326,7 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
         if(mode==="fix") c.azonosito_tipus=types[0];
         else if(mode==="valaszthato" && !types.includes(at)){
           if(!at && def.default_azonosito_tipus) c.azonosito_tipus=def.default_azonosito_tipus;
-          else { alert(`${typeLabel(c.tipus)}: az azonosítóhoz válaszd ki az azonosító típusát — ${types.map(idTypeName).join(" vagy ")}.`); return; }
+          else { showMessage(`${typeLabel(c.tipus)}: az azonosítóhoz válaszd ki az azonosító típusát — ${types.map(idTypeName).join(" vagy ")}.`, { title:"Figyelem" }); return; }
         }
       }
       try{
