@@ -1,4 +1,4 @@
-# Collector app — állapot-összefoglaló / átadási dokumentum (v22)
+# Collector app — állapot-összefoglaló / átadási dokumentum (v23)
 
 **Frissítve:** 2026. október 22. · **Cél:** ha ez a beszélgetés lezárul és újat nyitsz a Claude projektben, ez a dokumentum adja vissza a kontextust gyorsan.
 
@@ -19,7 +19,7 @@
 - **GitHub:** `github.com/Markovac76/laprol-lapra` (privát)
 - **Supabase:** „Laprol Lapra", Frankfurt, Free
 - **Tulajdonos UID:** `25cb3724-02d4-4002-98b0-c93f74ef4e42` (g.marcell.kovacs@gmail.com)
-- **Specifikáció:** jelenleg **v1.34** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
+- **Specifikáció:** jelenleg **v1.35** (a projekt-mappában, `laprol-lapra-specifikacio.md`) — ⚠️ a `.pdf` ennél elavultabb lehet, ellenőrizd/generáltasd újra, ha kell.
 - **README.md** (v1.8): projekt-belépő dokumentum fejlesztőnek/új munkamenetnek — tech stack, mappaszerkezet, helyi futtatás, deploy, és a "Migrációk"/"Inaktivitás elleni védelem" munkamódszer-szabályok részletesen (ott az elsődleges hely erre, nem itt vagy a specifikációban).
 
 ### Fájlszerkezet (natív ES modulok, build-eszköz nélkül)
@@ -72,7 +72,7 @@ laprol-lapra/
     ├── changes.js                               ← verziókövetés / felkiáltójel
     ├── component-images.js, image-resize.js     ← képfeltöltés / képjavaslat
     ├── image-zoom.js                            ← teljes képernyős képnagyítás (a lenyitott sor nagy képei)
-    ├── dialog.js                                ← az app saját üzenetablaka (showMessage; a natív alert helyett, sorba állítva)
+    ├── dialog.js                                ← az app saját üzenet- és kérdésablaka (showMessage, askConfirm; a natív alert / confirm helyett, közös sorban)
     ├── help.js, help-content.js                 ← beépített súgó
     └── changelog.js, changelog-content.js       ← 🔔 Újdonságok
 ```
@@ -287,7 +287,7 @@ Változatlan a korábbi összefoglalóhoz képest — lásd a `laprol-lapra-spec
 
 - Kezdő fejlesztésben, de már magabiztosan kezelem: VS Code, Git, GitHub, Vercel, Supabase SQL Editor, és a **Claude Code**-ot is.
 - **Előbb megbeszélés/ötletelés, utána kód** — hibákat/kéréseket összegyűjtve, egyben viszem tovább, nem egyesével.
-- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.34).
+- A specifikációt élő dokumentumként kezeljük, verziószámmal (jelenleg v1.35).
 - **Token-tudatos vagyok** — tömör válaszokat kérek, kevesebb ismétlést/fejezetcímet, amikor a kérdés nem indokol hosszú, strukturált választ.
 - **Magyarul kérem a kérdéseket/válaszokat** a Claude Code-munkameneteken belül (explicit kérés).
 - Git-fegyelem: a Code csak az én kifejezett "mehet a commit és push" jóváhagyásom UTÁN commitol/pushol, minden tesztelt lépés után külön commit-ban, világos, a hibajavítási pont sorszámára hivatkozó üzenettel.
@@ -313,7 +313,7 @@ A betűjelek a Claude Home csevegésben használt címkék. Egy „kör” = a p
 
 | Jel | Téma | Becsült kör | Megjegyzés |
 |---|---|---|---|
-| D | Karbantartás és szerkesztés összevonása: „Szám adatainak szerkesztése” gomb, piros törlés gombok, saját hibaablak, azonosító-hibaüzenetek | 5–6 | **Folyamatban (1/6 kör kész):** a döntések megszülettek, a körök ütemezése és az 1. kör (az app saját hibaablaka): specifikáció 13.15. |
+| D | Karbantartás és szerkesztés összevonása: „Szám adatainak szerkesztése” gomb, piros törlés gombok, saját hibaablak, azonosító-hibaüzenetek | 5–6 | **Folyamatban (2/6 kör kész):** a döntések megszülettek; kész az 1. kör (az app saját hibaablaka) és a 2. kör („Biztosan?” kérdések, egységes piros törlés gombok): specifikáció 13.15. |
 | E | Gyors Excel és sablonok átdolgozása | 3–4 | Lásd a nyitott pontok között a Gyors Excel (azonosító-alapú párosítás, komponens nélküli Szám jelzése) és az Excel-sablon (fő elem) tételeit. |
 | G | A beküldő értesítése és üzenet az adminnak | 5–6 | |
 | H | Valódi fióktörlés (Edge Function) | kb. 3 | A `lists.user_id` `ON DELETE CASCADE` miatt a törölt fiók által felvett közös lista-értékek is törlődnének: ezt előbb el kell dönteni. |

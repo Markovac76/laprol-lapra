@@ -1,6 +1,6 @@
 # OM Curator (platform) & Lapról Lapra (első modul) — specifikáció
 
-**Verzió:** 1.34 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
+**Verzió:** 1.35 · **Állapot:** ÉLES, aktív fejlesztés (a Lapról Lapra modul v1) · **Projekt:** Collector app
 
 > Élő dokumentum. Jelölések: **[DÖNTVE]** · **[NYITOTT]** · **[KÉSŐBB]**.
 > Az építés csak a specifikáció lezárása után kezdődik. A platform (OM Curator) itt **szándékosan magas szinten**, csak elvi szinten szerepel — a részletei akkor jönnek, amikor lesz második modul.
@@ -691,7 +691,7 @@ Előzmény: a ☰ Listák felületen értéket felvenni és átnevezni lehetett,
 - **Igazolás:** visszagörgetett próba valódi szerepkörökkel (`scripts/trial-49-lista-torles.js`, 11/11: a használatlan érték mind az öt listában törlődik; a használt és a védett érték megáll a helyes üzenettel és semmit nem töröl; sima felhasználó, letiltott admin, `anon` nem törölhet; a közvetlen `DELETE FROM lists` továbbra is `permission denied`; a képjavaslat-takarítás a kliens útján előtte „törlés 0, bent maradt 1”, utána „törlés 1, bent maradt 0”; a 34 lépéses forgatókönyv azonos), az új Szám próba 19/19, a visszaút próbája; a futtatás után éles módban a 16 / 19 / 14 / 13 / 11 próba; valódi HTTP-hívás a nyilvános kulccsal (az `rpc/delete_list_value` előtte 404, utána 401 / `42501`; a közvetlen törlés 401). Az audit (`scripts/audit-jogok.js`) modulként is hívható (`audit(q)`), hibás-állapot próbája: `scripts/trial-49-audit.js` (3/3).
 SQL: `49-lista-torles`.
 
-### 13.15 D kör — a szerkesztés egységesítése **[DÖNTVE; folyamatban — 1/6 kör kész, v1.34]**
+### 13.15 D kör — a szerkesztés egységesítése **[DÖNTVE; folyamatban — 2/6 kör kész, v1.35]**
 
 **A tulajdonos döntései:**
 1. **„Szám adatainak szerkesztése” gomb** a lenyitott Szám sorában (staff): egy koppintással a Szám szerkesztőjébe visz, és a szerkesztési munkaanyagot a háttérben elindítja, ha még nincs. A „Kész” és a „Közzététel” lépés marad (több javítás gyűjthető, egyszerre tehető közzé). Egygombos gyors közzététel nincs (elvetve, később újra elővehető).
@@ -699,7 +699,7 @@ SQL: `49-lista-torles`.
 3. **Saját ablak minden hibaüzenetre és minden „Biztosan?” kérdésre.** A törlés gombok egységesen pirosak, és a megerősítés kimondja, mi fog történni.
 4. **A sorozat-azonosító hibájánál** a szerkesztő mindkét kitöltött sort bekeretezi, és az azonosító-hibaüzenetek érthetőbbek lesznek.
 
-**Körök (előzetes ütemezés):** 53. lépés — hibaablak-alap és a hibaüzenetek (**kész**) · 54 — megerősítő kérdések és piros törlés gombok · 55 — „Szám adatainak szerkesztése” gomb · 56 — egy szerkesztő gomb · 57 — azonosító-hibaüzenetek, súgó, dokumentáció · 58 — tartalék.
+**Körök (előzetes ütemezés):** 53. lépés — hibaablak-alap és a hibaüzenetek (**kész**) · 54 — megerősítő kérdések és piros törlés gombok (**kész**) · 55 — „Szám adatainak szerkesztése” gomb · 56 — egy szerkesztő gomb · 57 — azonosító-hibaüzenetek, súgó, dokumentáció · 58 — tartalék.
 
 **1. kör — az app saját üzenetablaka (`js/dialog.js`) [megvalósítva — v1.34]:**
 - `showMessage(text, { title = "Hiba" })` → `Promise`, amely az ablak bezárásakor teljesül. Cím: „Hiba”, figyelmeztetésnél „Figyelem”, a sikeres feltöltés visszajelzésénél „Kész”. A szöveg `textContent`-ként kerül be (nem HTML), a sortörések megmaradnak; egy „Rendben” gomb (legalább 44 px).
@@ -710,9 +710,18 @@ SQL: `49-lista-torles`.
 - **Védőpróba:** `scripts/tests/no-native-dialogs.test.mjs` — elbukik, ha a `js/` alatt (a `dialog.js` kivételével) natív `alert(` hívás van; a megjegyzés és a karakterlánc-tartalom nem számít. A `confirm(` ellenőrzése a 2. körben kerül bele.
 - Nincs hálózati hívás, nincs új függőség. Súgó- és változásnapló-bejegyzés a 2. kör után, közösen.
 
+**2. kör — „Biztosan?” kérdések és egységes piros törlés gombok [megvalósítva — v1.35]:**
+- `askConfirm(text, { title, okLabel = "Rendben", cancelLabel = "Mégse", danger = false })` → `Promise<boolean>` (`js/dialog.js`, ugyanaz az elem és **ugyanaz a sor**, mint a `showMessage`-nél: egy kérdés nem csúszik rá egy nyitott hibaablakra, és fordítva). **Igaz csak az OK gombra**; a Mégse, az Esc és a háttérre koppintás hamis (pontosan, mint a régi „Mégse”: semmi nem történik). A két mód közti állapot (gombok, feliratok, piros szín, fókusz) minden megnyitáskor újra beáll.
+- **Mind a 15 natív `confirm(`** az új ablakon megy: kérdés alakú cím, cselekvő gombfelirat (pl. „Törlöd a képet?” / „Törlöm”); a szöveg kimondja, mi történik és mi nem (végleges-e, visszavonható-e, kire hat). Megerősítés után sehol nincs olyan művelet, amely közvetlen felhasználói koppintást kívánna (fájlválasztó, új ablak, vágólap).
+- **`danger: true` (piros OK, a fókusz a Mégse gombon, hogy egy véletlen Enter ne töröljön):** Listák-érték törlése, komponens törlése (élő párral: törlésre jelölés; csak munkaanyagban: azonnali törlés), Szám törlésre jelölése, Szám törlése a munkaanyagból, kép törlése, munkaanyag törlése, sorozat törlésének indítása, végleges törlés. **Nem `danger`** (a fókusz az OK gombon): felhasználó letiltása, admin jog adása / visszavonása, publikálatlanná tétel, visszaadás szerkesztésre, újratöltés nyitott ablakkal („Újratöltöm”).
+- **Egységes piros törlés gomb:** egyetlen közös CSS-szabály (`.btn.danger`, `.uactions button.danger`, `.imgtogglebtn.danger`, `.appdlg-ok.danger`); a színek az eddigi törlés-színek egy helyen (`--danger-ink`, `--danger-line`), a Listák 🗑 ikonja is ezt az árnyalatot használja. Az „Ez a példány törlése” gomb (az új tétel űrlapján és a Szám-szerkesztőben) eddig sima gomb volt, most piros. **Ami nem törlés, de eddig is piros volt, az marad:** „Letiltás” (felhasználók), „Publikálatlanná tétel”, „Törlésre jelölés visszavonása” (ugyanaz a gomb, mint a törlésre jelölés). A „Törlés visszavonása” (komponensnél) és az „Elfogad” nem piros.
+- **Védőpróba kiterjesztése:** a `scripts/tests/no-native-dialogs.test.mjs` a natív `confirm(`-ot is tiltja (az `askConfirm(` nem találat); a csere előtti fájlokon pontosan a 15 régi helyet találja. Gépi próba a közös sorra (üzenet és kérdés vegyesen): `scripts/tests/dialog.test.mjs`.
+- Súgó (a kép törlése) és változásnapló (az 1. és a 2. kör együtt) ezzel a körrel.
+
 ---
 
 *Napló:*
+- v1.35 — **54. lépés — D kör / 2: „Biztosan?” kérdések az app saját ablakában, egységes piros törlés gombok** (13.15): `askConfirm` (közös sor a hibaüzenetekkel), mind a 15 `confirm(` cseréje kérdés alakú címmel, cselekvő gombfelirattal és pontosabb szöveggel; a törlések piros OK-val és a Mégse-n álló fókusszal; egy közös piros stílus a törlés gombokra; a védőpróba a `confirm(`-ot is tiltja. Súgó és változásnapló. Csak kliens; adatbázis-változás nincs.
 - v1.34 — **53. lépés — D kör / 1: az app saját üzenetablaka** (13.15): a D kör négy döntése és ütemezése rögzítve; új `js/dialog.js` (`showMessage`), az `err(e)` és mind a 31 közvetlen `alert(` a saját ablakot használja; védőpróba a natív `alert(` ellen. Csak kliens; adatbázis-változás nincs.
 - v1.33 — **52. lépés — a státusz-szűrők egységesítése** (7. fejezet „Szűrők”): a Megvan / Hiányzik / Nem kell szűrő is a Szám minden nem törölt elemét nézi (a sablonon kívülieket is), mint a Jelöletlen; az 51. lépés megjegyzése lezárva. Egyetlen élő Számot érint (Lego Star Wars Magazin #29). Az F kör lezárult. Csak kliens; adatbázis-változás nincs.
 - v1.32 — **51. lépés — „Jelöletlen” szűrő és teljes képernyős képnagyítás** (7. fejezet „Szűrők”, 5.3 „Képkezelés”; a 10. fejezet 9. és 20. pontja lezárva): új szűrő a megjelent, legalább egy jelöletlen elemmel bíró Számokra (0-nál is látszik, a meg nem jelent Számok kimaradnak); a lenyitott sor nagy képeire koppintva teljes képernyős nézet (`js/image-zoom.js`). Csak kliens; adatbázis-változás nincs.

@@ -33,7 +33,7 @@ Nyelv: magyar. Tömör válaszok. A kérdéseket egyszerre, egyben, szövegben f
 
 ## Kliens
 - Új, nem az apphoz tartozó fájl vagy mappa (dokumentum, adat, eszköz) kerül a `.vercelignore`-ba; az élő címen 404-et kell adnia.
-- Hibaüzenet az app saját ablakában (`js/dialog.js`, `showMessage`) jelenik meg; natív `alert(` nem használható (a `scripts/tests/no-native-dialogs.test.mjs` őrzi).
+- Hibaüzenet és megerősítő kérdés az app saját ablakában (`js/dialog.js`, `showMessage`, `askConfirm`) jelenik meg; natív `alert(` és `confirm(` nem használható (a `scripts/tests/no-native-dialogs.test.mjs` őrzi).
 - Natív ES modulok, build-eszköz nélkül. Nincs service worker; a deploy után az appot újra kell tölteni a böngészőben.
 
 ## Munkamód a jogosultságokhoz
