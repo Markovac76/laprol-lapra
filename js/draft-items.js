@@ -11,7 +11,7 @@
 import { supabase, fetchAllRows } from "./supabase.js";
 import { state, COMP_TYPES, esc, fmtDate, listName } from "./state.js";
 import { openModal, sheet, err, guarded } from "./modal.js";
-import { showMessage } from "./dialog.js";
+import { showMessage, askConfirm } from "./dialog.js";
 import { initialComponents } from "./component-template.js";
 import { typeDef, idMode, masterFields, extraFields, isRequired, defaultIdType, storedIdProblem, orderComponents } from "./type-defs.js";
 
@@ -223,9 +223,9 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
             : `<div class="unote" style="margin-top:6px">★ Ez a Szám egyetlen eleme, ezért ez a fő elem.</div>`}
           ${comps.filter(x=>!x.deleted).length>1
             ? (k===mainKey
-                ? `<button type="button" class="btn ghost" disabled title="Ez a fő elem. Előbb jelölj ki másikat fő elemnek.">Ez a példány törlése</button>
+                ? `<button type="button" class="btn danger" disabled title="Ez a fő elem. Előbb jelölj ki másikat fő elemnek.">Ez a példány törlése</button>
                    <div class="unote">Ez a fő elem. Előbb jelölj ki másikat fő elemnek.</div>`
-                : `<button type="button" class="btn ghost" data-removecomp="${k}">Ez a példány törlése</button>`)
+                : `<button type="button" class="btn danger" data-removecomp="${k}">Ez a példány törlése</button>`)
             : `<div class="unote">Ez a Szám egyetlen eleme — csak a Számot lehet törölni.</div>`}
         </div>`;
       }).join("");
@@ -281,14 +281,14 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
         if(c.id && c.source_component_id){
           // Élő párral rendelkező komponens: TÖRÖLT-JELÖLÉS (publikáláskor lesz törölt az élő komponens);
           // csendes, a személyes adatok megmaradnak, visszaállítható.
-          if(!confirm("Törlöd ezt a komponenst a Számról?\n\nPublikáláskor eltűnik a Számról (csendesen, felkiáltójel nélkül). A hozzá tartozó személyes jelölések megmaradnak, és a törlés a publikálásig visszavonható.")) return;
+          if(!(await askConfirm("Törlöd ezt a komponenst a Számról?\n\nPublikáláskor eltűnik a Számról (csendesen, felkiáltójel nélkül). A hozzá tartozó személyes jelölések megmaradnak, és a törlés a publikálásig visszavonható.", { title:"Törlöd a komponenst?", okLabel:"Törlöm a Számról", danger:true }))) return;
           try{ const {error}=await supabase.from("draft_components").update({deleted:true, is_main:false}).eq("id",c.id); if(error) throw error; }
           catch(e){ err(e); return; }
           c.deleted = true; c.is_main = false;
         } else {
           // Csak a draftban létező (még sosem publikált) komponens: egyszerűen elhagyjuk.
           if(c.id){
-            if(!confirm("Törlöd ezt a komponenst a draftból?")) return;
+            if(!(await askConfirm("Törlöd ezt a komponenst a draftból?\n\nMég nem publikált elem: azonnal és véglegesen törlődik a munkaanyagból; az élő sorozatot nem érinti.", { title:"Törlöd a komponenst?", okLabel:"Törlöm", danger:true }))) return;
             try{ const {error}=await supabase.from("draft_components").delete().eq("id",c.id); if(error) throw error; }
             catch(e){ err(e); return; }
           }
@@ -375,14 +375,14 @@ export function draftItemForm(draftSeriesId, existing, components, onDone, templ
         // ütközne). Helyette törlésre jelöljük, így a publikálás soft-delete-eli
         // az élő párját, a felhasználók a szokásos felkiáltójelet kapják.
         const restore = !!existing.deleted;
-        if(!restore && !confirm(`Törlésre jelölöd a #${existing.lapszam} számot?
+        if(!restore && !(await askConfirm(`Törlésre jelölöd a #${existing.lapszam} számot?
 
-Publikáláskor ez a Szám TÖRÖLT lesz az élő sorozatban (a felhasználók felkiáltójelet kapnak; a saját adataik a nyugtázáskor törlődnek). A jelölés a publikálásig bármikor visszavonható.`)) return;
+Publikáláskor ez a Szám TÖRÖLT lesz az élő sorozatban (a felhasználók felkiáltójelet kapnak; a saját adataik a nyugtázáskor törlődnek). A jelölés a publikálásig bármikor visszavonható.`, { title:"Törlésre jelölöd a Számot?", okLabel:"Törlésre jelölöm", danger:true }))) return;
         try{ const {error}=await supabase.from("draft_issues").update({deleted:!restore}).eq("id",existing.id); if(error) throw error; }catch(e){ err(e); return; }
       } else {
-        if(!confirm(`Biztosan törlöd a #${existing.lapszam} számot a draftból?
+        if(!(await askConfirm(`Biztosan törlöd a #${existing.lapszam} számot a draftból?
 
-Ez csak a munkaanyagot érinti, élő Szám még nem tartozik hozzá.`)) return;
+Ez csak a munkaanyagot érinti, élő Szám még nem tartozik hozzá. A törlés azonnali, nem vonható vissza.`, { title:"Törlöd a Számot a munkaanyagból?", okLabel:"Törlöm", danger:true }))) return;
         try{ const {error}=await supabase.from("draft_issues").delete().eq("id",existing.id); if(error) throw error; }catch(e){ err(e); return; }
       }
       onDone();

@@ -221,7 +221,7 @@ export const HELP_CONTENT = {
       { q:"Hogyan engedélyezem vagy tiltom le a képfeltöltést egy komponensen (vagy a sorozat-borítón)?",
         a:"<p>Ha MÁR van valódi kép, egy kapcsoló jelenik meg staffnak: <b>„🔓 userek javasolhatnak”</b> / <b>„🔒 userek nem javasolhatnak”</b> — erre koppintva ki/be kapcsolhatod. Ha még NINCS kép, a feltöltés automatikusan engedélyezett, nincs mit kapcsolni.</p>" },
       { q:"Hogyan törlöm teljesen a képet (visszaállítás „Nincs kép” állapotra)?",
-        a:"<p>Ha van élő kép, egy <b>„🗑 Kép törlése”</b> gomb is megjelenik a feltöltés/csere gomb mellett — egyszerű megerősítő kérdés után törli a képet (a tárból is), és visszaáll „Nincs kép” állapotra, ami a userek felé automatikusan újra megnyitja a javaslási lehetőséget. Ugyanez a gomb komponens-képnél és a sorozat-borítóképnél is elérhető.</p>" },
+        a:"<p>Ha van élő kép, egy <b>„🗑 Kép törlése”</b> gomb is megjelenik a feltöltés/csere gomb mellett — egy megerősítő kérdés után (az app saját ablakában: a piros <b>„Törlöm”</b> gombbal; a <b>Mégse</b>, az Esc vagy a háttérre koppintás nem töröl) törli a képet (a tárból is), és visszaáll „Nincs kép” állapotra, ami a userek felé automatikusan újra megnyitja a javaslási lehetőséget. Ugyanez a gomb komponens-képnél és a sorozat-borítóképnél is elérhető.</p>" },
     ]},
 
     { id:"felhasznalok", title:"Felhasználók kezelése", open:false, items:[

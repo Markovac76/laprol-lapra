@@ -7,7 +7,7 @@
 import { supabase } from "./supabase.js";
 import { state, S, esc, pad, opts, capFirst, slugify, sortEgyebLast, typeLabel } from "./state.js";
 import { openModal, closeModal, err, friendlyError, sheet, guarded } from "./modal.js";
-import { showMessage } from "./dialog.js";
+import { showMessage, askConfirm } from "./dialog.js";
 import { reload } from "./data.js";
 import { typeFieldsHtml, readTypeFields, wireTypeFields } from "./draft-items.js";
 import { typeDef, defaultIdType, buildLiveIssuePayload } from "./type-defs.js";
@@ -89,7 +89,7 @@ export function itemForm(){
             <div class="field"><label>Darabszám (db)</label><input id="cdb-${inst.key}" type="number" min="0" value="${esc(inst.db??1)}"></div>
             <div class="field"><label>Jegyzet</label><input id="cn-${inst.key}" value="${esc(inst.jegyzet||"")}"></div>
           </div>
-          ${list.length>1?`<button type="button" class="btn ghost" data-removeinst="${inst.key}">Ez a példány törlése</button>`:""}
+          ${list.length>1?`<button type="button" class="btn danger" data-removeinst="${inst.key}">Ez a példány törlése</button>`:""}
         </div>`;
       }).join("");
       return blocks + `<button type="button" class="btn ghost" data-addinst="${esc(t)}">+ ${list.length?"Még egy ":""}${esc(typeLabel(t))} hozzáadása</button>`;
@@ -233,7 +233,7 @@ export function listsForm(){
     b.onclick=guarded(async ()=>{
       const t=b.dataset.del, e=b.dataset.e;
       const cur=(state.LISTS[t]||[]).find(o=>o.ertek===e); if(!cur) return;
-      if(!confirm(`Törlöd a(z) „${cur.nev}” értéket a(z) „${LIST_TITLES[t]}” listából?\n\nCsak akkor törlődik, ha sehol nincs használatban. Később újra felveheted.`)) return;
+      if(!(await askConfirm(`Törlöd a(z) „${cur.nev}” értéket a(z) „${LIST_TITLES[t]}” listából?\n\nCsak akkor törlődik, ha sehol nincs használatban (ha igen, az üzenet megmondja, hol). Később újra felveheted.`, { title:"Törlöd az értéket?", okLabel:"Törlöm", danger:true }))) return;
       try{
         const {error}=await supabase.rpc("delete_list_value",{p_tipus:t, p_ertek:e});
         if(error) throw error;

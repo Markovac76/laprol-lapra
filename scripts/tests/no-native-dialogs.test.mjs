@@ -52,11 +52,21 @@ assert.equal(/\balert\s*\(/.test(codeOnly("const t = `${ alert('x') }`;")), true
 assert.equal(/\balert\s*\(/.test(codeOnly(`if(x){ alert("hiba"); }`)), true, "a valódi hívás számít");
 assert.equal(/\balert\s*\(/.test(codeOnly(`const r = /["']/; alert("x");`)), true, "a regex-literál után a hívás számít");
 
-const files = readdirSync(JS).filter(f => f.endsWith(".js") && f !== "dialog.js").sort();
-const hits = [];
-for (const f of files){
-  const lines = codeOnly(readFileSync(join(JS, f), "utf8")).split("\n");
-  lines.forEach((l, i) => { if (/(^|[^.\w$])alert\s*\(|window\.alert\s*\(/.test(l)) hits.push(`${f}:${i + 1}`); });
+// D kör / 2: a natív confirm( is tiltott; az askConfirm( nem találat (a szó-határ miatt).
+const NATIVE = /(^|[^.\w$])(alert|confirm)\s*\(|window\.(alert|confirm)\s*\(/;
+assert.equal(NATIVE.test(codeOnly(`if(!(await askConfirm("x"))) return;`)), false, "az askConfirm( nem találat");
+assert.equal(NATIVE.test(codeOnly(`if(!confirm("x")) return;`)), true, "a natív confirm( találat");
+assert.equal(NATIVE.test(codeOnly(`// confirm("x")\nconst s = "confirm(";`)), false, "megjegyzésben és szövegben a confirm( nem számít");
+
+export function nativeDialogHits(files, read){
+  const hits = [];
+  for (const f of files){
+    codeOnly(read(f)).split("\n").forEach((l, i) => { const m = l.match(new RegExp(NATIVE.source, "g")); if (m) m.forEach(x => hits.push(`${f}:${i + 1} ${x.replace(/^[^a-z]*/i, "").replace(/\s*\($/, "")}`)); });
+  }
+  return hits;
 }
-assert.deepEqual(hits, [], "natív alert( hívás maradt: " + hits.join(", "));
-console.log(`OK — a js/ ${files.length} fájljában (a dialog.js kivételével) nincs natív alert( hívás`);
+
+const files = readdirSync(JS).filter(f => f.endsWith(".js") && f !== "dialog.js").sort();
+const hits = nativeDialogHits(files, f => readFileSync(join(JS, f), "utf8"));
+assert.deepEqual(hits, [], "natív alert( / confirm( hívás maradt: " + hits.join(", "));
+console.log(`OK — a js/ ${files.length} fájljában (a dialog.js kivételével) nincs natív alert( és confirm( hívás`);

@@ -17,7 +17,7 @@ import { showIssueChangePopup } from "./changes.js";
 import { uploadLiveImage, proposeImage, approveProposal, rejectProposal, setUploadEnabled, deleteLiveImage } from "./component-images.js";
 import { reload } from "./data.js";
 import { err } from "./modal.js";
-import { showMessage } from "./dialog.js";
+import { showMessage, askConfirm } from "./dialog.js";
 import { showApp, loginWithPassword, registerWithPassword, logout, initSession } from "./auth.js";
 import { checkVersion, onStale } from "./version.js";
 import { openImageZoom } from "./image-zoom.js";
@@ -74,7 +74,7 @@ async function handleImageAction(e){
   }
   const idel=e.target.closest("[data-imgdelete]");
   if(idel){
-    if(!confirm("Biztosan törlöd a képet?")) return true;
+    if(!(await askConfirm("Biztosan törlöd a képet?\n\nA kép a tárhelyről is törlődik, az elem „Nincs kép” állapotba kerül. Ez nem vonható vissza (új kép feltölthető).", { title:"Törlöd a képet?", okLabel:"Törlöm", danger:true }))) return true;
     await runImgAction(idel, async ()=>{
       try{ await deleteLiveImage(idel.dataset.enttype||"component", idel.dataset.imgdelete); await reload(); }catch(e2){ err(e2); }
     });
@@ -231,9 +231,9 @@ window.addEventListener("focus", dayRolled);
    (js/version.js; a törzsadat-írásokat a Supabase-kliens kapuja tiltja az újratöltésig.
    A sáv soha nem tölt újra magától; nyitott ablaknál az Újratöltés előbb rákérdez.) */
 onStale(()=>{ document.getElementById("verbar").hidden=false; syncHeadHeight(); });
-document.getElementById("verReload").addEventListener("click",()=>{
+document.getElementById("verReload").addEventListener("click",async ()=>{
   const nyitva=document.getElementById("modal").classList.contains("open");
-  if(nyitva && !confirm("Nyitva van egy ablak. Amit beírtál és még nem mentettél, az újratöltéskor elvész. Újratöltöd?")) return;
+  if(nyitva && !(await askConfirm("Nyitva van egy ablak. Amit beírtál és még nem mentettél, az újratöltéskor elvész. Újratöltöd?", { title:"Újratöltöd az oldalt?", okLabel:"Újratöltöm" }))) return;
   location.reload();
 });
 checkVersion(true);                                                              // betöltéskor

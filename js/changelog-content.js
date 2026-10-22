@@ -6,6 +6,9 @@
    Legújabb elöl. Szándékosan elválasztva a UI-tól (changelog.js).
    ============================================================ */
 export const CHANGELOG = [
+  { date:"2026-10-22",
+    text:"Az app mostantól a saját ablakában jelzi a hibákat, és abban kérdezi meg, hogy biztosan törölsz-e valamit (a böngésző szürke ablakai helyett). A törlés gombok mindenhol egységesen pirosak, a kérdés pedig kimondja, mi fog történni. Esc-re vagy a háttérre koppintva az ablak bezárul (a kérdés ilyenkor „Mégse”)."
+  },
   { date:"2026-10-20",
     text:"Új szűrő: a Jelöletlen azokat a már megjelent Számokat mutatja, amelyeknek legalább egy eleme még nincs megjelölve; a Nem kell és a Várható között találod. Új a képnagyítás is: a lenyitott sorban a nagy képre koppintva teljes képernyőn látod, a ✕-szel vagy a képre koppintva zárod be."
   },

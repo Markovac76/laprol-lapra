@@ -23,4 +23,20 @@ assert.deepEqual(log, ["nyit:A", "zár:A", "nyit:B", "zár:B", "nyit:C", "zár:C
 const q2 = makeSerialQueue(item => item === "rossz" ? Promise.reject(new Error("x")) : Promise.resolve(item));
 await assert.rejects(q2("rossz"));
 assert.equal(await q2("jó"), "jó", "egy hibás elem után a következő is megjelenik");
-console.log("OK — a soros üzenetablak-sor tesztjei átmentek (4 eset)");
+// D kör / 2: üzenet és megerősítő kérdés vegyesen, közös sorban. A kérdés megvárja a nyitott
+// hibaablakot (nem csúszik rá), az eredménye (igen / nem) a saját Promise-án jön vissza.
+const log2 = []; const rel2 = [];
+const run2 = item => new Promise(res => { log2.push("nyit:" + item.kind); rel2.push(v => { log2.push("zár:" + item.kind); res(item.kind === "confirm" ? v === true : undefined); }); });
+const q3 = makeSerialQueue(run2);
+const m1 = q3({ kind: "message" }), c1 = q3({ kind: "confirm" }), m2 = q3({ kind: "message" }), c2 = q3({ kind: "confirm" });
+await Promise.resolve(); await Promise.resolve();
+assert.deepEqual(log2, ["nyit:message"], "a kérdés nem nyílik meg, amíg a hibaablak nyitva van");
+rel2.shift()(); assert.equal(await m1, undefined);
+await Promise.resolve(); await Promise.resolve();
+assert.deepEqual(log2, ["nyit:message", "zár:message", "nyit:confirm"], "a hibaablak bezárása után jön a kérdés");
+rel2.shift()(true); assert.equal(await c1, true, "OK → igaz");
+await Promise.resolve(); await Promise.resolve();
+rel2.shift()(); await m2; await Promise.resolve(); await Promise.resolve();
+rel2.shift()(false); assert.equal(await c2, false, "Mégse / Esc / háttér → hamis");
+assert.deepEqual(log2, ["nyit:message", "zár:message", "nyit:confirm", "zár:confirm", "nyit:message", "zár:message", "nyit:confirm", "zár:confirm"], "vegyes sorrend: a beérkezés sorrendje");
+console.log("OK — a soros üzenetablak-sor tesztjei átmentek (5 eset, üzenet és kérdés vegyesen is)");

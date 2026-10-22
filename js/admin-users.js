@@ -11,6 +11,7 @@
 import { supabase, fetchAllRows } from "./supabase.js";
 import { state, esc } from "./state.js";
 import { openModal, err, sheet, guarded } from "./modal.js";
+import { askConfirm } from "./dialog.js";
 import { isOwnerRole } from "./permissions.js";
 
 function roleBadge(role,status){
@@ -63,13 +64,13 @@ async function handleAction(act, id, members){
   const m=members.find(x=>x.user_id===id); if(!m) return;
   const name=m.display_name || (id.slice(0,8)+"…");
   try{
-    if(act==="disable"){ if(!confirm(`Letiltod ezt a fiókot: ${name}? (visszafordítható)`)) return;
+    if(act==="disable"){ if(!(await askConfirm(`Letiltod ezt a fiókot: ${name}? (visszafordítható)\n\nA fiók nem tud belépni, amíg vissza nem engeded; az adatai megmaradnak.`, { title:"Letiltod a felhasználót?", okLabel:"Letiltom" }))) return;
       const {error}=await supabase.from("members").update({status:"disabled"}).eq("user_id",id); if(error) throw error; }
     else if(act==="enable"){
       const {error}=await supabase.from("members").update({status:"active"}).eq("user_id",id); if(error) throw error; }
-    else if(act==="promote"){ if(!confirm(`${name} kap admin jogot?`)) return;
+    else if(act==="promote"){ if(!(await askConfirm(`${name} kap admin jogot?\n\nKarbantarthatja a sorozatokat (munkaanyagok, publikálás, képek, Listák), és kezelheti a sima felhasználókat. A jog visszavonható.`, { title:"Admin jogot adsz?", okLabel:"Admin jogot adok" }))) return;
       const {error}=await supabase.from("members").update({role:"admin"}).eq("user_id",id); if(error) throw error; }
-    else if(act==="demote"){ if(!confirm(`${name} admin jogát visszavonod?`)) return;
+    else if(act==="demote"){ if(!(await askConfirm(`${name} admin jogát visszavonod?\n\nEzután sima felhasználó lesz: a saját jelöléseit kezelheti, karbantartani nem tud. A jog később újra megadható.`, { title:"Visszavonod az admin jogot?", okLabel:"Visszavonom" }))) return;
       const {error}=await supabase.from("members").update({role:"user"}).eq("user_id",id); if(error) throw error; }
     await usersForm();   // frissítés a szerverről
   }catch(e){ err(e); }

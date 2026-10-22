@@ -9,7 +9,7 @@
 import { supabase, fetchAllRows } from "./supabase.js";
 import { state, esc, listName, opts, fmtDate, DISPLAY_MAX, PAL12, PAL_FAMILIES } from "./state.js";
 import { openModal, err, sheet, guarded } from "./modal.js";
-import { showMessage } from "./dialog.js";
+import { showMessage, askConfirm } from "./dialog.js";
 import { reload } from "./data.js";
 import { isStaff, isOwnerRole } from "./permissions.js";
 import { fetchDraftItems, renderDraftItemsList, draftItemForm } from "./draft-items.js";
@@ -219,7 +219,7 @@ async function startEdit(s){
 }
 
 async function unpublish(s){
-  if(!confirm(`Publikálatlanná teszed a(z) „${s.megnevezes}” sorozatot? A már kiválasztó felhasználók megtartják a hozzáférést, újak nem választhatják.`)) return;
+  if(!(await askConfirm(`Publikálatlanná teszed a(z) „${s.megnevezes}” sorozatot? A már kiválasztó felhasználók megtartják a hozzáférést, újak nem választhatják.\n\nA sorozat adatai megmaradnak, és később újra publikálható.`, { title:"Publikálatlanná teszed a sorozatot?", okLabel:"Publikálatlanná teszem" }))) return;
   try{
     const { error } = await supabase.from("series").update({lifecycle:"unpublished"}).eq("id",s.id);
     if(error) throw error;
@@ -241,7 +241,7 @@ async function republish(s){
 // enélkül a finalizeDelete azonnal töröl). 14 napos türelmi idő; a DB-szintű
 // védőháló ezalatt blokkolja a szerkesztés-indítást és az újra-kiválasztást.
 async function startDelete(s){
-  if(!confirm(`Elindítod a(z) „${s.megnevezes}” törlési folyamatát? 14 napos türelmi idő indul, ami alatt az érintett felhasználók minden belépéskor jelzést kapnak, és a sorozat nem szerkeszthető / nem választható be újra. A türelmi idő letelte után véglegesen törölhető.`)) return;
+  if(!(await askConfirm(`Elindítod a(z) „${s.megnevezes}” törlési folyamatát? 14 napos türelmi idő indul, ami alatt az érintett felhasználók minden belépéskor jelzést kapnak, és a sorozat nem szerkeszthető / nem választható be újra. A türelmi idő letelte után véglegesen törölhető.`, { title:"Elindítod a sorozat törlését?", okLabel:"Törlés indítása", danger:true }))) return;
   try{
     const { error } = await supabase.rpc("start_force_delete", { p_series_id: s.id });
     if(error) throw error;
@@ -253,7 +253,7 @@ async function startDelete(s){
 // sorozat nevének pontos begépelése kötelező (a szerver is újra ellenőrzi).
 async function finalizeDelete(s){
   if(!s.force_delete_requested_at){
-    if(!confirm(`Biztosan véglegesen törlöd a(z) „${s.megnevezes}” sorozatot? Nincs rajta aktív kiválasztás — ez nem vonható vissza.`)) return;
+    if(!(await askConfirm(`Biztosan véglegesen törlöd a(z) „${s.megnevezes}” sorozatot? Nincs rajta aktív kiválasztás — ez nem vonható vissza.\n\nA sorozat a Számaival, elemeivel és a hozzá tartozó, még meglévő felhasználói adatokkal együtt törlődik.`, { title:"Véglegesen törlöd a sorozatot?", okLabel:"Véglegesen törlöm", danger:true }))) return;
     await doFinalize(s.id, null);
     return;
   }
@@ -337,7 +337,7 @@ async function release(d){
 }
 
 async function deleteDraft(d){
-  if(!confirm(`Biztosan törlöd ezt a munkaanyagot: „${d.megnevezes}”?`)) return;
+  if(!(await askConfirm(`Biztosan törlöd ezt a munkaanyagot: „${d.megnevezes}”?\n\nA munkaanyag minden, még nem publikált módosítása elvész; az élő sorozat nem változik. Nem vonható vissza.`, { title:"Törlöd a munkaanyagot?", okLabel:"Törlöm", danger:true }))) return;
   try{
     const { error } = await supabase.from("draft_series").delete().eq("id", d.id);
     if(error) throw error;
@@ -408,7 +408,7 @@ function showPublishError(d, e){
 // az élő sorozat érintetlen; a jogosultságot és a tiltásokat (force-törlés
 // türelmi ideje, közben futó publikálás) az SQL-függvény kényszeríti ki.
 async function returnToEdit(d, skipConfirm){
-  if(!skipConfirm && !confirm(`Visszaadod szerkesztésre a(z) „${d.megnevezes}” munkaanyagot? A tartalma érintetlen marad, az élő sorozat nem változik, értesítés nincs.`)) return;
+  if(!skipConfirm && !(await askConfirm(`Visszaadod szerkesztésre a(z) „${d.megnevezes}” munkaanyagot? A tartalma érintetlen marad, az élő sorozat nem változik, értesítés nincs.`, { title:"Visszaadod szerkesztésre?", okLabel:"Visszaadom" }))) return;
   try{
     const { error } = await supabase.rpc("return_draft_to_edit", { p_draft_id: d.id });
     if(error) throw error;
